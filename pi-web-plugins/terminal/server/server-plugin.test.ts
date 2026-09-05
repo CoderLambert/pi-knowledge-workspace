@@ -67,7 +67,7 @@ describe.skipIf(process.platform === "win32")("Terminal paired server entry", ()
       command: "exit 9",
       failureNotice: {
         message: "Workspace removal failed. See terminal output.",
-        context: { projectId: "project-1", targetWorkspaceId: "target-workspace" },
+        context: { targetWorkspaceId: "target-workspace" },
       },
     });
 
@@ -75,9 +75,9 @@ describe.skipIf(process.platform === "win32")("Terminal paired server entry", ()
       expect(records).toEqual([{
         severity: "error",
         message: "Workspace removal failed. See terminal output.",
+        scope: { projectId: "project-1" },
         context: {
           commandRunId: run.id,
-          projectId: "project-1",
           targetWorkspaceId: "target-workspace",
         },
       }]);

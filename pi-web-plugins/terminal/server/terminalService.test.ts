@@ -242,7 +242,7 @@ describe.skipIf(process.platform === "win32")("TerminalService command runs", ()
         command: "exit 7",
         failureNotice: {
           message: "Workspace removal failed. See terminal output.",
-          context: { projectId: "p1", targetWorkspaceId: "target-workspace" },
+          context: { targetWorkspaceId: "target-workspace" },
         },
       });
 
@@ -253,9 +253,9 @@ describe.skipIf(process.platform === "win32")("TerminalService command runs", ()
       expect(records).toEqual([{
         severity: "error",
         message: "Workspace removal failed. See terminal output.",
+        scope: { projectId: "p1" },
         context: {
           commandRunId: run.id,
-          projectId: "p1",
           targetWorkspaceId: "target-workspace",
         },
       }]);
@@ -277,7 +277,7 @@ describe.skipIf(process.platform === "win32")("TerminalService command runs", ()
         command: "true",
         failureNotice: {
           message: "Workspace removal failed. See terminal output.",
-          context: { projectId: "p1", targetWorkspaceId: "target-workspace" },
+          context: { targetWorkspaceId: "target-workspace" },
         },
       });
 

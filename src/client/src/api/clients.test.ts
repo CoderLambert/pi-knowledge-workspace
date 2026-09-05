@@ -48,11 +48,23 @@ afterEach(() => {
 });
 
 describe("machine-scoped runtime API", () => {
-  it("reads and dismisses server notices through the selected machine route", async () => {
-    const snapshot = { daemonInstanceId: "daemon-a", revision: 1, notices: [] };
-    const fetchMock = stubSequenceFetch([jsonResponse(snapshot), jsonResponse({ ...snapshot, revision: 2 })]);
+  it("reads scoped notices and dismisses them through the selected machine route", async () => {
+    const snapshot = {
+      daemonInstanceId: "daemon-a",
+      revision: 1,
+      notices: [{
+        id: "notice-1",
+        severity: "warning",
+        message: "Remote warning",
+        createdAt: "2026-08-01T00:00:00.000Z",
+        source: "plugin:remote",
+        scope: { projectId: "project-1" },
+        context: { projectId: "metadata-only" },
+      }],
+    };
+    const fetchMock = stubSequenceFetch([jsonResponse(snapshot), jsonResponse({ ...snapshot, revision: 2, notices: [] })]);
 
-    await noticesApi.snapshot("remote a");
+    await expect(noticesApi.snapshot("remote a")).resolves.toEqual(snapshot);
     await noticesApi.dismiss("remote a", "daemon-a", "notice-1");
 
     expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([

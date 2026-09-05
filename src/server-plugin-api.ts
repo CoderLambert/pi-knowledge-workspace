@@ -46,16 +46,32 @@ export interface ServerPluginActivationContext {
 
 export type ServerPluginNoticeSeverity = "info" | "warning" | "error";
 
+/** Browser-visibility selectors, matched only against the selected machine context; each id is at most 512 characters. */
+export interface ServerPluginNoticeScope {
+  readonly projectId?: string;
+  readonly workspaceId?: string;
+  readonly sessionId?: string;
+}
+
 /** Plugin-authored notice data. The host supplies the immutable source identity. */
 export interface ServerPluginNoticeInput {
   readonly severity: ServerPluginNoticeSeverity;
+  /** Non-empty human-readable text, limited to 4 KiB of UTF-8. */
   readonly message: string;
+  /** Omit for a global notice; a supplied scope must contain at least one id. */
+  readonly scope?: ServerPluginNoticeScope;
+  /** Detached metadata; keys never affect visibility. Limited to 16 KiB and JSON depth 32. */
   readonly context?: JsonObject;
 }
 
-/** Optional versioned capability for recording host-owned server notices. */
+/**
+ * Optional versioned capability for recording host-owned server notices.
+ * It is live during activation, start, and the active plugin lifetime, then is
+ * revoked before failed-start rollback or ordinary stop cleanup begins.
+ */
 export interface ServerPluginNoticeReporterV1 {
   readonly version: 1;
+  /** Throws after reporter revocation or when the complete input is invalid. */
   readonly record: (input: ServerPluginNoticeInput) => void;
 }
 

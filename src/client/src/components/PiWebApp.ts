@@ -2109,8 +2109,8 @@ export class PiWebApp extends LitElement {
       const context = notice.context ?? {};
       return notice.source === workspaceDeleteOperation
         && notice.message === expectedNoticeMessage
-        && context["projectId"] === workspace.projectId
-        && context["workspaceId"] === workspace.id;
+        && notice.scope?.projectId === workspace.projectId
+        && context["targetWorkspaceId"] === workspace.id;
     });
     if (!hasNotice()) await this.serverNotices.refresh(machineId);
     if (!hasNotice()) this.browserErrors.report(scope, `Failed to start workspace removal: ${message}`);

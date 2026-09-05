@@ -23,6 +23,14 @@ import type {
 } from "../../server-plugin-api.js";
 import type { PiWebPluginScope } from "../../shared/apiTypes.js";
 import {
+  parseServerNoticeScope,
+  SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES,
+  SERVER_PLUGIN_NOTICE_CONTEXT_MAX_DEPTH,
+  SERVER_PLUGIN_NOTICE_MESSAGE_MAX_BYTES,
+  SERVER_PLUGIN_NOTICE_SOURCE_PREFIX,
+  serverNoticeUtf8ByteLength,
+} from "../../shared/serverNoticeContract.js";
+import {
   REQUIRED_TERMINAL_PLUGIN_ID,
   REQUIRED_TERMINAL_RECOVERY_GUIDANCE,
 } from "../../shared/requiredTerminalPlugin.js";
@@ -119,13 +127,17 @@ interface ActiveServerPlugin {
   entry: PiWebPluginCatalogEntry;
   plugin: PiWebServerPlugin;
   activation: InternalServerPluginActivation;
+  noticeReporter?: ScopedNoticeReporter;
   providerContribution?: ServerPluginProviderContribution;
   pairedBackendContribution?: ServerPluginPairedBackendContribution;
 }
 
+interface ScopedNoticeReporter {
+  readonly reporter: ServerPluginNoticeReporterV1;
+  revoke(): void;
+}
+
 const DEFAULT_LIFECYCLE_TIMEOUT_MS = 10_000;
-/** Reserved for host-derived plugin attribution; core notice sources stay outside this namespace. */
-const SERVER_PLUGIN_NOTICE_SOURCE_PREFIX = "plugin:";
 
 /**
  * Resolves exactly one desired catalog snapshot and activates its server
@@ -249,6 +261,8 @@ export class ServerPluginRuntime {
     this.stopped = true;
     const activePlugins = [...this.activePlugins].reverse();
     this.activePlugins = [];
+    // Revoke every reporter before the first plugin cleanup callback can run.
+    for (const active of activePlugins) active.noticeReporter?.revoke();
     for (const active of activePlugins) {
       const stop = active.activation.stop?.bind(active.activation);
       if (stop === undefined) continue;
@@ -299,6 +313,7 @@ export class ServerPluginRuntime {
     let phase: ServerPluginLifecyclePhase = "validate";
     let plugin: PiWebServerPlugin | undefined;
     let rollbackStop: ((signal: AbortSignal) => Promise<void>) | undefined;
+    let noticeReporter: ScopedNoticeReporter | undefined;
     try {
       const settings = cloneJsonObject(entry.settings, `settings for server plugin ${entry.id}`);
       phase = "import";
@@ -309,14 +324,14 @@ export class ServerPluginRuntime {
       plugin = loadedPlugin;
       phase = "activate";
       const scopedLogger = createScopedLogger(entry.id, this.logger);
-      const notices = createScopedNoticeReporter(entry.id, this.noticeSink);
+      noticeReporter = createScopedNoticeReporter(entry.id, this.noticeSink);
       const activationValue = await runBounded(entry.id, phase, this.lifecycleTimeoutMs, (signal) => loadedPlugin.activate(Object.freeze({
         apiVersion: 1,
         pluginId: entry.id,
         packageRoot: entry.packageRoot,
         logger: scopedLogger,
         settings,
-        ...(notices === undefined ? {} : { notices }),
+        ...(noticeReporter === undefined ? {} : { notices: noticeReporter.reporter }),
         execFile: this.execFile,
         signal,
       })));
@@ -358,6 +373,7 @@ export class ServerPluginRuntime {
         entry,
         plugin: loadedPlugin,
         activation: loadedActivation,
+        ...(noticeReporter === undefined ? {} : { noticeReporter }),
         ...(providerContribution === undefined ? {} : { providerContribution }),
         ...(pairedBackendContribution === undefined ? {} : { pairedBackendContribution }),
       }));
@@ -369,6 +385,8 @@ export class ServerPluginRuntime {
       }));
       this.logger.info({ pluginId: entry.id, pluginName: loadedPlugin.name }, "server plugin activated");
     } catch (error) {
+      // A failed entry loses publication authority before rollback cleanup.
+      noticeReporter?.revoke();
       const rollbackError = (phase === "validate" || phase === "start") && rollbackStop !== undefined
         ? await this.rollbackStart(entry.id, rollbackStop)
         : undefined;
@@ -690,21 +708,28 @@ function parseHealth(value: unknown): ServerPluginHealth {
 function createScopedNoticeReporter(
   pluginId: string,
   sink: CreateServerPluginRuntimeOptions["noticeSink"],
-): ServerPluginNoticeReporterV1 | undefined {
+): ScopedNoticeReporter | undefined {
   if (sink === undefined) return undefined;
   const source = `${SERVER_PLUGIN_NOTICE_SOURCE_PREFIX}${pluginId}`;
-  return Object.freeze({
+  let active = true;
+  const reporter: ServerPluginNoticeReporterV1 = Object.freeze({
     version: 1,
     record(input: ServerPluginNoticeInput): void {
+      if (!active) throw new Error(`Server plugin notice reporter for ${pluginId} is no longer active`);
       sink(source, parseServerPluginNoticeInput(input));
     },
+  });
+  return Object.freeze({
+    reporter,
+    revoke(): void { active = false; },
   });
 }
 
 function parseServerPluginNoticeInput(value: unknown): ServerPluginNoticeInput {
   if (!isPlainRecord(value)) throw new Error("Server plugin notice input must be an object");
   if ("source" in value) throw new Error("Server plugin notices cannot set their source");
-  const unsupportedKey = Object.keys(value).find((key) => key !== "severity" && key !== "message" && key !== "context");
+  const unsupportedKey = Object.keys(value)
+    .find((key) => key !== "severity" && key !== "message" && key !== "scope" && key !== "context");
   if (unsupportedKey !== undefined) throw new Error(`Unsupported server plugin notice field: ${unsupportedKey}`);
   const severity = value["severity"];
   if (severity !== "info" && severity !== "warning" && severity !== "error") {
@@ -714,12 +739,23 @@ function parseServerPluginNoticeInput(value: unknown): ServerPluginNoticeInput {
   if (typeof message !== "string" || message.trim() === "") {
     throw new Error("Server plugin notice message must be a non-empty string");
   }
+  if (serverNoticeUtf8ByteLength(message) > SERVER_PLUGIN_NOTICE_MESSAGE_MAX_BYTES) {
+    throw new Error(`Server plugin notice message exceeds the ${String(SERVER_PLUGIN_NOTICE_MESSAGE_MAX_BYTES)} byte limit`);
+  }
+  const scope = value["scope"] === undefined
+    ? undefined
+    : parseServerNoticeScope(value["scope"], "Server plugin notice scope");
   const context = value["context"] === undefined
     ? undefined
-    : cloneJsonObject(value["context"], "server plugin notice context");
+    : cloneJsonObject(value["context"], "server plugin notice context", SERVER_PLUGIN_NOTICE_CONTEXT_MAX_DEPTH);
+  if (context !== undefined
+    && serverNoticeUtf8ByteLength(JSON.stringify(context)) > SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES) {
+    throw new Error(`Server plugin notice context exceeds the ${String(SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES)} byte limit`);
+  }
   return Object.freeze({
     severity,
     message,
+    ...(scope === undefined ? {} : { scope }),
     ...(context === undefined ? {} : { context }),
   });
 }
@@ -763,34 +799,55 @@ async function runBounded<T>(
   }
 }
 
-function cloneJsonObject(value: unknown, label: string): JsonObject {
+function cloneJsonObject(value: unknown, label: string, maxDepth?: number): JsonObject {
   if (!isPlainRecord(value)) throw new IncompatibleServerPluginError(`${label} must be a JSON object`);
-  return cloneJsonRecord(value, new Set<object>(), label);
+  return cloneJsonRecord(value, new Set<object>(), label, 0, maxDepth);
 }
 
-function cloneJsonRecord(value: Record<string, unknown>, ancestors: Set<object>, label: string): JsonObject {
+function cloneJsonRecord(
+  value: Record<string, unknown>,
+  ancestors: Set<object>,
+  label: string,
+  depth: number,
+  maxDepth: number | undefined,
+): JsonObject {
+  requireJsonDepth(depth, maxDepth, label);
   if (ancestors.has(value)) throw new IncompatibleServerPluginError(`${label} must not contain cycles`);
   ancestors.add(value);
   const output: Record<string, JsonValue> = {};
   for (const [key, child] of Object.entries(value)) {
-    defineJsonProperty(output, key, cloneJsonValue(child, ancestors, label));
+    defineJsonProperty(output, key, cloneJsonValue(child, ancestors, label, depth + 1, maxDepth));
   }
   ancestors.delete(value);
   return Object.freeze(output);
 }
 
-function cloneJsonValue(value: unknown, ancestors: Set<object>, label: string): JsonValue {
+function cloneJsonValue(
+  value: unknown,
+  ancestors: Set<object>,
+  label: string,
+  depth: number,
+  maxDepth: number | undefined,
+): JsonValue {
+  requireJsonDepth(depth, maxDepth, label);
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;
   if (typeof value === "number") {
     if (!Number.isFinite(value)) throw new IncompatibleServerPluginError(`${label} must contain only finite JSON numbers`);
     return value;
   }
-  if (Array.isArray(value)) return cloneJsonArray(value, ancestors, label);
-  if (isPlainRecord(value)) return cloneJsonRecord(value, ancestors, label);
+  if (Array.isArray(value)) return cloneJsonArray(value, ancestors, label, depth, maxDepth);
+  if (isPlainRecord(value)) return cloneJsonRecord(value, ancestors, label, depth, maxDepth);
   throw new IncompatibleServerPluginError(`${label} must contain only JSON values`);
 }
 
-function cloneJsonArray(value: unknown[], ancestors: Set<object>, label: string): readonly JsonValue[] {
+function cloneJsonArray(
+  value: unknown[],
+  ancestors: Set<object>,
+  label: string,
+  depth: number,
+  maxDepth: number | undefined,
+): readonly JsonValue[] {
+  requireJsonDepth(depth, maxDepth, label);
   if (ancestors.has(value)) throw new IncompatibleServerPluginError(`${label} must not contain cycles`);
   ancestors.add(value);
   try {
@@ -801,11 +858,17 @@ function cloneJsonArray(value: unknown[], ancestors: Set<object>, label: string)
       if (!Object.hasOwn(value, index)) {
         throw new IncompatibleServerPluginError(`${label} must not contain sparse arrays`);
       }
-      output[index] = cloneJsonValue(value[index], ancestors, label);
+      output[index] = cloneJsonValue(value[index], ancestors, label, depth + 1, maxDepth);
     }
     return Object.freeze(output);
   } finally {
     ancestors.delete(value);
+  }
+}
+
+function requireJsonDepth(depth: number, maxDepth: number | undefined, label: string): void {
+  if (maxDepth !== undefined && depth > maxDepth) {
+    throw new IncompatibleServerPluginError(`${label} exceeds the maximum JSON depth of ${String(maxDepth)}`);
   }
 }
 

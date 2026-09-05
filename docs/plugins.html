@@ -340,13 +340,16 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
                 <code>plugin-api/unstable</code> path and private <code>dist/**</code> deep imports are not contracts.
               </p>
               <p>
-                A server activation may feature-detect <code>context.notices?.version === 1</code> and record an
-                <code>info</code>, <code>warning</code>, or <code>error</code> notice with a non-empty message and
-                optional JSON context. PI WEB validates and clones the input and derives the host-owned
-                <code>plugin:&lt;plugin-id&gt;</code> source from the catalog entry, keeping plugin attribution separate
-                from core-owned notice sources. PI WEB retains ownership of publication, browser scoping, and
-                dismissal. The reporter cannot choose a source or access notice storage, routes, events, snapshots,
-                or dismissal. Existing server API v1 entries may ignore the optional capability.
+                A server activation may feature-detect <code>context.notices?.version === 1</code> and record a bounded
+                <code>info</code>, <code>warning</code>, or <code>error</code> notice. Explicit
+                <code>scope</code> ids alone control global/project/workspace/session visibility on the selected
+                machine; identically named keys in detached JSON <code>context</code> are metadata only. The reporter
+                is live through activation, start, and the active plugin lifetime, then is revoked before rollback or
+                stop cleanup. PI WEB validates each complete record atomically, derives its host-owned
+                <code>plugin:&lt;plugin-id&gt;</code> source, bounds per-plugin and global plugin retention without evicting
+                core notices, and owns publication and dismissal. Current notices have no dedupe/upsert behavior and
+                remain only for the session-daemon lifetime. See the <a href="plugins.md#server-notice-reporter">full
+                notice limits and lifecycle contract</a>.
               </p>
               <p>
                 Browser and server module paths must use canonical package-relative form; empty or <code>.</code>

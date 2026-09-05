@@ -436,13 +436,23 @@ export interface SessionRef {
 
 export type ServerNoticeSeverity = "info" | "warning" | "error";
 
-/** One independent server-created application event retained until dismissal. */
+/** Browser-visibility selectors for one server notice. */
+export interface ServerNoticeScope {
+  projectId?: string;
+  workspaceId?: string;
+  sessionId?: string;
+}
+
+/** One independent server-created event retained until dismissal, eligible plugin eviction, or daemon end. */
 export interface ServerNotice {
   id: string;
   severity: ServerNoticeSeverity;
   message: string;
   createdAt: string;
   source?: string;
+  /** Omitted for global visibility. */
+  scope?: ServerNoticeScope;
+  /** Detached diagnostic metadata that never controls visibility. */
   context?: JsonObject;
 }
 

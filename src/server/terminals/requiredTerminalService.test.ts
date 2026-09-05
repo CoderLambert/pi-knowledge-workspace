@@ -31,7 +31,7 @@ describe("required Terminal server composition port", () => {
       command: "true",
       failureNotice: {
         message: "Workspace removal failed. See terminal output.",
-        context: { projectId: "project-1", targetWorkspaceId: "workspace-2" },
+        context: { targetWorkspaceId: "workspace-2" },
       },
     };
     expect(service.runCommand(options)).toEqual(run);

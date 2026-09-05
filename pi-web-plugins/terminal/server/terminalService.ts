@@ -346,10 +346,11 @@ export class TerminalService {
       completedAt: new Date().toISOString(),
     };
     this.commandRuns.set(runId, completed);
-    if (completed.status === "failed" && failureNotice !== undefined) {
+    if (!this.disposed && completed.status === "failed" && failureNotice !== undefined) {
       this.recordNotice?.({
         severity: "error",
         message: failureNotice.message,
+        scope: { projectId: completed.projectId },
         context: { ...failureNotice.context, commandRunId: completed.id },
       });
     }

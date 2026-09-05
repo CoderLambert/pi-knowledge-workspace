@@ -709,19 +709,26 @@ Sessiond resolves the enabled catalog once per process start. It imports, valida
 
 ### Server notice reporter
 
-Feature-detect `context.notices?.version === 1` before reporting a notice. `record()` accepts only a severity (`info`, `warning`, or `error`), a non-empty message, and optional JSON-object context:
+Feature-detect `context.notices?.version === 1` before reporting a notice. `record()` accepts a severity (`info`, `warning`, or `error`), a non-empty message, optional browser-visibility `scope`, and optional detached JSON-object `context` metadata:
 
 ```ts
 if (context.notices?.version === 1) {
   context.notices.record({
     severity: "warning",
     message: "Background synchronization failed",
-    context: { projectId: "project-id" },
+    scope: { projectId: "project-id" },
+    context: { operation: "background-sync" },
   });
 }
 ```
 
-PI WEB validates and clones the input, derives the host-owned `plugin:<plugin-id>` source from the activating catalog entry, and then owns storage, realtime publication, browser scoping, and dismissal. The `plugin:` namespace keeps plugin attribution separate from core-owned notice sources. Plugins cannot provide or override `source`, and the reporter does not expose the notice store, snapshots, routes, event publication, or dismissal. Existing server API v1 plugins may ignore the optional capability and continue to load on hosts that provide it.
+Omitting `scope` makes a notice global. A supplied scope must contain at least one of `projectId`, `workspaceId`, or `sessionId`; every supplied id must be a non-empty string of at most 512 characters. All supplied ids must match the browser's currently presented project/workspace/session for the selected machine. Scope is the only visibility input: identically named keys inside `context`, the plugin id, source, message, and other metadata never change where a notice appears. Context is diagnostic data only.
+
+Messages are limited to 4 KiB of UTF-8. Context is limited to 16 KiB of serialized UTF-8 JSON and a maximum JSON nesting depth of 32. PI WEB validates the complete input before mutation or publication, safely clones and freezes accepted scope/context (including prototype-key, cycle, and sparse-array handling), and throws from `record()` for malformed or oversized input. The host derives the immutable `plugin:<plugin-id>` source from the activating catalog entry. Plugins cannot provide a source, id, publication hook, or dismissal operation, and the reporter exposes no store, route, event, or snapshot access.
+
+The reporter is live during `activate()`, `start()`, and the successfully active plugin lifetime. PI WEB revokes it before failed-start rollback or ordinary `stop()` cleanup begins; later calls throw and cannot record or publish state. Retaining the reporter beyond that lifetime does not extend its authority.
+
+Every accepted call is an independent occurrence; v1 has no deduplication, update, or upsert key. PI WEB retains at most 25 current notices from one plugin source and 100 plugin-authored notices globally, evicting the oldest eligible plugin occurrence when a limit overflows (same-source overflow first). Plugin overflow never evicts a core notice. Current notices otherwise remain in sessiond memory until exact-id dismissal or daemon restart; they are not persisted. Existing server API v1 plugins may ignore the optional capability and continue to load on hosts that provide it.
 
 ### Paired backend contract
 

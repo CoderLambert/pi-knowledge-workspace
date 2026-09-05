@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PiWebServerPlugin, ServerPluginActivation, ServerPluginActivationContext, ServerPluginNoticeInput, ServerPluginNoticeReporterV1, WorkspaceProvider } from "../../server-plugin-api.js";
 import type { PiWebPluginScope } from "../../shared/apiTypes.js";
+import {
+  SERVER_NOTICE_SCOPE_ID_MAX_LENGTH,
+  SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES,
+  SERVER_PLUGIN_NOTICE_CONTEXT_MAX_DEPTH,
+  SERVER_PLUGIN_NOTICE_MESSAGE_MAX_BYTES,
+} from "../../shared/serverNoticeContract.js";
 import { ServerNoticeService } from "../notices/serverNoticeService.js";
 import { ServerNoticeStore } from "../notices/serverNoticeStore.js";
 import type { PiWebPluginCatalogEntry, PiWebPluginCatalogSnapshot } from "../piWebPluginCatalog.js";
@@ -185,7 +191,80 @@ describe("server plugin runtime", () => {
     await runtime.stop();
   });
 
-  it("validates and safely deep-clones notice context", async () => {
+  it("revokes a successful reporter before ordinary stop cleanup", async () => {
+    let reporter: ServerPluginNoticeReporterV1 | undefined;
+    let stopError: unknown;
+    const records: ServerPluginNoticeInput[] = [];
+    const runtime = await createServerPluginRuntime({
+      catalog: { snapshot: () => Promise.resolve(testSnapshot([entry("alpha")])) },
+      importer: () => Promise.resolve({
+        default: plugin("Alpha", (context) => {
+          reporter = context.notices;
+          reporter?.record({ severity: "info", message: "activation" });
+          return {
+            start: () => { reporter?.record({ severity: "info", message: "start" }); },
+            stop: () => {
+              try {
+                reporter?.record({ severity: "info", message: "stop" });
+              } catch (error) {
+                stopError = error;
+              }
+            },
+          };
+        }),
+      }),
+      logger: testLogger(),
+      noticeSink: (_source, input) => { records.push(input); },
+    });
+
+    const noticeReporter = reporter;
+    if (noticeReporter === undefined) throw new Error("Expected notice reporter");
+    noticeReporter.record({ severity: "warning", message: "active" });
+    await runtime.stop();
+
+    expect(stopError).toMatchObject({ message: "Server plugin notice reporter for alpha is no longer active" });
+    expect(() => { noticeReporter.record({ severity: "error", message: "too late" }); })
+      .toThrow("no longer active");
+    expect(records.map(({ message }) => message)).toEqual(["activation", "start", "active"]);
+  });
+
+  it("revokes a failed reporter before startup rollback", async () => {
+    let reporter: ServerPluginNoticeReporterV1 | undefined;
+    let rollbackError: unknown;
+    const noticeSink = vi.fn();
+    const runtime = await createServerPluginRuntime({
+      catalog: { snapshot: () => Promise.resolve(testSnapshot([entry("failed")])) },
+      importer: () => Promise.resolve({
+        default: plugin("Failed", (context) => {
+          reporter = context.notices;
+          return {
+            start: () => { throw new Error("start failed"); },
+            stop: () => {
+              try {
+                reporter?.record({ severity: "error", message: "rollback" });
+              } catch (error) {
+                rollbackError = error;
+              }
+            },
+          };
+        }),
+      }),
+      logger: testLogger(),
+      noticeSink,
+    });
+
+    const noticeReporter = reporter;
+    if (noticeReporter === undefined) throw new Error("Expected notice reporter");
+    expect(runtime.healthRecords()).toEqual([
+      expect.objectContaining({ pluginId: "failed", state: "failed", phase: "start", message: "start failed" }),
+    ]);
+    expect(rollbackError).toMatchObject({ message: "Server plugin notice reporter for failed is no longer active" });
+    expect(() => { noticeReporter.record({ severity: "error", message: "too late" }); })
+      .toThrow("no longer active");
+    expect(noticeSink).not.toHaveBeenCalled();
+  });
+
+  it("validates and safely deep-clones notice scope and context", async () => {
     let reporter: ServerPluginNoticeReporterV1 | undefined;
     const records: { source: string; input: ServerPluginNoticeInput }[] = [];
     const runtime = await createServerPluginRuntime({
@@ -202,8 +281,10 @@ describe("server plugin runtime", () => {
 
     const noticeReporter = reporter;
     if (noticeReporter === undefined) throw new Error("Expected notice reporter");
+    const scope = { projectId: "project-1", workspaceId: "workspace-1" };
     const context = { nested: { labels: ["original"] } };
-    noticeReporter.record({ severity: "warning", message: "Plugin warning", context });
+    noticeReporter.record({ severity: "warning", message: "Plugin warning", scope, context });
+    scope.projectId = "mutated";
     context.nested.labels[0] = "mutated";
 
     const protoContext = { label: "safe" };
@@ -220,9 +301,11 @@ describe("server plugin runtime", () => {
     expect(recorded).toEqual({
       severity: "warning",
       message: "Plugin warning",
+      scope: { projectId: "project-1", workspaceId: "workspace-1" },
       context: { nested: { labels: ["original"] } },
     });
     expect(Object.isFrozen(recorded)).toBe(true);
+    expect(Object.isFrozen(recorded?.scope)).toBe(true);
     expect(Object.isFrozen(recorded?.context)).toBe(true);
     const nested = requireRecord(recorded?.context?.["nested"], "Expected recorded nested notice context");
     const labels = nested["labels"];
@@ -253,6 +336,47 @@ describe("server plugin runtime", () => {
     expect(() => { recordContext(circular); }).toThrow("must not contain cycles");
     expect(records).toHaveLength(2);
 
+    await runtime.stop();
+  });
+
+  it("accepts notice values exactly at the documented size and depth limits", async () => {
+    let reporter: ServerPluginNoticeReporterV1 | undefined;
+    const records: ServerPluginNoticeInput[] = [];
+    const runtime = await createServerPluginRuntime({
+      catalog: { snapshot: () => Promise.resolve(testSnapshot([entry("alpha")])) },
+      importer: () => Promise.resolve({
+        default: plugin("Alpha", (context) => {
+          reporter = context.notices;
+          return {};
+        }),
+      }),
+      logger: testLogger(),
+      noticeSink: (_source, input) => { records.push(input); },
+    });
+
+    const noticeReporter = reporter;
+    if (noticeReporter === undefined) throw new Error("Expected notice reporter");
+    const serializedEmptyContextBytes = JSON.stringify({ value: "" }).length;
+    noticeReporter.record({
+      severity: "info",
+      message: "🙂".repeat(SERVER_PLUGIN_NOTICE_MESSAGE_MAX_BYTES / 4),
+      scope: { sessionId: "s".repeat(SERVER_NOTICE_SCOPE_ID_MAX_LENGTH) },
+      context: { value: "x".repeat(SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES - serializedEmptyContextBytes) },
+    });
+    const maximumDepth: Record<string, unknown> = {};
+    let cursor = maximumDepth;
+    for (let depth = 0; depth < SERVER_PLUGIN_NOTICE_CONTEXT_MAX_DEPTH; depth += 1) {
+      const nested: Record<string, unknown> = {};
+      cursor["nested"] = nested;
+      cursor = nested;
+    }
+    Reflect.apply(noticeReporter.record, noticeReporter, [{
+      severity: "warning",
+      message: "Maximum depth",
+      context: maximumDepth,
+    }]);
+
+    expect(records).toHaveLength(2);
     await runtime.stop();
   });
 
@@ -321,7 +445,7 @@ describe("server plugin runtime", () => {
     await runtime.stop();
   });
 
-  it("rejects malformed or sparse notice arrays before mutating notice state", async () => {
+  it("rejects malformed or oversized notice records before mutating or publishing state", async () => {
     let reporter: ServerPluginNoticeReporterV1 | undefined;
     const publishGlobal = vi.fn();
     const store = new ServerNoticeStore({ daemonInstanceId: "daemon-a", createNoticeId: () => "notice-1" });
@@ -343,6 +467,8 @@ describe("server plugin runtime", () => {
 
     const noticeReporter = reporter;
     if (noticeReporter === undefined) throw new Error("Expected notice reporter");
+    noticeReporter.record({ severity: "info", message: "Existing notice", scope: { projectId: "project-1" } });
+    const baseline = notices.snapshot();
     const bigintArray: unknown[] = [1n];
     const sanitizingMap = vi.fn(() => ["sanitized"]);
     Object.defineProperty(bigintArray, "map", { value: sanitizingMap, configurable: true, writable: true });
@@ -351,27 +477,36 @@ describe("server plugin runtime", () => {
     const sparseArray: unknown[] = [];
     sparseArray.length = 2;
     sparseArray[1] = "present";
-    const invalidCases: { context: unknown; message: string }[] = [
-      { context: { values: bigintArray }, message: "must contain only JSON values" },
-      { context: { values: [() => undefined] }, message: "must contain only JSON values" },
-      { context: { values: circularArray }, message: "must not contain cycles" },
-      { context: { values: sparseArray }, message: "must not contain sparse arrays" },
+    const tooDeep: Record<string, unknown> = {};
+    let cursor = tooDeep;
+    for (let depth = 0; depth <= SERVER_PLUGIN_NOTICE_CONTEXT_MAX_DEPTH; depth += 1) {
+      const nested: Record<string, unknown> = {};
+      cursor["nested"] = nested;
+      cursor = nested;
+    }
+    const invalidCases: { input: unknown; message: string }[] = [
+      { input: { severity: "error", message: "Invalid array", context: { values: bigintArray } }, message: "must contain only JSON values" },
+      { input: { severity: "error", message: "Invalid array", context: { values: [() => undefined] } }, message: "must contain only JSON values" },
+      { input: { severity: "error", message: "Invalid array", context: { values: circularArray } }, message: "must not contain cycles" },
+      { input: { severity: "error", message: "Invalid array", context: { values: sparseArray } }, message: "must not contain sparse arrays" },
+      { input: { severity: "error", message: "🙂".repeat((SERVER_PLUGIN_NOTICE_MESSAGE_MAX_BYTES / 4) + 1) }, message: "message exceeds the 4096 byte limit" },
+      { input: { severity: "error", message: "Oversized context", context: { value: "x".repeat(SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES) } }, message: "context exceeds the 16384 byte limit" },
+      { input: { severity: "error", message: "Deep context", context: tooDeep }, message: "maximum JSON depth of 32" },
+      { input: { severity: "error", message: "Empty scope", scope: {} }, message: "must contain at least one" },
+      { input: { severity: "error", message: "Unknown scope", scope: { projectId: "project-1", tenantId: "tenant-1" } }, message: "Unsupported Server plugin notice scope field" },
+      { input: { severity: "error", message: "Blank scope", scope: { workspaceId: " " } }, message: "workspaceId must be a non-empty string" },
+      { input: { severity: "error", message: "Long scope", scope: { sessionId: "x".repeat(SERVER_NOTICE_SCOPE_ID_MAX_LENGTH + 1) } }, message: "at most 512 characters" },
     ];
 
     for (const invalid of invalidCases) {
-      expect(() => {
-        Reflect.apply(noticeReporter.record, noticeReporter, [{
-          severity: "error",
-          message: "Invalid array",
-          context: invalid.context,
-        }]);
-      }).toThrow(invalid.message);
+      expect(() => { Reflect.apply(noticeReporter.record, noticeReporter, [invalid.input]); })
+        .toThrow(invalid.message);
     }
 
     expect(sanitizingMap).not.toHaveBeenCalled();
-    expect(noticeSink).not.toHaveBeenCalled();
-    expect(publishGlobal).not.toHaveBeenCalled();
-    expect(notices.snapshot()).toEqual({ daemonInstanceId: "daemon-a", revision: 0, notices: [] });
+    expect(noticeSink).toHaveBeenCalledOnce();
+    expect(publishGlobal).toHaveBeenCalledOnce();
+    expect(notices.snapshot()).toEqual(baseline);
 
     await runtime.stop();
   });

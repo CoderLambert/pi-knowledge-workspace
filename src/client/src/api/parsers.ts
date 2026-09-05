@@ -5,6 +5,7 @@ import type { JsonValue, PiPackageInfo, PiPackageInstallableSuggestion, PiPackag
 import { parseKnownPiWebCapabilities } from "../../../shared/capabilities";
 import { parseDeprecatedAgentInputs } from "../../../shared/piWebStatusParsing";
 import { PI_WEB_PLUGIN_RECOVERY_COMMANDS, pluginDisableRecoveryCommand } from "../../../shared/pluginRecoveryCommands";
+import { parseServerNoticeScope } from "../../../shared/serverNoticeContract";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -833,6 +834,7 @@ function parseServerNotice(value: unknown): ServerNotice {
   const createdAt = requireNonEmptyString(record, "createdAt");
   if (!Number.isFinite(Date.parse(createdAt))) throw new Error("Invalid server notice creation time");
   const source = optionalString(record, "source");
+  const scope = record["scope"] === undefined ? undefined : parseServerNoticeScope(record["scope"], "Server notice scope");
   const context = record["context"] === undefined ? undefined : parseJsonObject(record["context"], "server notice context");
   return {
     id: requireNonEmptyString(record, "id"),
@@ -840,6 +842,7 @@ function parseServerNotice(value: unknown): ServerNotice {
     message: requireString(record, "message"),
     createdAt,
     ...optionalField("source", source),
+    ...optionalField("scope", scope),
     ...optionalField("context", context),
   };
 }

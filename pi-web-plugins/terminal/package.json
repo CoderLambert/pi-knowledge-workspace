@@ -5,7 +5,7 @@
   "piWeb": {
     "plugins": [
       {
-        "id": "terminal",
+        "id": "pi-web.terminal",
         "browserRoot": "browser",
         "module": "browser/pi-web-plugin.js",
         "serverModule": "server-plugin.js",

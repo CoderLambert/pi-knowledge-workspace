@@ -57,7 +57,7 @@ describe.skipIf(process.platform === "win32")("Terminal paired server entry", ()
 
   it("reports a private host-composed command failure without exposing the intent on the run", async () => {
     const records: ServerPluginNoticeInput[] = [];
-    const activation = activateTerminalPlugin(activationContext("terminal", (input) => { records.push(input); }));
+    const activation = activateTerminalPlugin(activationContext("pi-web.terminal", (input) => { records.push(input); }));
     const run = activation.requiredTerminalService.runCommand({
       origin: "core",
       projectId: "project-1",
@@ -88,7 +88,7 @@ describe.skipIf(process.platform === "win32")("Terminal paired server entry", ()
 
   it("does not accept a failure-notice intent from the paired browser protocol", async () => {
     const records: ServerPluginNoticeInput[] = [];
-    const activation = activateTerminalPlugin(activationContext("terminal", (input) => { records.push(input); }));
+    const activation = activateTerminalPlugin(activationContext("pi-web.terminal", (input) => { records.push(input); }));
     const backend = activation.pairedBackend;
     if (backend === undefined) throw new Error("Expected Terminal paired backend");
     const runValue = await backendRequest(backend, requestContext("terminal.run", {
@@ -166,8 +166,8 @@ describe.skipIf(process.platform === "win32")("Terminal paired server entry", ()
     }
   });
 
-  it("publishes the required service only for the terminal identity", async () => {
-    const activation = activateTerminalPlugin(activationContext("terminal"));
+  it("publishes the required service only for the pi-web.terminal identity", async () => {
+    const activation = activateTerminalPlugin(activationContext("pi-web.terminal"));
     expect(activation.pairedBackend?.version).toBe(1);
     expect(typeof activation.pairedBackend?.openChannel).toBe("function");
     expect(typeof activation.requiredTerminalService.closeForCwd).toBe("function");
@@ -175,9 +175,9 @@ describe.skipIf(process.platform === "win32")("Terminal paired server entry", ()
     expect(typeof activation.requiredTerminalService.bindActivitySink).toBe("function");
     await activation.stop?.(new AbortController().signal);
 
-    expect(() => activateTerminalPlugin(activationContext("other"))).toThrow("must activate as plugin id terminal");
+    expect(() => activateTerminalPlugin(activationContext("other"))).toThrow("must activate as plugin id pi-web.terminal");
 
-    const withoutNotices = { ...activationContext("terminal") };
+    const withoutNotices = { ...activationContext("pi-web.terminal") };
     Reflect.deleteProperty(withoutNotices, "notices");
     expect(() => activateTerminalPlugin(Object.freeze(withoutNotices)))
       .toThrow("requires server notice reporter version 1");

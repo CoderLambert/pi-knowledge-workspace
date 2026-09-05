@@ -5,8 +5,8 @@ import { TerminalFacade, type RequiredTerminalBrowserFacadeV1 } from "./Terminal
 import { TerminalPanel } from "./TerminalPanel";
 import { TerminalSoftKeys } from "./TerminalSoftKeys";
 
-export const TERMINAL_PANEL_ELEMENT = terminalPanelElementName("terminal");
-export const TERMINAL_SOFT_KEYS_ELEMENT = terminalSoftKeysElementName("terminal");
+export const TERMINAL_PANEL_ELEMENT = terminalPanelElementName("pi-web.terminal");
+export const TERMINAL_SOFT_KEYS_ELEMENT = terminalSoftKeysElementName("pi-web.terminal");
 
 const terminalCustomElementOwnersKey = Symbol.for("pi-web.terminal.custom-element-owners.v1");
 
@@ -27,8 +27,8 @@ export function activateTerminalPlugin(
   runtime = new TerminalBrowserRuntime(),
   facade: RequiredTerminalBrowserFacadeV1 = new TerminalFacade(),
 ): TerminalPluginActivation {
-  if (context.pluginId !== "terminal") {
-    throw new Error(`Terminal browser entry must activate as plugin id terminal, received ${context.pluginId}`);
+  if (context.pluginId !== "pi-web.terminal") {
+    throw new Error(`Terminal browser entry must activate as plugin id pi-web.terminal, received ${context.pluginId}`);
   }
   const panelElement = terminalPanelElementName(context.runtimePluginId);
   const softKeysElement = terminalSoftKeysElementName(context.runtimePluginId);

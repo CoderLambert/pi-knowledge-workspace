@@ -90,7 +90,10 @@ describe("SessionDaemonWorkspaceCatalog", () => {
         name: "Git",
       }],
       health: [{ pluginId: "git", health: { status: "degraded", message: "Git is old", details: { version: 1, nested: ["ok", { ready: true }] } } }],
-      diagnostics: [{ code: "duplicate-id", source: "local", message: "Duplicate PI WEB plugin id: git", pluginId: "git" }],
+      diagnostics: [
+        { code: "duplicate-id", source: "local", message: "Duplicate PI WEB plugin id: git", pluginId: "git" },
+        { code: "reserved-id", source: "npm:@acme/tools", message: "Choose a different id", pluginId: "pi-web.tools" },
+      ],
     })));
     const catalog = new SessionDaemonWorkspaceCatalog({ request });
 
@@ -103,7 +106,10 @@ describe("SessionDaemonWorkspaceCatalog", () => {
       safeStart: "bundled-only",
       records: [{ pluginId: "git", source: "bundled", scope: "bundled", moduleRevision: "sha256:abc", browserRevision: "sha256:browser", settingsRevision: "sha256:settings", machineSpecific: true, backendCapabilityVersion: 1, channelVersion: 1, state: "active", name: "Git" }],
       health: [{ pluginId: "git", health: { status: "degraded", message: "Git is old", details: { version: 1, nested: ["ok", { ready: true }] } } }],
-      diagnostics: [{ code: "duplicate-id", source: "local", message: "Duplicate PI WEB plugin id: git", pluginId: "git" }],
+      diagnostics: [
+        { code: "duplicate-id", source: "local", message: "Duplicate PI WEB plugin id: git", pluginId: "git" },
+        { code: "reserved-id", source: "npm:@acme/tools", message: "Choose a different id", pluginId: "pi-web.tools" },
+      ],
     });
     expect(Object.isFrozen(snapshot)).toBe(true);
     expect(Object.isFrozen(snapshot.records)).toBe(true);

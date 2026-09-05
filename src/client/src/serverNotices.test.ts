@@ -48,7 +48,7 @@ describe("visibleServerNotices", () => {
   it("keeps a Terminal-attributed removal failure visible across its project worktrees", () => {
     const deletionNotice = {
       ...notice("terminal-deletion"),
-      source: "plugin:terminal",
+      source: "plugin:pi-web.terminal",
       context: { commandRunId: "run-1", projectId: "project-a", targetWorkspaceId: "target-worktree" },
     };
 

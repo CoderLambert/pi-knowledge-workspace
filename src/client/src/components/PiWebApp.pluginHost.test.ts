@@ -7,7 +7,7 @@ import { TerminalFacade, type RequiredTerminalBrowserFacadeV1, type RequiredTerm
 import { InMemoryTerminalSelectionMemory } from "../../../../pi-web-plugins/terminal/terminalSelection";
 import type { WorkspaceFilesCapabilityV1, WorkspacePanelContext as PublicWorkspacePanelContext } from "../../../plugin-api";
 import type { Machine, Project, TerminalCommandRun, Workspace } from "../api";
-import { machineScopedPluginId } from "../../../shared/machinePluginIds";
+import { machineScopedBundledPluginId } from "../../../shared/machinePluginIds";
 import { initialAppState } from "../appState";
 import { browserErrorScopeKey, workspaceBrowserErrorScope } from "../browserErrors";
 import type { MachineNavigationSnapshot } from "../controllers/machineNavigationMemory";
@@ -20,7 +20,7 @@ vi.mock("../plugins/external", () => ({ loadExternalPlugins: vi.fn() }));
 
 const project: Project = { id: "project-1", name: "Project", path: "/repo", createdAt: "now" };
 const remoteMachine: Machine = { id: "remote-1", name: "Remote", kind: "remote", createdAt: "now", updatedAt: "now" };
-const TERMINAL_PANEL_ID = "terminal:workspace.terminal";
+const TERMINAL_PANEL_ID = "pi-web.terminal:workspace.terminal";
 
 const workspace: Workspace = {
   id: "workspace-1",
@@ -275,8 +275,8 @@ describe("PiWebApp plugin host", () => {
     const runtime = new TerminalBrowserRuntime(new InMemoryTerminalSelectionMemory());
     const restoredTerminalIds: (string | undefined)[] = [];
     appPluginRegistry(app).register({
-      id: "terminal",
-      sourcePluginId: "terminal",
+      id: "pi-web.terminal",
+      sourcePluginId: "pi-web.terminal",
       machineSpecific: true,
       backendRevision: "local-terminal-r1",
       backendCapabilityVersion: 1,
@@ -316,8 +316,8 @@ describe("PiWebApp plugin host", () => {
     if (!(compositions instanceof Map)) throw new Error("PiWebApp required Terminal composition map was unavailable");
     compositions.set("local", {
       binding: {
-        registrationPluginId: "terminal",
-        sourcePluginId: "terminal",
+        registrationPluginId: "pi-web.terminal",
+        sourcePluginId: "pi-web.terminal",
         backendRevision: "local-terminal-r1",
         backendCapabilityVersion: 1,
         channelVersion: 1,
@@ -330,7 +330,7 @@ describe("PiWebApp plugin host", () => {
     await callAsyncAppMethod(app, "restoreRoute", false);
     expect(restoredTerminalIds).toEqual(["terminal-1"]);
 
-    browser.navigate("http://localhost/app?project=project-1&workspace=workspace-1&tool=terminal%3Aworkspace.terminal&view=terminal%3Aworkspace.terminal&terminal.workspace.terminal--terminal=terminal-2");
+    browser.navigate("http://localhost/app?project=project-1&workspace=workspace-1&tool=pi-web.terminal%3Aworkspace.terminal&view=pi-web.terminal%3Aworkspace.terminal&pi-web.terminal.workspace.terminal--terminal=terminal-2");
     callAppMethod(app, "onPopState");
     await vi.waitFor(() => { expect(restoredTerminalIds).toEqual(["terminal-1", "terminal-2"]); });
   });
@@ -513,8 +513,8 @@ describe("PiWebApp plugin host", () => {
     expect(appState(app)).toMatchObject({
       selectedMachine: { id: machineB.id },
       selectedWorkspace: { id: workspaceB.id },
-      workspaceTool: `${machineScopedPluginId(machineB.id, "terminal")}:workspace.terminal`,
-      mainView: `${machineScopedPluginId(machineB.id, "terminal")}:workspace.terminal`,
+      workspaceTool: `${machineScopedBundledPluginId(machineB.id, "pi-web.terminal")}:workspace.terminal`,
+      mainView: `${machineScopedBundledPluginId(machineB.id, "pi-web.terminal")}:workspace.terminal`,
     });
     expect(window.history.length).toBe(historyLength + 1);
     expect(browser.pushed).toHaveLength(1);
@@ -805,7 +805,7 @@ describe("PiWebApp plugin host", () => {
     vi.mocked(loadExternalPlugins).mockResolvedValue({
       terminalMode: "required",
       registrations: [{
-        id: "terminal",
+        id: "pi-web.terminal",
         machineSpecific: true,
         backendRevision: "terminal-r1",
         backendCapabilityVersion: 1,
@@ -1115,13 +1115,13 @@ describe("PiWebApp plugin host", () => {
     })) throw new Error("Could not stub successful Terminal workspace restoration");
 
     workspacePanelContextFromApp(app).terminal.open({ terminalId: "target-terminal-2" });
-    await vi.waitFor(() => { expect(browser.url.searchParams.get("terminal.workspace.terminal--terminal")).toBe("target-terminal-2"); });
+    await vi.waitFor(() => { expect(browser.url.searchParams.get("pi-web.terminal.workspace.terminal--terminal")).toBe("target-terminal-2"); });
 
     expect(browser.url.searchParams.get("project")).toBe(project.id);
     expect(browser.url.searchParams.get("workspace")).toBe(workspace.id);
     expect(browser.url.searchParams.get("tool")).toBe(TERMINAL_PANEL_ID);
-    expect(browser.url.searchParams.get("terminal.workspace.terminal--terminal")).toBe("target-terminal-2");
-    expect(browser.url.searchParams.get("terminal.workspace.terminal--start")).toBeNull();
+    expect(browser.url.searchParams.get("pi-web.terminal.workspace.terminal--terminal")).toBe("target-terminal-2");
+    expect(browser.url.searchParams.get("pi-web.terminal.workspace.terminal--start")).toBeNull();
     expect(browser.pushed).toHaveLength(1);
     expect(browser.pushed[0]).not.toBe(originUrl);
   });
@@ -1142,8 +1142,8 @@ describe("PiWebApp plugin host", () => {
     callAppMethod(app, "openWorkspaceTool", TERMINAL_PANEL_ID);
     await vi.waitFor(() => { expect(appState(app).workspaceTool).toBe(TERMINAL_PANEL_ID); });
 
-    expect(browser.url.searchParams.get("terminal.workspace.terminal--start")).toBe("1");
-    expect(browser.url.searchParams.get("terminal.workspace.terminal--terminal")).toBeNull();
+    expect(browser.url.searchParams.get("pi-web.terminal.workspace.terminal--start")).toBe("1");
+    expect(browser.url.searchParams.get("pi-web.terminal.workspace.terminal--terminal")).toBeNull();
   });
 
   it("does not publish a command terminal after its workspace restore is superseded", async () => {
@@ -1182,7 +1182,7 @@ describe("PiWebApp plugin host", () => {
     await opening;
 
     expect(publishWorkspaceTool).not.toHaveBeenCalled();
-    expect(browser.url.searchParams.get("terminal.workspace.terminal--terminal")).toBeNull();
+    expect(browser.url.searchParams.get("pi-web.terminal.workspace.terminal--terminal")).toBeNull();
     expect(appState(app).selectedWorkspace?.id).toBe(otherWorkspace.id);
   });
 
@@ -1197,7 +1197,7 @@ describe("PiWebApp plugin host", () => {
       selectedWorkspace: workspace,
       workspaces: [workspace],
     });
-    const runtimePluginId = machineScopedPluginId(remoteMachine.id, "terminal");
+    const runtimePluginId = machineScopedBundledPluginId(remoteMachine.id, "pi-web.terminal");
     const run = {
       id: "run-1",
       origin: runtimePluginId,
@@ -1225,7 +1225,7 @@ describe("PiWebApp plugin host", () => {
       terminalMode: "required",
       registrations: [{
         id: runtimePluginId,
-        sourcePluginId: "terminal",
+        sourcePluginId: "pi-web.terminal",
         machineId: remoteMachine.id,
         machineSpecific: true,
         backendRevision: "remote-terminal-r7",
@@ -1240,7 +1240,7 @@ describe("PiWebApp plugin host", () => {
 
     await expect(handle.completed).resolves.toEqual(run);
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(requestedUrl).toBe(`${window.location.origin}/api/machines/remote-1/plugin-backends/terminal/projects/project-1/workspaces/workspace-1/terminal.run`);
+    expect(requestedUrl).toBe(`${window.location.origin}/api/machines/remote-1/plugin-backends/pi-web.terminal/projects/project-1/workspaces/workspace-1/terminal.run`);
     const requestBody = requestedInit?.body;
     if (typeof requestBody !== "string") throw new Error("Expected serialized Terminal backend request body");
     expect(JSON.parse(requestBody)).toEqual({
@@ -1335,7 +1335,7 @@ describe("PiWebApp plugin host", () => {
       .mockResolvedValueOnce({
         terminalMode: "required",
         registrations: [{
-          id: "terminal",
+          id: "pi-web.terminal",
           machineSpecific: true,
           backendRevision: "terminal-r1",
           backendCapabilityVersion: 1,
@@ -1398,7 +1398,7 @@ describe("PiWebApp plugin host", () => {
     await callAsyncAppMethod(app, "registerExternalPlugins", "PI WEB plugins", () => Promise.resolve({
       terminalMode: "required",
       registrations: [{
-        id: "terminal",
+        id: "pi-web.terminal",
         machineSpecific: true,
         backendRevision: "terminal-r1",
         backendCapabilityVersion: 1,
@@ -1452,7 +1452,7 @@ describe("PiWebApp plugin host", () => {
       mainView: TERMINAL_PANEL_ID,
     });
     const registration = {
-      id: "terminal",
+      id: "pi-web.terminal",
       machineSpecific: true,
       backendRevision: "terminal-r1",
       backendCapabilityVersion: 1 as const,
@@ -1487,12 +1487,12 @@ describe("PiWebApp plugin host", () => {
     await callAsyncAppMethod(app, "registerExternalPlugins", "Failed retry", () => Promise.resolve({
       terminalMode: "required",
       registrations: [],
-      failures: [{ entry: manifestEntry("terminal"), error: new Error("manifest unavailable") }],
+      failures: [{ entry: manifestEntry("pi-web.terminal"), error: new Error("manifest unavailable") }],
     }));
     expect(mobileTabIds(app)).toEqual(["navigation", "chat"]);
     expect(appPluginRegistry(app).hasPlugin("ordinary")).toBe(true);
     expect(callAppMethod(app, "getDefaultActions")).toEqual(expect.not.arrayContaining([
-      expect.objectContaining({ id: "terminal:view.terminal" }),
+      expect.objectContaining({ id: "pi-web.terminal:view.terminal" }),
       expect.objectContaining({ id: "ordinary:act" }),
     ]));
 
@@ -1503,7 +1503,7 @@ describe("PiWebApp plugin host", () => {
     }));
     expect(mobileTabIds(app)).toContain(TERMINAL_PANEL_ID);
     expect(callAppMethod(app, "getDefaultActions")).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "terminal:view.terminal" }),
+      expect.objectContaining({ id: "pi-web.terminal:view.terminal" }),
       expect.objectContaining({ id: "ordinary:act" }),
     ]));
   });
@@ -1516,7 +1516,7 @@ describe("PiWebApp plugin host", () => {
       terminalMode: "required",
       registrations: [
         {
-          id: "terminal",
+          id: "pi-web.terminal",
           machineSpecific: true,
           backendRevision: "terminal-r1",
           backendCapabilityVersion: 1,
@@ -1535,7 +1535,7 @@ describe("PiWebApp plugin host", () => {
 
     await ensureGatewayPluginsLoaded(app);
 
-    expect(appPluginRegistry(app).hasPlugin("terminal")).toBe(false);
+    expect(appPluginRegistry(app).hasPlugin("pi-web.terminal")).toBe(false);
     expect(appPluginRegistry(app).hasPlugin("info")).toBe(false);
     expect(displayedError(app)).toContain("Required Terminal plugin failed to activate");
     expect(displayedError(app)).toContain("Terminal activation failed");
@@ -1567,7 +1567,7 @@ describe("PiWebApp plugin host", () => {
       terminalMode: "required",
       registrations: [
         {
-          id: "terminal",
+          id: "pi-web.terminal",
           machineSpecific: true,
           backendRevision: "terminal-r1",
           backendCapabilityVersion: 1,
@@ -1786,12 +1786,14 @@ function markPluginLoadingReady(app: PiWebApp, loadedMachineIds: readonly string
 }
 
 function installTestTerminalComposition(app: PiWebApp, machineId: string): void {
-  const runtimePluginId = machineId === "local" ? "terminal" : machineScopedPluginId(machineId, "terminal");
+  const runtimePluginId = machineId === "local"
+    ? "pi-web.terminal"
+    : machineScopedBundledPluginId(machineId, "pi-web.terminal");
   const registry = appPluginRegistry(app);
   if (!registry.hasPlugin(runtimePluginId)) {
     registry.register({
       id: runtimePluginId,
-      sourcePluginId: "terminal",
+      sourcePluginId: "pi-web.terminal",
       ...(machineId === "local" ? {} : { machineId }),
       machineSpecific: true,
       backendRevision: `${machineId}-terminal-r1`,
@@ -1805,7 +1807,7 @@ function installTestTerminalComposition(app: PiWebApp, machineId: string): void 
   compositions.set(machineId, {
     binding: {
       registrationPluginId: runtimePluginId,
-      sourcePluginId: "terminal",
+      sourcePluginId: "pi-web.terminal",
       backendRevision: `${machineId}-terminal-r1`,
       backendCapabilityVersion: 1,
       channelVersion: 1,

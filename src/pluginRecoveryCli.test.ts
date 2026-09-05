@@ -41,7 +41,7 @@ describe("plugin recovery CLI", () => {
 
   it("rejects disabling required Terminal with safe-start recovery guidance", async () => {
     expect(() => {
-      runPluginRecoveryCli(["disable", "terminal", "--config", configPath], dependencies([]));
+      runPluginRecoveryCli(["disable", "pi-web.terminal", "--config", configPath], dependencies([]));
     }).toThrow("safe-start set none --restart");
     await expect(readFile(configPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });

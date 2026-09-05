@@ -24,7 +24,7 @@ describe("bundled Terminal package", () => {
       type: "module",
       piWeb: {
         plugins: [{
-          id: "terminal",
+          id: "pi-web.terminal",
           browserRoot: "browser",
           module: "browser/pi-web-plugin.js",
           serverModule: "server-plugin.js",
@@ -121,11 +121,12 @@ describe("bundled Terminal package", () => {
       });
 
       expect(runtime.requiredTerminalService()).toBeDefined();
-      await expect(service.manifest()).resolves.toMatchObject({
+      const manifest = await service.manifest();
+      expect(manifest).toMatchObject({
         lifecycleVersion: 2,
         terminalMode: "required",
         plugins: [{
-          id: "terminal",
+          id: "pi-web.terminal",
           backendCapabilityVersion: 1,
           channelVersion: 1,
           source: "bundled",
@@ -133,6 +134,7 @@ describe("bundled Terminal package", () => {
           machineSpecific: true,
         }],
       });
+      expect(manifest.plugins[0]?.module).toMatch(/^\/pi-web-plugins\/pi-web\.terminal\/browser\/pi-web-plugin\.js\?v=sha256%3A[a-f\d]{64}$/u);
       const serverModule = (await catalog.snapshot()).plugins[0]?.serverModule;
       expect(serverModule === undefined ? undefined : pathToFileURL(serverModule.filePath).protocol).toBe("file:");
     } finally {

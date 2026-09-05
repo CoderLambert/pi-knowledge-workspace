@@ -162,7 +162,7 @@ function workspaceContext(
     terminal: { open: vi.fn(), runCommand: vi.fn() },
     navigation: {
       version: 1,
-      contributionId: "terminal:workspace.terminal",
+      contributionId: "pi-web.terminal:workspace.terminal",
       query: navigation.query ?? {},
       set: navigation.set ?? vi.fn(),
     },

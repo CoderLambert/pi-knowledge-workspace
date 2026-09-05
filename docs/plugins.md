@@ -262,7 +262,7 @@ Plugin enablement is separate from package installation. Use **Settings → Pi p
 }
 ```
 
-Plugins are enabled by default. `plugins.<id>.enabled: false` removes a browser-only entry on the next page load and prevents a server entry from loading on the next sessiond start. The bundled `terminal` plugin is the exception: it is required during normal startup, and ordinary enablement config cannot disable it. The optional `settings` object must be JSON-compatible and is captured for a server entry only at sessiond startup.
+Plugins are enabled by default. `plugins.<id>.enabled: false` removes a browser-only entry on the next page load and prevents a server entry from loading on the next sessiond start. The bundled `pi-web.terminal` plugin is the exception: it is required during normal startup, and ordinary enablement config cannot disable it. The optional `settings` object must be JSON-compatible and is captured for a server entry only at sessiond startup.
 
 ### Desired versus active state
 
@@ -289,7 +289,7 @@ pi-web plugins safe-start set none --restart
 pi-web plugins safe-start clear --restart
 ```
 
-- `disable` sets that plugin's desired `enabled` value to `false` while preserving unrelated config. It rejects `terminal` because Terminal is required; use `safe-start set none` only for recovery.
+- `disable` sets that plugin's desired `enabled` value to `false` while preserving unrelated config. It rejects `pi-web.terminal` because Terminal is required; use `safe-start set none` only for recovery.
 - `bundled-only` persists safe start and filters discovery before external local or Pi-package server modules are considered. The bundled Terminal entry remains required.
 - `none` persists the emergency level and imports no server plugins. The kernel folder workspace and core diagnosis/settings surfaces remain available, but Terminal and Terminal-backed command workflows are unavailable.
 - `clear` returns the next startup to ordinary configured discovery.
@@ -307,12 +307,12 @@ Built-in plugins can be managed from **Settings → PI WEB plugins** or with the
 
 ### Terminal
 
-**Plugin id:** `terminal`
+**Plugin id:** `pi-web.terminal`
 **What it does:** supplies PI WEB's Terminal panel and navigation action, Xterm UI and browser state, PTY/replay and command-run service, and its paired request/channel protocol.
 
 Terminal is a bundled machine-specific browser/server plugin and is required during normal and `bundled-only` startup. PI WEB activates it before ordinary plugins and publishes its browser entry only when the bundled server entry is active, healthy, revision-matched, and exposes the paired request/channel contract. The browser entry uses that workspace-scoped backend for local and selected remote machines; it owns terminal selection, reconnect/replay, mobile keys, copy behavior, command-run display, and cleanup instead of calling Terminal-specific application routes. Missing, incompatible, failed, or unhealthy Terminal startup fails visibly with `safe-start set none` recovery guidance rather than claiming Terminal is available. Only an active session-daemon lifecycle snapshot can declare intentional no-Terminal recovery; while runtime state is unavailable or incompatible, ordinary plugin modules remain withheld and the required failure stays retryable.
 
-`plugins.terminal.enabled: false`, the Settings toggle, and `pi-web plugins disable terminal` do not disable Terminal. Use `pi-web plugins safe-start set none --restart` only to bring up diagnosis/settings surfaces without Terminal, repair the installation or config, then clear safe start and restart sessiond.
+`plugins["pi-web.terminal"].enabled: false`, the Settings toggle, and `pi-web plugins disable pi-web.terminal` do not disable Terminal. Its canonical contribution ids are `pi-web.terminal:workspace.terminal` and `pi-web.terminal:view.terminal`; the released `core:workspace.terminal` and `core:view.terminal` aliases remain supported. Use `pi-web plugins safe-start set none --restart` only to bring up diagnosis/settings surfaces without Terminal, repair the installation or config, then clear safe start and restart sessiond.
 
 ### Files
 
@@ -491,7 +491,7 @@ Rules:
 
 - `piWeb.plugins` must be an array of objects.
 - Each entry must have an explicit `id` and at least one of `module` or `serverModule`.
-- `id` must match `^[a-z][a-z0-9.-]*$`. Externally declared ids `core`, `themes`, and every `machine.*` id are reserved for the host and rejected with an attributed package diagnostic.
+- `id` must match `^[a-z][a-z0-9.-]*$`. The exact id `pi-web` and every `pi-web.*` id are reserved exclusively for PI WEB-owned bundled plugins. External local/dev/Pi-package declarations using them are rejected with an attributed `reserved-id` diagnostic that asks the author to choose another id. Browser and federated manifest entries in that namespace are likewise rejected before import unless both `source` and `scope` are `bundled`. The existing `core`, `themes`, and `machine.*` namespaces remain host-reserved. Plain `terminal` is still a valid third-party id; it is not an alias for the bundled Terminal plugin.
 - Both module paths must be safe canonical relative paths to existing files inside the package root. Backslashes, absolute or Windows drive-qualified paths, and empty, `.`, `..`, `.git`, or `node_modules` segments are rejected.
 - Every browser entry must declare `browserRoot`; a server-only entry must not. The root is `.` or a safe canonical package-relative directory with no empty, `.`, `..`, `.git`, or `node_modules` segment; Windows drive-qualified roots are rejected. It must resolve inside the package, and the browser module must remain inside it both logically and after symlink resolution.
 - Server entries are imported as Node ES modules. When a `serverModule` uses a `.js` path, declare `"type": "module"` in that plugin package; `.mjs` is the explicit-extension alternative.
@@ -512,8 +512,8 @@ The manifest contains a lifecycle version, a `terminalMode` marker, and each pub
   "terminalMode": "required",
   "plugins": [
     {
-      "id": "terminal",
-      "module": "/pi-web-plugins/terminal/browser/pi-web-plugin.js?v=<content-revision>",
+      "id": "pi-web.terminal",
+      "module": "/pi-web-plugins/pi-web.terminal/browser/pi-web-plugin.js?v=<content-revision>",
       "backendRevision": "<active-terminal-server-revision>",
       "backendCapabilityVersion": 1,
       "channelVersion": 1,

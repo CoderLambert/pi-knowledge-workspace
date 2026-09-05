@@ -38,7 +38,7 @@ describe("required Terminal browser composition port", () => {
     });
     const terminal = facade.createWorkspaceTerminal({
       origin: "tasks",
-      registrationPluginId: "terminal",
+      registrationPluginId: "pi-web.terminal",
       workspace,
       backend: { capabilityVersion: 1, request: vi.fn() },
       host: { navigateWorkspaceContribution: vi.fn() },

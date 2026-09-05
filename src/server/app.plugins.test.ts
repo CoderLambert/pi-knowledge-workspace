@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
-import { machineScopedPluginId } from "../shared/machinePluginIds.js";
+import { machineScopedBundledPluginId, machineScopedPluginId } from "../shared/machinePluginIds.js";
 import { buildApp } from "./app.js";
 import { appTestContext, fakeRemoteClient, registerAppTestHooks } from "./app.testSupport.js";
 import { PiWebPluginService } from "./piWebPluginService.js";
@@ -184,6 +184,55 @@ describe("buildApp PI WEB plugin routes", () => {
     expect(request).toHaveBeenCalledWith("GET", "/pi-web-plugins/remote-tools/pi-web-plugin.js?v=123");
   });
 
+  it("federates the required bundled Terminal identity and proxies its package assets", async () => {
+    const addResponse = await appTestContext.app.inject({ method: "POST", url: "/api/machines", payload: { name: "Remote", baseUrl: "https://remote.example.test/" } });
+    const remote = addResponse.json<{ id: string }>();
+    const requestJson = vi.fn(() => Promise.resolve({
+      statusCode: 200,
+      headers: { "content-type": "application/json" },
+      body: {
+        lifecycleVersion: 2,
+        terminalMode: "required",
+        plugins: [{
+          id: "pi-web.terminal",
+          module: "/pi-web-plugins/pi-web.terminal/browser/pi-web-plugin.js?v=terminal-r1",
+          backendRevision: "terminal-server-r1",
+          backendCapabilityVersion: 1,
+          channelVersion: 1,
+          source: "bundled",
+          scope: "bundled",
+          machineSpecific: true,
+        }],
+      },
+    }));
+    const request = vi.fn(() => Promise.resolve({
+      statusCode: 200,
+      headers: { "content-type": "application/javascript" },
+      body: Readable.from(["export default {};"]),
+    }));
+    appTestContext.remoteClient = fakeRemoteClient({ requestJson, request });
+
+    const manifestResponse = await appTestContext.app.inject({ method: "GET", url: `/api/machines/${remote.id}/pi-web-plugins/manifest.json` });
+    const scopedPluginId = machineScopedBundledPluginId(remote.id, "pi-web.terminal");
+    expect(manifestResponse.statusCode).toBe(200);
+    expect(manifestResponse.json()).toMatchObject({
+      terminalMode: "required",
+      plugins: [{
+        id: "pi-web.terminal",
+        module: `../../../../pi-web-plugins/${scopedPluginId}/browser/pi-web-plugin.js?v=terminal-r1`,
+        source: "bundled",
+        scope: "bundled",
+      }],
+    });
+
+    const assetResponse = await appTestContext.app.inject({
+      method: "GET",
+      url: `/pi-web-plugins/${scopedPluginId}/browser/pi-web-plugin.js?v=terminal-r1`,
+    });
+    expect(assetResponse.statusCode).toBe(200);
+    expect(request).toHaveBeenCalledWith("GET", "/pi-web-plugins/pi-web.terminal/browser/pi-web-plugin.js?v=terminal-r1");
+  });
+
   it("returns an explicit mixed-version error instead of pairing a remote browser module with an unverified backend", async () => {
     const addResponse = await appTestContext.app.inject({ method: "POST", url: "/api/machines", payload: { name: "Remote", baseUrl: "https://remote.example.test/" } });
     const remote = addResponse.json<{ id: string }>();
@@ -209,7 +258,7 @@ describe("buildApp PI WEB plugin routes", () => {
   it.each([
     { label: "missing", body: { plugins: [{ id: "browser-only", module: "/pi-web-plugins/browser-only/plugin.js" }] } },
     { label: "future", body: { lifecycleVersion: 3, terminalMode: "recovery-disabled", plugins: [] } },
-    { label: "recovery Terminal", body: { lifecycleVersion: 2, terminalMode: "recovery-disabled", plugins: [{ id: "terminal", module: "/pi-web-plugins/terminal/pi-web-plugin.js", backendRevision: "server-r1", backendCapabilityVersion: 1, channelVersion: 1, machineSpecific: true }] } },
+    { label: "recovery Terminal", body: { lifecycleVersion: 2, terminalMode: "recovery-disabled", plugins: [{ id: "pi-web.terminal", module: "/pi-web-plugins/pi-web.terminal/pi-web-plugin.js", backendRevision: "server-r1", backendCapabilityVersion: 1, channelVersion: 1, source: "bundled", scope: "bundled", machineSpecific: true }] } },
   ])("returns an explicit compatibility error for a $label remote lifecycle version", async ({ body }) => {
     const addResponse = await appTestContext.app.inject({ method: "POST", url: "/api/machines", payload: { name: "Remote", baseUrl: "https://remote.example.test/" } });
     const remote = addResponse.json<{ id: string }>();
@@ -258,6 +307,31 @@ describe("buildApp PI WEB plugin routes", () => {
 
     expect(response.statusCode).toBe(502);
     expect(response.json()).toMatchObject({ machineId: remote.id, detail: "Duplicate remote PI WEB plugin id: duplicate" });
+  });
+
+  it.each([
+    { id: "pi-web", source: "local", scope: "local" },
+    { id: "pi-web.tools", source: "npm:@acme/tools", scope: "user" },
+    { id: "pi-web.tools", source: undefined, scope: undefined },
+  ])("rejects remote $id entries that lack bundled host attribution", async ({ id, source, scope }) => {
+    const addResponse = await appTestContext.app.inject({ method: "POST", url: "/api/machines", payload: { name: "Remote", baseUrl: "https://remote.example.test/" } });
+    const remote = addResponse.json<{ id: string }>();
+    appTestContext.remoteClient = fakeRemoteClient({
+      requestJson: vi.fn(() => Promise.resolve({
+        statusCode: 200,
+        headers: {},
+        body: {
+          lifecycleVersion: 2,
+          terminalMode: "recovery-disabled",
+          plugins: [{ id, module: `/pi-web-plugins/${id}/plugin.js`, source, scope }],
+        },
+      })),
+    });
+
+    const response = await appTestContext.app.inject({ method: "GET", url: `/api/machines/${remote.id}/pi-web-plugins/manifest.json` });
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toMatchObject({ machineId: remote.id, detail: `Reserved remote PI WEB plugin id: ${id}` });
   });
 
   it("accepts manifest-relative and legacy plugin-root-relative modules while dropping unsafe remote modules", async () => {

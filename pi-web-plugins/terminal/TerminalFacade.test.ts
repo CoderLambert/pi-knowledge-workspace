@@ -43,7 +43,7 @@ describe("Terminal facade", () => {
     const navigateWorkspaceContribution = vi.fn();
     const terminal = new TerminalFacade().createWorkspaceTerminal({
       origin: "actions",
-      registrationPluginId: "terminal",
+      registrationPluginId: "pi-web.terminal",
       workspace,
       backend: backend(request),
       host: { navigateWorkspaceContribution },
@@ -58,7 +58,7 @@ describe("Terminal facade", () => {
       metadata: { source: "task" },
     }, undefined);
     expect(navigateWorkspaceContribution).toHaveBeenCalledWith(workspace, {
-      contributionId: "terminal:workspace.terminal",
+      contributionId: "pi-web.terminal:workspace.terminal",
       navigationAliases: ["core:workspace.terminal"],
       query: { terminal: "t1", start: undefined },
     });
@@ -75,7 +75,7 @@ describe("Terminal facade", () => {
     const facade = new TerminalFacade({ pollIntervalMs: 25 });
     const terminal = facade.createWorkspaceTerminal({
       origin: "actions",
-      registrationPluginId: "terminal",
+      registrationPluginId: "pi-web.terminal",
       workspace,
       backend: backend(request),
       host: { navigateWorkspaceContribution: vi.fn() },
@@ -97,7 +97,7 @@ describe("Terminal facade", () => {
     });
     const terminal = new TerminalFacade({ pollIntervalMs: 25 }).createWorkspaceTerminal({
       origin: "actions",
-      registrationPluginId: "terminal",
+      registrationPluginId: "pi-web.terminal",
       workspace,
       backend: backend(request),
       host: { navigateWorkspaceContribution: vi.fn() },
@@ -114,7 +114,7 @@ describe("Terminal facade", () => {
     const navigateWorkspaceContribution = vi.fn();
     const terminal = new TerminalFacade().createWorkspaceTerminal({
       origin: "actions",
-      registrationPluginId: "machine.remote.terminal",
+      registrationPluginId: "machine.remote.pi-web.terminal",
       workspace,
       backend: backend(vi.fn(() => Promise.resolve(null))),
       host: { navigateWorkspaceContribution },
@@ -126,17 +126,17 @@ describe("Terminal facade", () => {
 
     expect(navigateWorkspaceContribution.mock.calls).toEqual([
       [workspace, {
-        contributionId: "machine.remote.terminal:workspace.terminal",
+        contributionId: "machine.remote.pi-web.terminal:workspace.terminal",
         navigationAliases: ["core:workspace.terminal"],
         query: { start: "1" },
       }],
       [workspace, {
-        contributionId: "machine.remote.terminal:workspace.terminal",
+        contributionId: "machine.remote.pi-web.terminal:workspace.terminal",
         navigationAliases: ["core:workspace.terminal"],
         query: { start: "2" },
       }],
       [workspace, {
-        contributionId: "machine.remote.terminal:workspace.terminal",
+        contributionId: "machine.remote.pi-web.terminal:workspace.terminal",
         navigationAliases: ["core:workspace.terminal"],
         query: { terminal: "selected", start: undefined },
       }],
@@ -164,7 +164,7 @@ describe("Terminal facade", () => {
     const facade = new TerminalFacade();
     expect(() => facade.createWorkspaceTerminal({
       origin: "actions",
-      registrationPluginId: "terminal",
+      registrationPluginId: "pi-web.terminal",
       workspace,
       backend: { request: () => Promise.resolve(null) },
       host: { navigateWorkspaceContribution: vi.fn() },

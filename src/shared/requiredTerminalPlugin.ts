@@ -1,4 +1,4 @@
-export const REQUIRED_TERMINAL_PLUGIN_ID = "terminal";
+export const REQUIRED_TERMINAL_PLUGIN_ID = "pi-web.terminal";
 
 export type TerminalPluginMode = "required" | "recovery-disabled";
 

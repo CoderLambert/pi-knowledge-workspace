@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { machineScopedPluginId, parseMachineScopedPluginId, type MachineScopedPluginIdParts } from "../../shared/machinePluginIds.js";
+import { machineScopedManifestPluginId, parseMachineScopedPluginId, type MachineScopedPluginIdParts } from "../../shared/machinePluginIds.js";
 import { PI_WEB_PLUGIN_LIFECYCLE_VERSION } from "../../shared/apiTypes.js";
-import { isPiWebPluginId } from "../../shared/pluginIds.js";
+import { isPiWebBundledPluginId, isPiWebPluginId, isReservedPiWebPluginId } from "../../shared/pluginIds.js";
 import { requirePluginBackendRevision } from "../../shared/pluginBackendProtocol.js";
 import { REQUIRED_TERMINAL_PLUGIN_ID, type TerminalPluginMode } from "../../shared/requiredTerminalPlugin.js";
 import { RemoteMachineRequestError, type MachineClient } from "./machineClient.js";
@@ -103,7 +103,7 @@ function rewriteRemotePluginManifest(machineId: string, manifest: RemotePluginMa
       if (modulePath === undefined) return [];
       return [{
         ...plugin,
-        module: `../../../../pi-web-plugins/${encodeURIComponent(machineScopedPluginId(machineId, plugin.id))}/${modulePath.path}${modulePath.query}`,
+        module: `../../../../pi-web-plugins/${encodeURIComponent(machineScopedManifestPluginId(machineId, plugin.id))}/${modulePath.path}${modulePath.query}`,
       }];
     }),
   };
@@ -175,6 +175,12 @@ function parseRemoteManifest(value: unknown): RemotePluginManifest {
     if (!isRecord(entry) || typeof entry["id"] !== "string" || !isPiWebPluginId(entry["id"]) || typeof entry["module"] !== "string" || entry["module"] === "") {
       throw new Error("Invalid remote PI WEB plugin manifest entry");
     }
+    const source = typeof entry["source"] === "string" ? entry["source"] : undefined;
+    const scope = typeof entry["scope"] === "string" ? entry["scope"] : undefined;
+    if (isReservedPiWebPluginId(entry["id"])
+      && !(isPiWebBundledPluginId(entry["id"]) && source === "bundled" && scope === "bundled")) {
+      throw new Error(`Reserved remote PI WEB plugin id: ${entry["id"]}`);
+    }
     const backendRevision = parseRemoteBackendRevision(entry["backendRevision"]);
     const backendCapabilityVersion = parseRemoteBackendCapabilityVersion(entry["backendCapabilityVersion"]);
     const channelVersion = parseRemoteChannelVersion(entry["channelVersion"]);
@@ -190,8 +196,8 @@ function parseRemoteManifest(value: unknown): RemotePluginManifest {
       ...(backendRevision === undefined ? {} : { backendRevision }),
       ...(backendCapabilityVersion === undefined ? {} : { backendCapabilityVersion }),
       ...(channelVersion === undefined ? {} : { channelVersion }),
-      ...(typeof entry["source"] === "string" ? { source: entry["source"] } : {}),
-      ...(typeof entry["scope"] === "string" ? { scope: entry["scope"] } : {}),
+      ...(source === undefined ? {} : { source }),
+      ...(scope === undefined ? {} : { scope }),
       ...(parseRemoteMachineSpecific(entry["machineSpecific"])),
     };
   });

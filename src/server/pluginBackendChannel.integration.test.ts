@@ -232,7 +232,7 @@ async function createTopology(
   }, federatedAdmissions);
   await federated.listen({ host: "127.0.0.1", port: 0 });
 
-  const path = `/plugin-backends/terminal/projects/${encodeURIComponent(project.id)}/workspaces/${encodeURIComponent(workspaceId)}/channels/terminal.attach`;
+  const path = `/plugin-backends/pi-web.terminal/projects/${encodeURIComponent(project.id)}/workspaces/${encodeURIComponent(workspaceId)}/channels/terminal.attach`;
   let closed = false;
   const topology: ChannelTopology = {
     registry,
@@ -278,7 +278,7 @@ function contribution(
   openChannel: NonNullable<ServerPluginPairedBackendContribution["backend"]["openChannel"]>,
 ): ServerPluginPairedBackendContribution {
   return {
-    pluginId: "terminal",
+    pluginId: "pi-web.terminal",
     pluginName: "Terminal",
     packageRoot: "/plugins/terminal",
     source: "fixture",

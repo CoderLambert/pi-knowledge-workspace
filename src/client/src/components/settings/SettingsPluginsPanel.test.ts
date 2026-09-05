@@ -208,12 +208,12 @@ describe("settings-plugins-panel layout", () => {
   });
 
   it("renders required Terminal enabled and non-editable despite ordinary disable config", () => {
-    const terminal = { ...pluginInfo("terminal", true), required: true as const };
-    const config = configResponse({ plugins: { terminal: { enabled: false } } });
+    const terminal = { ...pluginInfo("pi-web.terminal", true), required: true as const };
+    const config = configResponse({ plugins: { "pi-web.terminal": { enabled: false } } });
     const [row] = settingsPluginRows(pluginsResponse([terminal]), config);
     if (row === undefined) throw new Error("Expected Terminal settings row");
 
-    expect(row).toMatchObject({ id: "terminal", enabled: true, editable: false, required: true });
+    expect(row).toMatchObject({ id: "pi-web.terminal", enabled: true, editable: false, required: true });
     const panel = new SettingsPluginsPanel();
     panel.pluginsResponse = pluginsResponse([terminal]);
     panel.configResponse = config;

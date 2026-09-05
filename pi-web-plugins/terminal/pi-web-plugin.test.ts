@@ -39,32 +39,32 @@ describe("Terminal browser plugin activation", () => {
   it("allocates browser product state per local or remote registration", () => {
     const firstContext = workspaceContext("remote-1");
     const secondContext = workspaceContext("remote-2");
-    const first = plugin.activate(activationContext("machine.one.terminal")).contributions.workspacePanels?.[0]?.render(firstContext);
-    const second = plugin.activate(activationContext("machine.two.terminal")).contributions.workspacePanels?.[0]?.render(secondContext);
+    const first = plugin.activate(activationContext("machine.one.pi-web.terminal")).contributions.workspacePanels?.[0]?.render(firstContext);
+    const second = plugin.activate(activationContext("machine.two.pi-web.terminal")).contributions.workspacePanels?.[0]?.render(secondContext);
     const firstValues = templateValues(first);
     const secondValues = templateValues(second);
     const firstRuntime = firstValues.find((value) => value instanceof TerminalBrowserRuntime);
     const secondRuntime = secondValues.find((value) => value instanceof TerminalBrowserRuntime);
 
-    expect(templateText(first)).toContain("pi-web-terminal-panel-machine-one-terminal");
+    expect(templateText(first)).toContain("pi-web-terminal-panel-machine-one-pi-web-terminal");
     expect(firstValues).toContain(firstContext);
     expect(secondValues).toContain(secondContext);
-    expect(customElements.get(terminalPanelElementName("machine.one.terminal"))).toBeDefined();
-    expect(customElements.get(terminalPanelElementName("machine.two.terminal"))).toBeDefined();
-    expect(customElements.get(terminalPanelElementName("machine.two.terminal")))
-      .not.toBe(customElements.get(terminalPanelElementName("machine.one.terminal")));
-    expect(firstValues).toContain(terminalSoftKeysElementName("machine.one.terminal"));
-    expect(secondValues).toContain(terminalSoftKeysElementName("machine.two.terminal"));
-    expect(customElements.get(terminalSoftKeysElementName("machine.one.terminal"))).toBeDefined();
-    expect(customElements.get(terminalSoftKeysElementName("machine.two.terminal")))
-      .not.toBe(customElements.get(terminalSoftKeysElementName("machine.one.terminal")));
+    expect(customElements.get(terminalPanelElementName("machine.one.pi-web.terminal"))).toBeDefined();
+    expect(customElements.get(terminalPanelElementName("machine.two.pi-web.terminal"))).toBeDefined();
+    expect(customElements.get(terminalPanelElementName("machine.two.pi-web.terminal")))
+      .not.toBe(customElements.get(terminalPanelElementName("machine.one.pi-web.terminal")));
+    expect(firstValues).toContain(terminalSoftKeysElementName("machine.one.pi-web.terminal"));
+    expect(secondValues).toContain(terminalSoftKeysElementName("machine.two.pi-web.terminal"));
+    expect(customElements.get(terminalSoftKeysElementName("machine.one.pi-web.terminal"))).toBeDefined();
+    expect(customElements.get(terminalSoftKeysElementName("machine.two.pi-web.terminal")))
+      .not.toBe(customElements.get(terminalSoftKeysElementName("machine.one.pi-web.terminal")));
     expect(firstRuntime).toBeInstanceOf(TerminalBrowserRuntime);
     expect(secondRuntime).toBeInstanceOf(TerminalBrowserRuntime);
     expect(secondRuntime).not.toBe(firstRuntime);
   });
 
   it("routes the navigation action through the required Terminal host facade", async () => {
-    const result = activateTerminalPlugin(activationContext("machine.remote.terminal"));
+    const result = activateTerminalPlugin(activationContext("machine.remote.pi-web.terminal"));
     const openTerminal = vi.fn<PluginRuntimeContext["openTerminal"]>();
     const context = runtimeContext(openTerminal);
 
@@ -73,14 +73,14 @@ describe("Terminal browser plugin activation", () => {
     expect(openTerminal).toHaveBeenCalledOnce();
   });
 
-  it("rejects activation under any source identity other than terminal", () => {
+  it("rejects activation under any source identity other than pi-web.terminal", () => {
     expect(() => activateTerminalPlugin({ ...activationContext(), pluginId: "other" }))
-      .toThrow("must activate as plugin id terminal");
+      .toThrow("must activate as plugin id pi-web.terminal");
   });
 });
 
-function activationContext(runtimePluginId = "terminal"): PluginActivationContext {
-  return Object.freeze({ apiVersion: 2, pluginId: "terminal", runtimePluginId, html, svg });
+function activationContext(runtimePluginId = "pi-web.terminal"): PluginActivationContext {
+  return Object.freeze({ apiVersion: 2, pluginId: "pi-web.terminal", runtimePluginId, html, svg });
 }
 
 function workspaceContext(machineId: string): WorkspacePanelContext {
@@ -92,7 +92,7 @@ function workspaceContext(machineId: string): WorkspacePanelContext {
     host: { requestRender: vi.fn() },
     prompt: { insertText: vi.fn(), getText: vi.fn(() => ""), getSelection: vi.fn(() => null) },
     terminal: { open: vi.fn(), runCommand: vi.fn() },
-    navigation: { version: 1, contributionId: "terminal:workspace.terminal", query: {}, set: vi.fn() },
+    navigation: { version: 1, contributionId: "pi-web.terminal:workspace.terminal", query: {}, set: vi.fn() },
   };
 }
 

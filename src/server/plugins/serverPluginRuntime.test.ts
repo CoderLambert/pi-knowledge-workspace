@@ -139,7 +139,7 @@ describe("server plugin runtime", () => {
     const reporters = new Map<string, ServerPluginNoticeReporterV1 | undefined>();
     const records: { source: string; input: ServerPluginNoticeInput }[] = [];
     const runtime = await createServerPluginRuntime({
-      catalog: { snapshot: () => Promise.resolve(testSnapshot([entry("terminal"), entry("workspace.delete")])) },
+      catalog: { snapshot: () => Promise.resolve(testSnapshot([entry("pi-web.terminal"), entry("workspace.delete")])) },
       importer: (url) => {
         const pluginId = pluginIdFromUrl(url);
         return Promise.resolve({
@@ -153,7 +153,7 @@ describe("server plugin runtime", () => {
       noticeSink: (source, input) => { records.push({ source, input }); },
     });
 
-    const terminalReporter = reporters.get("terminal");
+    const terminalReporter = reporters.get("pi-web.terminal");
     const workspaceDeleteReporter = reporters.get("workspace.delete");
     if (terminalReporter === undefined || workspaceDeleteReporter === undefined) {
       throw new Error("Expected notice reporters");
@@ -165,7 +165,7 @@ describe("server plugin runtime", () => {
 
     expect(records).toEqual([
       {
-        source: "plugin:terminal",
+        source: "plugin:pi-web.terminal",
         input: { severity: "warning", message: "Terminal warning" },
       },
       {
@@ -684,12 +684,12 @@ describe("server plugin runtime", () => {
     const runtime = await createServerPluginRuntimeWithRequiredTerminal({
       catalog: { snapshot: () => Promise.resolve(testSnapshot([
         entry("zeta", { scope: "bundled" }),
-        entry("terminal", { scope: "bundled", browserRevision: "terminal-browser" }),
+        entry("pi-web.terminal", { scope: "bundled", browserRevision: "terminal-browser" }),
       ])) },
       importer: (url) => {
         const id = pluginIdFromUrl(url);
         imported.push(id);
-        if (id === "terminal") {
+        if (id === "pi-web.terminal") {
           return Promise.resolve(pluginModule("Terminal", {
             pairedBackend: {
               version: 1,
@@ -708,9 +708,9 @@ describe("server plugin runtime", () => {
       logger: testLogger(),
     });
 
-    expect(imported).toEqual(["terminal", "zeta"]);
+    expect(imported).toEqual(["pi-web.terminal", "zeta"]);
     expect(runtime.healthRecords().map(({ pluginId, state }) => [pluginId, state])).toEqual([
-      ["terminal", "active"],
+      ["pi-web.terminal", "active"],
       ["zeta", "active"],
     ]);
     expect(runtime.requiredTerminalService()).not.toBe(requiredService);
@@ -724,7 +724,7 @@ describe("server plugin runtime", () => {
     const stopped = vi.fn();
     await expect(createServerPluginRuntimeWithRequiredTerminal({
       catalog: { snapshot: () => Promise.resolve(testSnapshot([
-        entry("terminal", { scope: "bundled", browserRevision: "terminal-browser" }),
+        entry("pi-web.terminal", { scope: "bundled", browserRevision: "terminal-browser" }),
       ])) },
       importer: () => Promise.resolve(pluginModule("Terminal", {
         pairedBackend: {
@@ -746,7 +746,7 @@ describe("server plugin runtime", () => {
     await expect(createServerPluginRuntimeWithRequiredTerminal({
       catalog: { snapshot: () => Promise.resolve(testSnapshot([
         entry("alpha", { scope: "bundled" }),
-        entry("terminal", { scope: "bundled", browserRevision: "terminal-browser" }),
+        entry("pi-web.terminal", { scope: "bundled", browserRevision: "terminal-browser" }),
       ])) },
       importer: (url) => {
         const id = pluginIdFromUrl(url);
@@ -764,7 +764,7 @@ describe("server plugin runtime", () => {
       },
       logger: testLogger(),
     })).rejects.toThrow("Required Terminal server entry is unhealthy: PTY unavailable");
-    expect(imported).toEqual(["terminal"]);
+    expect(imported).toEqual(["pi-web.terminal"]);
     expect(stopped).toHaveBeenCalledOnce();
   });
 });

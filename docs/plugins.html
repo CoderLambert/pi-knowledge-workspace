@@ -353,8 +353,13 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
                 segments, traversal, backslashes, and absolute or Windows drive-qualified paths are rejected. Each
                 browser entry must declare a safe package-relative <code>browserRoot</code> containing its module;
                 server-only entries must not declare one. Invalid, missing, package-escaping, symlink-escaping, or
-                module-excluding roots fail discovery. Externally declared ids <code>core</code>, <code>themes</code>,
-                and the <code>machine.*</code> namespace are reserved and rejected.
+                module-excluding roots fail discovery. The exact id <code>pi-web</code> and every
+                <code>pi-web.*</code> id are reserved for PI WEB-owned bundled plugins; external local, dev, and Pi-package
+                declarations are rejected with an attributed diagnostic that asks the author to choose another id.
+                Browser and federated manifest entries in that namespace are also rejected before import unless both
+                <code>source</code> and <code>scope</code> are <code>bundled</code>. Existing <code>core</code>,
+                <code>themes</code>, and <code>machine.*</code> namespaces remain host-reserved.
+                Plain <code>terminal</code> remains available to third-party plugins.
               </p>
               <ul>
                 <li>Only files logically and canonically inside <code>browserRoot</code> are served; everything else in the package stays outside plugin asset routes.</li>
@@ -484,7 +489,8 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
 
               <h3>Terminal</h3>
               <p>
-                <strong>Terminal</strong> is the required bundled, machine-specific browser/server plugin. It supplies
+                Plugin id: <code>pi-web.terminal</code>. <strong>Terminal</strong> is the required bundled,
+                machine-specific browser/server plugin. It supplies
                 the Terminal panel and navigation action, Xterm UI and browser state, PTY/replay and command-run
                 service, and its paired request/channel protocol. Normal and <code>bundled-only</code> startup activates
                 it before ordinary plugins and publishes its browser entry only while the matching bundled server entry
@@ -493,7 +499,9 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
                 command-run display, and cleanup, instead of calling Terminal-specific application routes.
               </p>
               <p>
-                Ordinary config, Settings, and <code>pi-web plugins disable terminal</code> cannot disable Terminal.
+                Ordinary config, Settings, and <code>pi-web plugins disable pi-web.terminal</code> cannot disable Terminal.
+                Canonical contribution ids use <code>pi-web.terminal:*</code>; the released
+                <code>core:workspace.terminal</code> and <code>core:view.terminal</code> aliases remain supported.
                 Missing, incompatible, failed, or unhealthy startup reports the failure instead of claiming Terminal is
                 available. Only an active session-daemon lifecycle snapshot can declare intentional no-Terminal recovery;
                 unavailable or incompatible runtime state withholds ordinary plugin modules and remains retryable. For
@@ -677,7 +685,7 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
 <span class="prompt">$</span> pi-web plugins safe-start clear --restart</code></pre>
               </div>
               <ul>
-                <li><code>disable</code> persists <code>plugins.&lt;id&gt;.enabled: false</code> while preserving unrelated config. It rejects required <code>terminal</code>; use no-plugin safe start only for recovery.</li>
+                <li><code>disable</code> persists <code>plugins.&lt;id&gt;.enabled: false</code> while preserving unrelated config. It rejects required <code>pi-web.terminal</code>; use no-plugin safe start only for recovery.</li>
                 <li><code>bundled-only</code> filters discovery before external server packages are considered, while the bundled Terminal entry remains required.</li>
                 <li><code>none</code> imports no server plugins. The kernel folder workspace and diagnosis/Settings surfaces remain available, but Terminal and Terminal-backed command workflows do not.</li>
                 <li><code>clear</code> restores ordinary configured discovery on the next start.</li>

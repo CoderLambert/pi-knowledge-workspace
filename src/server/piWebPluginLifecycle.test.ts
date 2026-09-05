@@ -117,7 +117,7 @@ describe("PI WEB plugin desired/active lifecycle reconciliation", () => {
 
   it("never publishes a Terminal browser entry in no-plugin recovery", () => {
     const desired = snapshot([
-      entry("terminal", { browser: "browser-1" }),
+      entry("pi-web.terminal", { browser: "browser-1" }),
       entry("browser-only", { browser: "browser-1" }),
     ]);
     const runtime = createWorkspaceProviderRuntimeSnapshot([], [], "none");
@@ -125,7 +125,7 @@ describe("PI WEB plugin desired/active lifecycle reconciliation", () => {
     const reconciled = reconcilePiWebPluginLifecycle(desired, { status: "available", snapshot: runtime }, moduleUrl, "none");
 
     expect(reconciled.browserPlugins.map(({ plugin }) => plugin.id)).toEqual(["browser-only"]);
-    expect(plugin(reconciled, "terminal")).not.toHaveProperty("module");
+    expect(plugin(reconciled, "pi-web.terminal")).not.toHaveProperty("module");
     expect(reconciled.response.serverRuntime.terminalMode).toBe("recovery-disabled");
   });
 

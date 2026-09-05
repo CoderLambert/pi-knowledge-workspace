@@ -47,25 +47,25 @@ describe("contribution-scoped query helpers", () => {
 
   it("patches canonical contribution keys while removing aliases and preserving unrelated state", () => {
     expect(patchContributionQueryRecord({
-      "terminal.workspace.terminal--terminal": "old",
+      "pi-web.terminal.workspace.terminal--terminal": "old",
       "core.workspace.terminal--terminal": "legacy",
       "core.workspace.terminal--start": "old-start",
       "files.workspace.files--file": "README.md",
-    }, "terminal:workspace.terminal", ["core:workspace.terminal"], {
+    }, "pi-web.terminal:workspace.terminal", ["core:workspace.terminal"], {
       terminal: "next",
       start: 7,
     })).toEqual({
-      "terminal.workspace.terminal--terminal": "next",
-      "terminal.workspace.terminal--start": "7",
+      "pi-web.terminal.workspace.terminal--terminal": "next",
+      "pi-web.terminal.workspace.terminal--start": "7",
       "files.workspace.files--file": "README.md",
     });
 
     expect(patchContributionQueryRecord({
-      "terminal.workspace.terminal--terminal": "keep",
+      "pi-web.terminal.workspace.terminal--terminal": "keep",
       "core.workspace.terminal--start": "old-start",
-    }, "terminal:workspace.terminal", ["core:workspace.terminal"], {
+    }, "pi-web.terminal:workspace.terminal", ["core:workspace.terminal"], {
       start: undefined,
-    })).toEqual({ "terminal.workspace.terminal--terminal": "keep" });
+    })).toEqual({ "pi-web.terminal.workspace.terminal--terminal": "keep" });
   });
 
   it("reads inherited-key names as own strings and bounds values, keys, counts, and aggregate length", () => {

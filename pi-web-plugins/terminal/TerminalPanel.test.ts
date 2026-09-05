@@ -511,7 +511,7 @@ function terminalBackend(
 function terminalNavigation(terminalId?: string, autoStartRequest?: string): WorkspacePanelNavigationV1 {
   return {
     version: 1,
-    contributionId: "terminal:workspace.terminal",
+    contributionId: "pi-web.terminal:workspace.terminal",
     query: {
       ...(terminalId === undefined ? {} : { terminal: terminalId }),
       ...(autoStartRequest === undefined ? {} : { start: autoStartRequest }),

@@ -1,7 +1,7 @@
 import { PI_WEB_PLUGIN_LIFECYCLE_VERSION } from "../../../shared/apiTypes";
-import { machineScopedPluginId } from "../../../shared/machinePluginIds";
+import { machineScopedManifestPluginId } from "../../../shared/machinePluginIds";
 import { requirePluginBackendRevision } from "../../../shared/pluginBackendProtocol";
-import { isPiWebPluginId, isReservedPiWebPluginId } from "../../../shared/pluginIds";
+import { isPiWebBundledPluginId, isPiWebPluginId, isReservedPiWebPluginId } from "../../../shared/pluginIds";
 import { REQUIRED_TERMINAL_PLUGIN_ID, type TerminalPluginMode } from "../../../shared/requiredTerminalPlugin";
 import { resolveAppUrl, type AppUrlContext } from "../appUrl";
 import type { PiWebPlugin, PiWebPluginRegistration } from "./types";
@@ -12,6 +12,8 @@ export interface PluginManifestEntry {
   backendRevision?: string;
   backendCapabilityVersion?: 1;
   channelVersion?: 1;
+  source?: string;
+  scope?: string;
   machineSpecific: boolean;
 }
 
@@ -50,7 +52,7 @@ export async function loadExternalPlugins(manifestUrl = "pi-web-plugins/manifest
       const module = await (options.moduleLoader ?? importPluginModule)(moduleUrl);
       const plugin = parsePluginModule(module, moduleUrl);
       registrations.push({
-        id: options.machineId === undefined ? entry.id : machineScopedPluginId(options.machineId, entry.id),
+        id: options.machineId === undefined ? entry.id : machineScopedManifestPluginId(options.machineId, entry.id),
         plugin,
         machineSpecific: entry.machineSpecific,
         ...(entry.backendRevision === undefined ? {} : { backendRevision: entry.backendRevision }),
@@ -91,7 +93,12 @@ function parseManifest(value: unknown): PluginManifest {
     if (!isRecord(entry) || typeof entry["id"] !== "string" || typeof entry["module"] !== "string" || entry["module"] === "") throw new Error("Invalid plugin manifest entry");
     const id = entry["id"];
     if (!isPiWebPluginId(id)) throw new Error(`Invalid plugin manifest id: ${id}`);
-    if (isReservedPiWebPluginId(id)) throw new Error(`Reserved plugin manifest id: ${id}`);
+    const source = optionalString(entry["source"]);
+    const scope = optionalString(entry["scope"]);
+    if (isReservedPiWebPluginId(id)
+      && !(isPiWebBundledPluginId(id) && source === "bundled" && scope === "bundled")) {
+      throw new Error(`Reserved plugin manifest id: ${id}`);
+    }
     const backendRevision = parseBackendRevision(entry["backendRevision"]);
     const backendCapabilityVersion = parseBackendCapabilityVersion(entry["backendCapabilityVersion"]);
     const channelVersion = parseChannelVersion(entry["channelVersion"]);
@@ -103,6 +110,8 @@ function parseManifest(value: unknown): PluginManifest {
       ...(backendRevision === undefined ? {} : { backendRevision }),
       ...(backendCapabilityVersion === undefined ? {} : { backendCapabilityVersion }),
       ...(channelVersion === undefined ? {} : { channelVersion }),
+      ...(source === undefined ? {} : { source }),
+      ...(scope === undefined ? {} : { scope }),
       machineSpecific: parseMachineSpecific(entry["machineSpecific"]),
     };
   });
@@ -123,6 +132,10 @@ function parseManifest(value: unknown): PluginManifest {
     throw new Error("Recovery-disabled plugin manifest must not publish Terminal");
   }
   return { terminalMode, plugins };
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 function parseTerminalMode(value: unknown): TerminalPluginMode {

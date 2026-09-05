@@ -335,7 +335,7 @@ function contribution(
   openChannel: NonNullable<ServerPluginPairedBackendContribution["backend"]["openChannel"]>,
 ): ServerPluginPairedBackendContribution {
   return {
-    pluginId: "terminal",
+    pluginId: "pi-web.terminal",
     pluginName: "Terminal",
     packageRoot: "/plugins/terminal",
     source: "fixture",
@@ -362,7 +362,7 @@ function projectReader() {
 }
 
 function connect(workspaceId: string): WebSocket {
-  const socket = new WebSocket(`${serverUrl(app)}/plugin-backends/terminal/projects/${encodeURIComponent(project.id)}/workspaces/${encodeURIComponent(workspaceId)}/channels/terminal.attach`);
+  const socket = new WebSocket(`${serverUrl(app)}/plugin-backends/pi-web.terminal/projects/${encodeURIComponent(project.id)}/workspaces/${encodeURIComponent(workspaceId)}/channels/terminal.attach`);
   sockets.push(socket);
   return socket;
 }

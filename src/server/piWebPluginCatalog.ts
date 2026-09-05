@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { DefaultPackageManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { loadPiWebConfig, piWebDataDir, type PiWebConfig } from "../config.js";
 import type { PiWebPluginScope, PiWebPluginSettings } from "../shared/apiTypes.js";
-import { isPiWebPluginId, isReservedPiWebPluginId } from "../shared/pluginIds.js";
+import { isPiWebBundledPluginId, isPiWebPluginId, isReservedPiWebPluginId } from "../shared/pluginIds.js";
 import { REQUIRED_TERMINAL_PLUGIN_ID } from "../shared/requiredTerminalPlugin.js";
 
 export interface ConfiguredPiPackage {
@@ -60,7 +60,7 @@ export interface PiWebPluginCatalogEntry extends PiWebPluginPackageEntry {
   settingsRevision: string;
 }
 
-export type PiWebPluginCatalogDiagnosticCode = "invalid-package" | "duplicate-id" | "required-plugin-config";
+export type PiWebPluginCatalogDiagnosticCode = "invalid-package" | "reserved-id" | "duplicate-id" | "required-plugin-config";
 
 export interface PiWebPluginCatalogDiagnostic {
   code: PiWebPluginCatalogDiagnosticCode;
@@ -177,7 +177,7 @@ export class PiWebPluginCatalog {
     const diagnostics: PiWebPluginCatalogDiagnostic[] = [];
     const plugins = await this.discoverPlugins(this.reporter(diagnostics), options.scope);
     if (config.plugins?.[REQUIRED_TERMINAL_PLUGIN_ID]?.enabled === false && plugins.some(isBundledTerminalPlugin)) {
-      const message = "plugins.terminal.enabled=false is ignored because Terminal is required; use serverPlugins.safeStart=none for recovery";
+      const message = `plugins[${JSON.stringify(REQUIRED_TERMINAL_PLUGIN_ID)}].enabled=false is ignored because Terminal is required; use serverPlugins.safeStart=none for recovery`;
       diagnostics.push({
         code: "required-plugin-config",
         source: "config",
@@ -197,7 +197,8 @@ export class PiWebPluginCatalog {
    * remains readable even when active Pi-package discovery is unavailable.
    */
   async browserPlugin(pluginId: string): Promise<PiWebPluginPackageEntry | undefined> {
-    if (!isPiWebPluginId(pluginId) || isReservedPiWebPluginId(pluginId)) return undefined;
+    if (!isPiWebPluginId(pluginId)
+      || (isReservedPiWebPluginId(pluginId) && !isPiWebBundledPluginId(pluginId))) return undefined;
     const report = this.reporter([]);
     const localRecords = new Map<string, PiWebPluginPackageEntry>();
     for (const plugin of await this.discoverLocalPlugins(report)) addUnique(localRecords, plugin, report);
@@ -215,11 +216,13 @@ export class PiWebPluginCatalog {
   private reporter(diagnostics: PiWebPluginCatalogDiagnostic[]): ReportDiagnostic {
     return (source, error, details = {}) => {
       const message = error instanceof Error ? error.message : String(error);
+      const reservedId = error instanceof ReservedPiWebPluginIdError ? error.pluginId : undefined;
+      const pluginId = details.pluginId ?? reservedId;
       diagnostics.push({
-        code: details.code ?? "invalid-package",
+        code: details.code ?? (reservedId === undefined ? "invalid-package" : "reserved-id"),
         source,
         message,
-        ...(details.pluginId === undefined ? {} : { pluginId: details.pluginId }),
+        ...(pluginId === undefined ? {} : { pluginId }),
       });
       this.warningSink(`Skipping PI WEB plugin from ${source}: ${message}`);
     };
@@ -321,7 +324,8 @@ async function discoverLocalPlugin(
   localRoot: LocalPluginRoot,
   directoryEntryNamesProvider: DirectoryEntryNamesProvider,
 ): Promise<PiWebPluginPackageEntry[]> {
-  const config = await readPiWebPackageConfig(root);
+  const trustedBundledRoot = localRoot.source === "bundled" && localRoot.scope === "bundled";
+  const config = await readPiWebPackageConfig(root, trustedBundledRoot);
   if (config === undefined) return [];
   const plugins = await discoverPluginEntries(root, config, directoryEntryNamesProvider);
   return plugins.map((plugin) => ({ ...plugin, source: localRoot.source, scope: localRoot.scope }));
@@ -614,7 +618,7 @@ function updatePackageHash(hash: Hash, ...values: (string | Buffer)[]): void {
   }
 }
 
-async function readPiWebPackageConfig(root: string): Promise<PiWebPackageConfig | undefined> {
+async function readPiWebPackageConfig(root: string, allowPiWebBundledIds = false): Promise<PiWebPackageConfig | undefined> {
   const packagePath = join(root, "package.json");
   const canonicalPackagePath = await realpath(packagePath).catch(() => undefined);
   if (canonicalPackagePath === undefined) return undefined;
@@ -633,12 +637,16 @@ async function readPiWebPackageConfig(root: string): Promise<PiWebPackageConfig 
   const piWeb = parsed["piWeb"];
   if (!isRecord(piWeb)) return undefined;
 
-  const plugins = parsePluginEntries(piWeb, packagePath);
+  const plugins = parsePluginEntries(piWeb, packagePath, allowPiWebBundledIds);
   if (plugins.length === 0) return undefined;
   return { plugins };
 }
 
-function parsePluginEntries(piWeb: Record<string, unknown>, packagePath: string): PiWebPluginMetadataEntry[] {
+function parsePluginEntries(
+  piWeb: Record<string, unknown>,
+  packagePath: string,
+  allowPiWebBundledIds: boolean,
+): PiWebPluginMetadataEntry[] {
   if (piWeb["plugin"] !== undefined) {
     throw new Error(`Unsupported PI WEB plugin metadata in ${packagePath}: use piWeb.plugins with { id, module?, browserRoot?, serverModule?, machineSpecific? } entries`);
   }
@@ -650,7 +658,9 @@ function parsePluginEntries(piWeb: Record<string, unknown>, packagePath: string)
     if (!isRecord(entry)) throw new Error(`PI WEB plugin entry ${String(index + 1)} must be an object in ${packagePath}`);
     const id = entry["id"];
     if (typeof id !== "string" || !isPiWebPluginId(id)) throw new Error(`Invalid PI WEB plugin id in ${packagePath}: ${String(id)}`);
-    if (isReservedPiWebPluginId(id)) throw new Error(`Reserved PI WEB plugin id in ${packagePath}: ${id}`);
+    if (isReservedPiWebPluginId(id) && !(allowPiWebBundledIds && isPiWebBundledPluginId(id))) {
+      throw new ReservedPiWebPluginIdError(id, packagePath);
+    }
     const module = parseOptionalModule(entry["module"], "browser", packagePath, id);
     const serverModule = parseOptionalModule(entry["serverModule"], "server", packagePath, id);
     if (module === undefined && serverModule === undefined) throw new Error(`PI WEB plugin ${id} must declare module or serverModule in ${packagePath}`);
@@ -669,6 +679,14 @@ function parsePluginEntries(piWeb: Record<string, unknown>, packagePath: string)
       machineSpecific,
     };
   });
+}
+
+class ReservedPiWebPluginIdError extends Error {
+  override name = "ReservedPiWebPluginIdError";
+
+  constructor(readonly pluginId: string, packagePath: string) {
+    super(`Reserved PI WEB plugin id in ${packagePath}: ${pluginId}. Choose a different id; pi-web, pi-web.*, core, themes, and machine.* are host-owned.`);
+  }
 }
 
 function parseOptionalModule(value: unknown, kind: "browser" | "server", packagePath: string, pluginId: string): string | undefined {

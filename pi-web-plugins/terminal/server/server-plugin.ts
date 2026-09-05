@@ -44,8 +44,8 @@ const plugin: PiWebServerPlugin = {
 export default plugin;
 
 export function activateTerminalPlugin(context: ServerPluginActivationContext): TerminalActivation {
-  if (context.pluginId !== "terminal") {
-    throw new Error(`Terminal server entry must activate as plugin id terminal, received ${context.pluginId}`);
+  if (context.pluginId !== "pi-web.terminal") {
+    throw new Error(`Terminal server entry must activate as plugin id pi-web.terminal, received ${context.pluginId}`);
   }
   const notices = context.notices;
   if (notices?.version !== 1) {

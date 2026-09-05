@@ -7,7 +7,7 @@ import { browserErrorContext, browserErrorScopeKey, BrowserErrorReporter, clearB
 import { isSessionActive } from "../../../shared/activity";
 import { workspaceDeleteOperation } from "../../../shared/workspaceDeletion";
 import { PI_WEB_CAPABILITIES, supportsPiWebCapability } from "../../../shared/capabilities";
-import { machineScopedPluginId } from "../../../shared/machinePluginIds";
+import { machineScopedBundledPluginId, machineScopedManifestPluginId } from "../../../shared/machinePluginIds";
 import { AuthController } from "../controllers/authController";
 import { MachineController } from "../controllers/machineController";
 import { MachineStatusController } from "../controllers/machineStatusController";
@@ -1837,7 +1837,7 @@ export class PiWebApp extends LitElement {
       machineId: machine.id,
       shouldLoadPlugin: (entry) => this.plugins.shouldLoadRemotePlugin(entry.id, entry.machineSpecific)
         && ((entry.id === REQUIRED_TERMINAL_PLUGIN_ID && !this.terminalAvailableForMachine(machine.id))
-          || !this.plugins.hasPlugin(machineScopedPluginId(machine.id, entry.id))),
+          || !this.plugins.hasPlugin(machineScopedManifestPluginId(machine.id, entry.id))),
     }), machine.id)
       .then((loaded) => { if (loaded) this.loadedMachinePluginIds.add(machine.id); })
       .finally(() => { this.machinePluginLoadPromises.delete(machine.id); });
@@ -1872,7 +1872,7 @@ export class PiWebApp extends LitElement {
       }
       const terminalRuntimeId = machineId === "local"
         ? REQUIRED_TERMINAL_PLUGIN_ID
-        : machineScopedPluginId(machineId, REQUIRED_TERMINAL_PLUGIN_ID);
+        : machineScopedBundledPluginId(machineId, REQUIRED_TERMINAL_PLUGIN_ID);
       for (const registration of result.registrations) {
         const isRequiredTerminal = result.terminalMode === "required" && registration.id === terminalRuntimeId;
         try {
@@ -1995,7 +1995,7 @@ export class PiWebApp extends LitElement {
     const mode = this.verifiedPluginModeByMachine.get(machineId);
     const terminalRuntimeId = machineId === "local"
       ? REQUIRED_TERMINAL_PLUGIN_ID
-      : machineScopedPluginId(machineId, REQUIRED_TERMINAL_PLUGIN_ID);
+      : machineScopedBundledPluginId(machineId, REQUIRED_TERMINAL_PLUGIN_ID);
     if (pluginId === terminalRuntimeId) return mode === "required" && this.terminalAvailableForMachine(machineId);
     return mode === "recovery-disabled" || (mode === "required" && this.terminalAvailableForMachine(machineId));
   }

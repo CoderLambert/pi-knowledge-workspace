@@ -6,9 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   parsePluginBackendChannelServerEnvelope,
   PLUGIN_BACKEND_CHANNEL_DATA_FRAME_MAX_BYTES,
+  PLUGIN_BACKEND_CHANNEL_OPEN_FRAME_MAX_BYTES,
   serializePluginBackendChannelDataEnvelope,
 } from "../../shared/pluginBackendProtocol.js";
 import { PluginBackendChannelProxyAdmissionPool } from "./pluginBackendChannelProxyAdmission.js";
+import { installPluginBackendChannelWebSocketPayloadLimit } from "../webSocketBridge.js";
 import { registerPluginBackendChannelProxyRoutes } from "./pluginBackendChannelProxyRoutes.js";
 
 let app: FastifyInstance;
@@ -18,6 +20,7 @@ let sockets: WebSocket[];
 beforeEach(async () => {
   app = Fastify({ logger: false });
   await app.register(fastifyWebsocket);
+  installPluginBackendChannelWebSocketPayloadLimit(app.websocketServer);
   upstream = new WebSocketServer({ host: "127.0.0.1", port: 0 });
   await waitForListening(upstream);
   sockets = [];
@@ -87,6 +90,10 @@ describe("local plugin backend channel proxy", () => {
 
   it("rejects excess proxy admissions before opening another daemon socket", async () => {
     const admissions = new PluginBackendChannelProxyAdmissionPool({ maxTotal: 1, transportConnectTimeoutMs: 1_000 });
+    const receiverLimits: number[] = [];
+    app.websocketServer.on("connection", (socket) => {
+      receiverLimits.push(webSocketReceiverMaxPayload(socket));
+    });
     let connectionCount = 0;
     let resolveDaemonConnected: ((socket: WebSocket) => void) | undefined;
     const daemonConnected = new Promise<WebSocket>((resolve) => { resolveDaemonConnected = resolve; });
@@ -120,6 +127,10 @@ describe("local plugin backend channel proxy", () => {
     await expect(rejected).resolves.toMatchObject({ code: 1006 });
     expect(connectionCount).toBe(1);
     expect(admissions.activeCount).toBe(1);
+    expect(receiverLimits).toEqual([
+      PLUGIN_BACKEND_CHANNEL_OPEN_FRAME_MAX_BYTES,
+      PLUGIN_BACKEND_CHANNEL_OPEN_FRAME_MAX_BYTES,
+    ]);
 
     const firstClosed = nextClose(first);
     const daemonClosed = nextClose(daemonSocket);
@@ -281,6 +292,15 @@ function fastifyServerUrl(instance: FastifyInstance): string {
   const address = instance.server.address();
   if (address === null || typeof address === "string") throw new Error("Expected TCP server address");
   return `ws://127.0.0.1:${String(address.port)}`;
+}
+
+function webSocketReceiverMaxPayload(socket: WebSocket): number {
+  const receiver: unknown = Reflect.get(socket, "_receiver");
+  const maxPayload: unknown = typeof receiver === "object" && receiver !== null
+    ? Reflect.get(receiver, "_maxPayload")
+    : undefined;
+  if (typeof maxPayload !== "number") throw new Error("Expected ws receiver payload limit");
+  return maxPayload;
 }
 
 function rawDataToString(data: RawData): string {

@@ -21,10 +21,13 @@ type ServerNoticeScopeKey = typeof SERVER_NOTICE_SCOPE_KEYS[number];
 /** Validate, detach, and freeze the visibility selectors carried by a notice. */
 export function parseServerNoticeScope(value: unknown, label: string): ServerNoticeScope {
   if (!isPlainRecord(value)) throw new Error(`${label} must be an object`);
-  const keys = Object.keys(value);
-  const unsupportedKey = keys.find((key) => !isServerNoticeScopeKey(key));
-  if (unsupportedKey !== undefined) throw new Error(`Unsupported ${label} field: ${unsupportedKey}`);
-  if (keys.length === 0) {
+  let hasOwnKey = false;
+  for (const key in value) {
+    if (!Object.hasOwn(value, key)) continue;
+    hasOwnKey = true;
+    if (!isServerNoticeScopeKey(key)) throw new Error(`Unsupported ${label} field: ${key}`);
+  }
+  if (!hasOwnKey) {
     throw new Error(`${label} must contain at least one of projectId, workspaceId, or sessionId`);
   }
 
@@ -32,7 +35,7 @@ export function parseServerNoticeScope(value: unknown, label: string): ServerNot
   for (const key of SERVER_NOTICE_SCOPE_KEYS) {
     if (!Object.hasOwn(value, key)) continue;
     const id = value[key];
-    if (typeof id !== "string" || id.trim() === "" || id.length > SERVER_NOTICE_SCOPE_ID_MAX_LENGTH) {
+    if (typeof id !== "string" || id.length > SERVER_NOTICE_SCOPE_ID_MAX_LENGTH || id.trim() === "") {
       throw new Error(`${label} ${key} must be a non-empty string of at most ${String(SERVER_NOTICE_SCOPE_ID_MAX_LENGTH)} characters`);
     }
     scope[key] = id;
@@ -44,8 +47,28 @@ export function isPluginServerNoticeSource(source: string | undefined): source i
   return source?.startsWith(SERVER_PLUGIN_NOTICE_SOURCE_PREFIX) === true;
 }
 
-export function serverNoticeUtf8ByteLength(value: string): number {
-  return new TextEncoder().encode(value).byteLength;
+/** Return as soon as a string cannot fit within a notice UTF-8 byte budget. */
+export function serverNoticeStringExceedsUtf8ByteLimit(value: string, maxBytes: number): boolean {
+  let byteLength = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit <= 0x7f) {
+      byteLength += 1;
+    } else if (codeUnit <= 0x7ff) {
+      byteLength += 2;
+    } else if (codeUnit >= 0xd800 && codeUnit <= 0xdbff
+      && index + 1 < value.length
+      && value.charCodeAt(index + 1) >= 0xdc00
+      && value.charCodeAt(index + 1) <= 0xdfff) {
+      byteLength += 4;
+      index += 1;
+    } else {
+      // TextEncoder replaces isolated surrogates with the three-byte U+FFFD.
+      byteLength += 3;
+    }
+    if (byteLength > maxBytes) return true;
+  }
+  return false;
 }
 
 function isServerNoticeScopeKey(value: string): value is ServerNoticeScopeKey {

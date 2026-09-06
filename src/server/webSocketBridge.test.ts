@@ -10,6 +10,7 @@ import {
   bridgeSockets,
   createBoundedTextWebSocketSender,
   createBufferedSender,
+  installPluginBackendChannelWebSocketPayloadLimit,
 } from "./webSocketBridge.js";
 
 const servers = new Set<WebSocketServer>();
@@ -53,6 +54,48 @@ describe("bridgeSockets", () => {
     const clientClosed = nextClose(errorCaseClientSide.peerSocket);
     errorCaseUpstreamSide.bridgeSocket.emit("error", new Error("upstream failed"));
     await clientClosed;
+  });
+});
+
+describe("plugin backend channel upgrade payload limit", () => {
+  it("caps current direct and federated paired routes without narrowing unrelated upgrades", async () => {
+    const defaultMaxPayload = 8 * 1024 * 1024;
+    const socketServer = new WebSocketServer({ host: "127.0.0.1", port: 0, maxPayload: defaultMaxPayload });
+    servers.add(socketServer);
+    installPluginBackendChannelWebSocketPayloadLimit(socketServer);
+    const receiverLimits = new Map<string, number>();
+    socketServer.on("connection", (socket, request) => {
+      sockets.add(socket);
+      receiverLimits.set(request.url ?? "", webSocketReceiverMaxPayload(socket));
+      if (request.url?.includes("admission=denied") === true) {
+        socket.close(1013, "admission denied");
+      }
+    });
+    await waitForListening(socketServer);
+
+    const pairedPaths = [
+      "/paired-plugin-backends/pi-web.terminal/projects/p/workspaces/w/channels/terminal.attach",
+      "/api/paired-plugin-backends/pi-web.terminal/projects/p/workspaces/w/channels/terminal.attach?admission=denied",
+      "/api/machines/remote-one/paired-plugin-backends/pi-web.terminal/projects/p/workspaces/w/channels/terminal.attach",
+    ];
+    const unrelatedPaths = [
+      "/plugin-backends/pi-web.terminal/projects/p/workspaces/w/channels/terminal.attach",
+      "/api/sessions/session-1/socket",
+    ];
+
+    for (const path of [...pairedPaths, ...unrelatedPaths]) {
+      const client = new WebSocket(`${serverUrl(socketServer)}${path}`);
+      sockets.add(client);
+      const closed = nextClose(client);
+      await nextOpen(client);
+      if (!path.includes("admission=denied")) client.close();
+      await closed;
+    }
+
+    expect(pairedPaths.map((path) => receiverLimits.get(path)))
+      .toEqual(pairedPaths.map(() => PLUGIN_BACKEND_CHANNEL_OPEN_FRAME_MAX_BYTES));
+    expect(unrelatedPaths.map((path) => receiverLimits.get(path)))
+      .toEqual(unrelatedPaths.map(() => defaultMaxPayload));
   });
 });
 
@@ -311,6 +354,15 @@ function socketMessages(socket: WebSocket): { next(): Promise<string> } {
         : Promise.resolve(value);
     },
   };
+}
+
+function webSocketReceiverMaxPayload(socket: WebSocket): number {
+  const receiver: unknown = Reflect.get(socket, "_receiver");
+  const maxPayload: unknown = typeof receiver === "object" && receiver !== null
+    ? Reflect.get(receiver, "_maxPayload")
+    : undefined;
+  if (typeof maxPayload !== "number") throw new Error("Expected ws receiver payload limit");
+  return maxPayload;
 }
 
 function rawDataToString(data: RawData): string {

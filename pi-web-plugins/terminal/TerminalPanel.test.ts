@@ -5,16 +5,34 @@ import { Terminal } from "@xterm/xterm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TerminalBrowserRuntime } from "./TerminalBrowserRuntime";
 import { TerminalPanel, filterTerminalInput } from "./TerminalPanel";
+import { defineTerminalCustomElements, TERMINAL_SOFT_KEYS_ELEMENT } from "./pi-web-plugin";
 import { TERMINAL_CHANNEL_DATA_JSON_MAX_BYTES } from "./terminalProtocol";
 import { InMemoryTerminalSelectionMemory } from "./terminalSelection";
 
 afterEach(() => {
   document.body.replaceChildren();
+  localStorage.clear();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
 describe("Terminal panel lifecycle", () => {
+  it("renders the registered pi-web.terminal soft-key element from its default path", async () => {
+    defineTerminalCustomElements();
+    const panel = createTerminalPanel();
+    document.body.append(panel);
+    await panel.updateComplete;
+
+    Reflect.set(panel, "terminals", [terminalInfo("terminal-1")]);
+    Reflect.set(panel, "selectedId", "terminal-1");
+    Reflect.set(panel, "softKeysEnabled", true);
+    await panel.updateComplete;
+
+    expect(panel.shadowRoot?.querySelector(TERMINAL_SOFT_KEYS_ELEMENT)?.localName)
+      .toBe(TERMINAL_SOFT_KEYS_ELEMENT);
+    expect(panel.shadowRoot?.querySelector("pi-web-terminal-soft-keys-terminal")).toBeNull();
+  });
+
   it("closes the paired channel and cancels retries, requests, observers, timers, and Xterm on disconnect", () => {
     vi.useFakeTimers();
     const panel = createTerminalPanel();

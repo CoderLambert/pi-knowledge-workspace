@@ -363,6 +363,18 @@ describe("server plugin runtime", () => {
       scope: { sessionId: "s".repeat(SERVER_NOTICE_SCOPE_ID_MAX_LENGTH) },
       context: { value: "x".repeat(SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES - serializedEmptyContextBytes) },
     });
+    const escapedUnit = "\u0000";
+    const escapedUnitBytes = JSON.stringify(escapedUnit).length - 2;
+    const escapedCapacity = SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES - serializedEmptyContextBytes;
+    const escapedValue = escapedUnit.repeat(Math.floor(escapedCapacity / escapedUnitBytes))
+      + "x".repeat(escapedCapacity % escapedUnitBytes);
+    expect(new TextEncoder().encode(JSON.stringify({ value: escapedValue })).byteLength)
+      .toBe(SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES);
+    noticeReporter.record({
+      severity: "info",
+      message: "Escaped context boundary",
+      context: { value: escapedValue },
+    });
     const maximumDepth: Record<string, unknown> = {};
     let cursor = maximumDepth;
     for (let depth = 0; depth < SERVER_PLUGIN_NOTICE_CONTEXT_MAX_DEPTH; depth += 1) {
@@ -376,7 +388,7 @@ describe("server plugin runtime", () => {
       context: maximumDepth,
     }]);
 
-    expect(records).toHaveLength(2);
+    expect(records).toHaveLength(3);
     await runtime.stop();
   });
 
@@ -484,12 +496,26 @@ describe("server plugin runtime", () => {
       cursor["nested"] = nested;
       cursor = nested;
     }
+    const broadPropertyCount = 20_000;
+    let broadContextReads = 0;
+    const broadContext: Record<string, unknown> = {};
+    for (let index = 0; index < broadPropertyCount; index += 1) {
+      Object.defineProperty(broadContext, `field-${String(index).padStart(5, "0")}`, {
+        enumerable: true,
+        get() {
+          broadContextReads += 1;
+          if (index === broadPropertyCount - 1) throw new Error("notice validation read beyond its byte budget");
+          return "x";
+        },
+      });
+    }
     const invalidCases: { input: unknown; message: string }[] = [
       { input: { severity: "error", message: "Invalid array", context: { values: bigintArray } }, message: "must contain only JSON values" },
       { input: { severity: "error", message: "Invalid array", context: { values: [() => undefined] } }, message: "must contain only JSON values" },
       { input: { severity: "error", message: "Invalid array", context: { values: circularArray } }, message: "must not contain cycles" },
       { input: { severity: "error", message: "Invalid array", context: { values: sparseArray } }, message: "must not contain sparse arrays" },
       { input: { severity: "error", message: "🙂".repeat((SERVER_PLUGIN_NOTICE_MESSAGE_MAX_BYTES / 4) + 1) }, message: "message exceeds the 4096 byte limit" },
+      { input: { severity: "error", message: "Broad oversized context", context: broadContext }, message: "context exceeds the 16384 byte limit" },
       { input: { severity: "error", message: "Oversized context", context: { value: "x".repeat(SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES) } }, message: "context exceeds the 16384 byte limit" },
       { input: { severity: "error", message: "Deep context", context: tooDeep }, message: "maximum JSON depth of 32" },
       { input: { severity: "error", message: "Empty scope", scope: {} }, message: "must contain at least one" },
@@ -504,6 +530,8 @@ describe("server plugin runtime", () => {
     }
 
     expect(sanitizingMap).not.toHaveBeenCalled();
+    expect(broadContextReads).toBeGreaterThan(0);
+    expect(broadContextReads).toBeLessThan(broadPropertyCount);
     expect(noticeSink).toHaveBeenCalledOnce();
     expect(publishGlobal).toHaveBeenCalledOnce();
     expect(notices.snapshot()).toEqual(baseline);

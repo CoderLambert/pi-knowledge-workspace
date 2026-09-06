@@ -43,7 +43,7 @@ interface TerminalReplayInputSuppression {
 export class TerminalPanel extends LitElement {
   @property({ attribute: false }) context: WorkspacePanelContext | undefined;
   @property({ attribute: false }) runtime: TerminalBrowserRuntime | undefined;
-  @property({ attribute: false }) softKeysElementName = "pi-web-terminal-soft-keys-terminal";
+  @property({ attribute: false }) softKeysElementName = "pi-web-terminal-soft-keys-pi-web-terminal";
   @query(".terminal-host") private terminalHost?: HTMLDivElement | null;
   @query(".terminal-copy-content") private terminalCopyContent?: HTMLPreElement | null;
   @query(".terminal-copy-selector") private terminalCopySelector?: HTMLTextAreaElement | null;

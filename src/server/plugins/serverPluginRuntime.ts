@@ -28,7 +28,7 @@ import {
   SERVER_PLUGIN_NOTICE_CONTEXT_MAX_DEPTH,
   SERVER_PLUGIN_NOTICE_MESSAGE_MAX_BYTES,
   SERVER_PLUGIN_NOTICE_SOURCE_PREFIX,
-  serverNoticeUtf8ByteLength,
+  serverNoticeStringExceedsUtf8ByteLimit,
 } from "../../shared/serverNoticeContract.js";
 import {
   REQUIRED_TERMINAL_PLUGIN_ID,
@@ -261,9 +261,10 @@ export class ServerPluginRuntime {
     this.stopped = true;
     const activePlugins = [...this.activePlugins].reverse();
     this.activePlugins = [];
-    // Revoke every reporter before the first plugin cleanup callback can run.
-    for (const active of activePlugins) active.noticeReporter?.revoke();
     for (const active of activePlugins) {
+      // A plugin remains active while reverse-order dependents stop. Revoke its
+      // reporter immediately before its own cleanup, never earlier or later.
+      active.noticeReporter?.revoke();
       const stop = active.activation.stop?.bind(active.activation);
       if (stop === undefined) continue;
       try {
@@ -730,30 +731,36 @@ function createScopedNoticeReporter(
 function parseServerPluginNoticeInput(value: unknown): ServerPluginNoticeInput {
   if (!isPlainRecord(value)) throw new Error("Server plugin notice input must be an object");
   if ("source" in value) throw new Error("Server plugin notices cannot set their source");
-  const unsupportedKey = Object.keys(value)
-    .find((key) => key !== "severity" && key !== "message" && key !== "scope" && key !== "context");
-  if (unsupportedKey !== undefined) throw new Error(`Unsupported server plugin notice field: ${unsupportedKey}`);
+  for (const key in value) {
+    if (!Object.hasOwn(value, key)) continue;
+    if (key !== "severity" && key !== "message" && key !== "scope" && key !== "context") {
+      throw new Error(`Unsupported server plugin notice field: ${key}`);
+    }
+  }
   const severity = value["severity"];
   if (severity !== "info" && severity !== "warning" && severity !== "error") {
     throw new Error("Server plugin notice severity must be info, warning, or error");
   }
   const message = value["message"];
-  if (typeof message !== "string" || message.trim() === "") {
+  if (typeof message !== "string") {
     throw new Error("Server plugin notice message must be a non-empty string");
   }
-  if (serverNoticeUtf8ByteLength(message) > SERVER_PLUGIN_NOTICE_MESSAGE_MAX_BYTES) {
+  if (serverNoticeStringExceedsUtf8ByteLimit(message, SERVER_PLUGIN_NOTICE_MESSAGE_MAX_BYTES)) {
     throw new Error(`Server plugin notice message exceeds the ${String(SERVER_PLUGIN_NOTICE_MESSAGE_MAX_BYTES)} byte limit`);
+  }
+  // This scan and allocation are bounded because the UTF-8 limit passed first.
+  if (message.trim() === "") {
+    throw new Error("Server plugin notice message must be a non-empty string");
   }
   const scope = value["scope"] === undefined
     ? undefined
     : parseServerNoticeScope(value["scope"], "Server plugin notice scope");
   const context = value["context"] === undefined
     ? undefined
-    : cloneJsonObject(value["context"], "server plugin notice context", SERVER_PLUGIN_NOTICE_CONTEXT_MAX_DEPTH);
-  if (context !== undefined
-    && serverNoticeUtf8ByteLength(JSON.stringify(context)) > SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES) {
-    throw new Error(`Server plugin notice context exceeds the ${String(SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES)} byte limit`);
-  }
+    : cloneJsonObject(value["context"], "server plugin notice context", {
+        maxDepth: SERVER_PLUGIN_NOTICE_CONTEXT_MAX_DEPTH,
+        maxBytes: SERVER_PLUGIN_NOTICE_CONTEXT_MAX_BYTES,
+      });
   return Object.freeze({
     severity,
     message,
@@ -801,9 +808,23 @@ async function runBounded<T>(
   }
 }
 
-function cloneJsonObject(value: unknown, label: string, maxDepth?: number): JsonObject {
+interface JsonCloneLimits {
+  readonly maxDepth?: number;
+  readonly maxBytes?: number;
+}
+
+interface JsonCloneByteBudget {
+  readonly label: string;
+  readonly maxBytes: number;
+  remaining: number;
+}
+
+function cloneJsonObject(value: unknown, label: string, limits: JsonCloneLimits = {}): JsonObject {
   if (!isPlainRecord(value)) throw new IncompatibleServerPluginError(`${label} must be a JSON object`);
-  return cloneJsonRecord(value, new Set<object>(), label, 0, maxDepth);
+  const byteBudget = limits.maxBytes === undefined
+    ? undefined
+    : { label, maxBytes: limits.maxBytes, remaining: limits.maxBytes };
+  return cloneJsonRecord(value, new Set<object>(), label, 0, limits.maxDepth, byteBudget);
 }
 
 function cloneJsonRecord(
@@ -812,13 +833,25 @@ function cloneJsonRecord(
   label: string,
   depth: number,
   maxDepth: number | undefined,
+  byteBudget: JsonCloneByteBudget | undefined,
 ): JsonObject {
   requireJsonDepth(depth, maxDepth, label);
   if (ancestors.has(value)) throw new IncompatibleServerPluginError(`${label} must not contain cycles`);
+  consumeJsonBytes(byteBudget, 2); // Opening and closing braces.
   ancestors.add(value);
   const output: Record<string, JsonValue> = {};
-  for (const [key, child] of Object.entries(value)) {
-    defineJsonProperty(output, key, cloneJsonValue(child, ancestors, label, depth + 1, maxDepth));
+  let propertyCount = 0;
+  for (const key in value) {
+    if (!Object.hasOwn(value, key)) continue;
+    if (propertyCount > 0) consumeJsonBytes(byteBudget, 1); // Comma.
+    consumeJsonStringBytes(byteBudget, key);
+    consumeJsonBytes(byteBudget, 1); // Colon.
+    defineJsonProperty(
+      output,
+      key,
+      cloneJsonValue(value[key], ancestors, label, depth + 1, maxDepth, byteBudget),
+    );
+    propertyCount += 1;
   }
   ancestors.delete(value);
   return Object.freeze(output);
@@ -830,15 +863,28 @@ function cloneJsonValue(
   label: string,
   depth: number,
   maxDepth: number | undefined,
+  byteBudget: JsonCloneByteBudget | undefined,
 ): JsonValue {
   requireJsonDepth(depth, maxDepth, label);
-  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new IncompatibleServerPluginError(`${label} must contain only finite JSON numbers`);
+  if (value === null) {
+    consumeJsonBytes(byteBudget, 4);
     return value;
   }
-  if (Array.isArray(value)) return cloneJsonArray(value, ancestors, label, depth, maxDepth);
-  if (isPlainRecord(value)) return cloneJsonRecord(value, ancestors, label, depth, maxDepth);
+  if (typeof value === "string") {
+    consumeJsonStringBytes(byteBudget, value);
+    return value;
+  }
+  if (typeof value === "boolean") {
+    consumeJsonBytes(byteBudget, value ? 4 : 5);
+    return value;
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new IncompatibleServerPluginError(`${label} must contain only finite JSON numbers`);
+    consumeJsonBytes(byteBudget, String(value).length);
+    return value;
+  }
+  if (Array.isArray(value)) return cloneJsonArray(value, ancestors, label, depth, maxDepth, byteBudget);
+  if (isPlainRecord(value)) return cloneJsonRecord(value, ancestors, label, depth, maxDepth, byteBudget);
   throw new IncompatibleServerPluginError(`${label} must contain only JSON values`);
 }
 
@@ -848,9 +894,11 @@ function cloneJsonArray(
   label: string,
   depth: number,
   maxDepth: number | undefined,
+  byteBudget: JsonCloneByteBudget | undefined,
 ): readonly JsonValue[] {
   requireJsonDepth(depth, maxDepth, label);
   if (ancestors.has(value)) throw new IncompatibleServerPluginError(`${label} must not contain cycles`);
+  consumeJsonBytes(byteBudget, 2); // Opening and closing brackets.
   ancestors.add(value);
   try {
     const output: JsonValue[] = [];
@@ -860,11 +908,50 @@ function cloneJsonArray(
       if (!Object.hasOwn(value, index)) {
         throw new IncompatibleServerPluginError(`${label} must not contain sparse arrays`);
       }
-      output[index] = cloneJsonValue(value[index], ancestors, label, depth + 1, maxDepth);
+      if (index > 0) consumeJsonBytes(byteBudget, 1); // Comma.
+      output[index] = cloneJsonValue(value[index], ancestors, label, depth + 1, maxDepth, byteBudget);
     }
     return Object.freeze(output);
   } finally {
     ancestors.delete(value);
+  }
+}
+
+function consumeJsonStringBytes(byteBudget: JsonCloneByteBudget | undefined, value: string): void {
+  if (byteBudget === undefined) return;
+  consumeJsonBytes(byteBudget, 2); // Opening and closing quotes.
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit === 0x22 || codeUnit === 0x5c
+      || codeUnit === 0x08 || codeUnit === 0x09 || codeUnit === 0x0a
+      || codeUnit === 0x0c || codeUnit === 0x0d) {
+      consumeJsonBytes(byteBudget, 2);
+    } else if (codeUnit <= 0x1f) {
+      consumeJsonBytes(byteBudget, 6);
+    } else if (codeUnit <= 0x7f) {
+      consumeJsonBytes(byteBudget, 1);
+    } else if (codeUnit <= 0x7ff) {
+      consumeJsonBytes(byteBudget, 2);
+    } else if (codeUnit >= 0xd800 && codeUnit <= 0xdbff
+      && index + 1 < value.length
+      && value.charCodeAt(index + 1) >= 0xdc00
+      && value.charCodeAt(index + 1) <= 0xdfff) {
+      consumeJsonBytes(byteBudget, 4);
+      index += 1;
+    } else if (codeUnit >= 0xd800 && codeUnit <= 0xdfff) {
+      // Well-formed JSON.stringify escapes isolated UTF-16 surrogates as \uXXXX.
+      consumeJsonBytes(byteBudget, 6);
+    } else {
+      consumeJsonBytes(byteBudget, 3);
+    }
+  }
+}
+
+function consumeJsonBytes(byteBudget: JsonCloneByteBudget | undefined, count: number): void {
+  if (byteBudget === undefined) return;
+  byteBudget.remaining -= count;
+  if (byteBudget.remaining < 0) {
+    throw new Error(`${byteBudget.label} exceeds the ${String(byteBudget.maxBytes)} byte limit`);
   }
 }
 

@@ -381,7 +381,7 @@ function isPluginBackendChannelUpgradePath(rawUrl: string | undefined): boolean 
   if (segments[index] === "api") index += 1;
   if (segments[index] === "machines") index += 2;
   return segments.length - index === 8
-    && segments[index] === "plugin-backends"
+    && segments[index] === "paired-plugin-backends"
     && segments[index + 2] === "projects"
     && segments[index + 4] === "workspaces"
     && segments[index + 6] === "channels";

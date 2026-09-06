@@ -370,12 +370,11 @@ export function setPluginBackendChannelSocketPayloadLimit(socket: WebSocket, max
 
 function isPluginBackendChannelUpgradePath(rawUrl: string | undefined): boolean {
   if (rawUrl === undefined) return false;
-  let pathname: string;
-  try {
-    pathname = new URL(rawUrl, "http://pi-web.local").pathname;
-  } catch {
-    return false;
-  }
+  // Match the raw request target that Fastify routes. WHATWG URL parsing
+  // normalizes percent-encoded complete dot segments before ws allocates its
+  // receiver, even though Fastify retains those segments as route parameters.
+  const queryIndex = rawUrl.indexOf("?");
+  const pathname = queryIndex === -1 ? rawUrl : rawUrl.slice(0, queryIndex);
   const segments = pathname.split("/").filter((segment) => segment !== "");
   let index = 0;
   if (segments[index] === "api") index += 1;

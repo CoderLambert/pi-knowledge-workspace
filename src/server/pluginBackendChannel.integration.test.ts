@@ -3,10 +3,11 @@ import { createConnection, Socket as NetSocket } from "node:net";
 import Fastify, { type FastifyInstance } from "fastify";
 import fastifyWebsocket from "@fastify/websocket";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { WebSocket, type RawData } from "ws";
+import { WebSocket, type RawData, type WebSocketServer } from "ws";
 import type { JsonValue } from "../server-plugin-api.js";
 import {
   parsePluginBackendChannelServerEnvelope,
+  PLUGIN_BACKEND_CHANNEL_OPEN_FRAME_MAX_BYTES,
   serializePluginBackendChannelDataEnvelope,
   serializePluginBackendChannelOpenEnvelope,
 } from "../shared/pluginBackendProtocol.js";
@@ -135,7 +136,7 @@ describe("plugin backend channel end-to-end teardown and receive drain", () => {
     transport.destroy();
   });
 
-  it.each(channelKinds)("physically bounds paused no-open and abnormal sockets through %s", async (kind) => {
+  it.each(channelKinds)("preallocates and physically bounds encoded-dot admission rejections through %s", async (kind) => {
     const topology = await createTopology(() => ({ receive: () => undefined }), { maxTotal: 1 });
     const rawSockets: NetSocket[] = [];
     try {
@@ -146,8 +147,15 @@ describe("plugin backend channel end-to-end teardown and receive drain", () => {
         expect(topology.registry.activeChannelCount()).toBe(1);
       });
 
-      const denied = await Promise.all(Array.from({ length: 3 }, async () => openRawWebSocket(topology.url(kind))));
+      const deniedPath = encodedDotChannelRequestPath(kind);
+      const denied = await Promise.all(Array.from(
+        { length: 3 },
+        async () => openRawWebSocket(topology.url(kind), deniedPath),
+      ));
       rawSockets.push(...denied);
+      expect(topology.receiverPayloadLimits(kind, deniedPath)).toEqual(
+        Array.from({ length: 3 }, () => PLUGIN_BACKEND_CHANNEL_OPEN_FRAME_MAX_BYTES),
+      );
       await vi.waitFor(() => {
         expect(topology.physicalSocketCounts(kind)).toEqual(expectedPhysicalCounts(kind, 1));
         expect(topology.registry.activeChannelCount()).toBe(1);
@@ -171,6 +179,7 @@ interface ChannelTopology {
   connect(kind: ChannelKind): WebSocket;
   url(kind: ChannelKind): string;
   physicalSocketCounts(kind: ChannelKind): { sessiond: number; local: number; federated: number };
+  receiverPayloadLimits(kind: ChannelKind, requestPath: string): readonly number[];
   activeProxyAdmissions(): { local: number; federated: number };
   close(): Promise<void>;
 }
@@ -201,6 +210,7 @@ async function createTopology(
   const browserSockets = new Set<WebSocket>();
 
   const sessiond = await websocketApp();
+  const sessiondReceiverPayloadLimits = captureReceiverPayloadLimits(sessiond.websocketServer);
   registerPluginBackendChannelRoutes(sessiond, {
     projects: { requireProject: (projectId) => projectId === project.id ? Promise.resolve(project) : Promise.reject(new Error("Project not found")) },
     backends: registry,
@@ -208,6 +218,7 @@ async function createTopology(
   await sessiond.listen({ host: "127.0.0.1", port: 0 });
 
   const local = await websocketApp();
+  const localReceiverPayloadLimits = captureReceiverPayloadLimits(local.websocketServer);
   registerPluginBackendChannelProxyRoutes(local, {
     connectWebSocket(path, socketOptions) {
       const socket = new WebSocket(`${serverUrl(sessiond)}${path}`, socketOptions);
@@ -227,6 +238,7 @@ async function createTopology(
     },
   };
   const federated = await websocketApp();
+  const federatedReceiverPayloadLimits = captureReceiverPayloadLimits(federated.websocketServer);
   registerMachineProxyRoutes(federated, {
     remoteClient: (machineId) => Promise.resolve(machineId === "remote" ? remoteClient : undefined),
   }, federatedAdmissions);
@@ -252,6 +264,14 @@ async function createTopology(
         local: kind === "direct" ? 0 : local.websocketServer.clients.size,
         federated: kind === "federated" ? federated.websocketServer.clients.size : 0,
       };
+    },
+    receiverPayloadLimits(kind, requestPath) {
+      const limits = kind === "direct"
+        ? sessiondReceiverPayloadLimits
+        : kind === "local-proxy"
+          ? localReceiverPayloadLimits
+          : federatedReceiverPayloadLimits;
+      return [...(limits.get(requestPath) ?? [])];
     },
     activeProxyAdmissions: () => ({ local: localAdmissions.activeCount, federated: federatedAdmissions.activeCount }),
     async close() {
@@ -312,6 +332,32 @@ function expectedProxyAdmissions(kind: ChannelKind, count: number): { local: num
   };
 }
 
+function encodedDotChannelRequestPath(kind: ChannelKind): string {
+  const channelPath = "/paired-plugin-backends/pi-web.terminal/projects/%2e%2e/workspaces/workspace-one/channels/terminal.attach";
+  if (kind === "direct") return channelPath;
+  if (kind === "local-proxy") return `/api${channelPath}`;
+  return `/api/machines/remote${channelPath}`;
+}
+
+function captureReceiverPayloadLimits(server: WebSocketServer): Map<string, number[]> {
+  const limits = new Map<string, number[]>();
+  server.on("connection", (socket, request) => {
+    const requestLimits = limits.get(request.url ?? "") ?? [];
+    requestLimits.push(webSocketReceiverMaxPayload(socket));
+    limits.set(request.url ?? "", requestLimits);
+  });
+  return limits;
+}
+
+function webSocketReceiverMaxPayload(socket: WebSocket): number {
+  const receiver: unknown = Reflect.get(socket, "_receiver");
+  const maxPayload: unknown = typeof receiver === "object" && receiver !== null
+    ? Reflect.get(receiver, "_maxPayload")
+    : undefined;
+  if (typeof maxPayload !== "number") throw new Error("Expected ws receiver payload limit");
+  return maxPayload;
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => { setTimeout(resolve, ms); });
 }
@@ -360,8 +406,9 @@ function socketMessages(socket: WebSocket): { next(): Promise<string> } {
   };
 }
 
-async function openRawWebSocket(urlValue: string): Promise<NetSocket> {
+async function openRawWebSocket(urlValue: string, rawRequestPath?: string): Promise<NetSocket> {
   const url = new URL(urlValue);
+  const requestPath = rawRequestPath ?? `${url.pathname}${url.search}`;
   const port = Number(url.port);
   const socket = createConnection({ host: url.hostname, port });
   socket.on("error", () => undefined);
@@ -385,7 +432,7 @@ async function openRawWebSocket(urlValue: string): Promise<NetSocket> {
     socket.once("connect", () => {
       const key = randomBytes(16).toString("base64");
       socket.write([
-        `GET ${url.pathname}${url.search} HTTP/1.1`,
+        `GET ${requestPath} HTTP/1.1`,
         `Host: ${url.host}`,
         "Upgrade: websocket",
         "Connection: Upgrade",

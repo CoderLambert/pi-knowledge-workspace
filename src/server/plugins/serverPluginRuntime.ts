@@ -59,10 +59,10 @@ export interface ServerPluginRuntimeRecord {
   browserRevision?: string;
   settingsRevision: string;
   machineSpecific: boolean;
-  /** Additive browser feature detection for a direct paired request backend. */
-  backendCapabilityVersion?: 1;
-  /** Additive browser feature detection for bounded paired channels. */
-  channelVersion?: 1;
+  /** Additive browser feature detection for package-paired requests. */
+  pairedRequestVersion?: 1;
+  /** Additive browser feature detection for package-paired channels. */
+  pairedChannelVersion?: 1;
   state: ServerPluginRuntimeState;
   name?: string;
   phase?: ServerPluginLifecyclePhase;
@@ -279,8 +279,8 @@ export class ServerPluginRuntime {
           name: active.plugin.name,
           phase: "stop",
           message: errorMessage(error),
-          ...(active.activation.pairedBackend === undefined ? {} : { backendCapabilityVersion: 1 }),
-          ...(active.activation.pairedBackend?.openChannel === undefined ? {} : { channelVersion: 1 }),
+          ...(active.activation.pairedBackend?.request === undefined ? {} : { pairedRequestVersion: 1 }),
+          ...(active.activation.pairedBackend?.openChannel === undefined ? {} : { pairedChannelVersion: 1 }),
         }));
         this.logger.error({ err: error, pluginId: active.entry.id, phase: "stop" }, "server plugin stop failed");
       }
@@ -380,8 +380,8 @@ export class ServerPluginRuntime {
       this.recordsById.set(entry.id, recordFor(entry, {
         state: "active",
         name: loadedPlugin.name,
-        ...(pairedBackendContribution === undefined ? {} : { backendCapabilityVersion: 1 }),
-        ...(pairedBackendContribution?.backend.openChannel === undefined ? {} : { channelVersion: 1 }),
+        ...(pairedBackendContribution?.backend.request === undefined ? {} : { pairedRequestVersion: 1 }),
+        ...(pairedBackendContribution?.backend.openChannel === undefined ? {} : { pairedChannelVersion: 1 }),
       }));
       this.logger.info({ pluginId: entry.id, pluginName: loadedPlugin.name }, "server plugin activated");
     } catch (error) {
@@ -436,7 +436,7 @@ function requireTerminalCatalogEntry(snapshot: PiWebPluginCatalogSnapshot): PiWe
 }
 
 function requireTerminalActivation(activation: InternalServerPluginActivation): void {
-  if (activation.pairedBackend?.openChannel === undefined) {
+  if (activation.pairedBackend?.request === undefined || activation.pairedBackend.openChannel === undefined) {
     throw new IncompatibleServerPluginError("Required Terminal server entry must expose paired request and channel version 1");
   }
   if (activation.requiredTerminalService === undefined) {
@@ -466,7 +466,7 @@ function disabledReason(entry: PiWebPluginCatalogEntry, safeStart: ServerPluginS
 
 function recordFor(
   entry: PiWebPluginCatalogEntry,
-  status: Pick<ServerPluginRuntimeRecord, "state"> & Partial<Pick<ServerPluginRuntimeRecord, "name" | "phase" | "message" | "backendCapabilityVersion" | "channelVersion">>,
+  status: Pick<ServerPluginRuntimeRecord, "state"> & Partial<Pick<ServerPluginRuntimeRecord, "name" | "phase" | "message" | "pairedRequestVersion" | "pairedChannelVersion">>,
 ): ServerPluginRuntimeRecord {
   return Object.freeze({
     pluginId: entry.id,
@@ -476,8 +476,8 @@ function recordFor(
     ...(entry.browserModule === undefined ? {} : { browserRevision: entry.browserModule.revision }),
     settingsRevision: entry.settingsRevision,
     machineSpecific: entry.machineSpecific,
-    ...(status.backendCapabilityVersion === undefined ? {} : { backendCapabilityVersion: status.backendCapabilityVersion }),
-    ...(status.channelVersion === undefined ? {} : { channelVersion: status.channelVersion }),
+    ...(status.pairedRequestVersion === undefined ? {} : { pairedRequestVersion: status.pairedRequestVersion }),
+    ...(status.pairedChannelVersion === undefined ? {} : { pairedChannelVersion: status.pairedChannelVersion }),
     state: status.state,
     ...(status.name === undefined ? {} : { name: status.name }),
     ...(status.phase === undefined ? {} : { phase: status.phase }),
@@ -604,13 +604,13 @@ function isServerPluginActivation(value: unknown): value is ServerPluginActivati
 
 function snapshotPairedPluginBackend(value: unknown): PairedPluginBackendV1 {
   if (!isPairedPluginBackend(value)) {
-    throw new IncompatibleServerPluginError("Server plugin pairedBackend must be a version 1 request backend with an optional channel opener");
+    throw new IncompatibleServerPluginError("Server plugin pairedBackend must be version 1 with at least one request or channel handler");
   }
-  const request = value.request.bind(value);
+  const request = value.request?.bind(value);
   const openChannel = value.openChannel?.bind(value);
   return Object.freeze({
     version: 1,
-    request: (context: PairedPluginRequestContext) => request(context),
+    ...(request === undefined ? {} : { request: (context: PairedPluginRequestContext) => request(context) }),
     ...(openChannel === undefined ? {} : {
       openChannel: async (context: PairedPluginChannelOpenContext) => snapshotPairedPluginChannel(await openChannel(context)),
     }),
@@ -618,10 +618,12 @@ function snapshotPairedPluginBackend(value: unknown): PairedPluginBackendV1 {
 }
 
 function isPairedPluginBackend(value: unknown): value is PairedPluginBackendV1 {
-  return isRecord(value)
-    && value["version"] === 1
-    && typeof value["request"] === "function"
-    && (value["openChannel"] === undefined || typeof value["openChannel"] === "function");
+  if (!isRecord(value) || value["version"] !== 1) return false;
+  const request = value["request"];
+  const openChannel = value["openChannel"];
+  return (typeof request === "function" || typeof openChannel === "function")
+    && (request === undefined || typeof request === "function")
+    && (openChannel === undefined || typeof openChannel === "function");
 }
 
 function snapshotPairedPluginChannel(value: unknown): PairedPluginChannel {

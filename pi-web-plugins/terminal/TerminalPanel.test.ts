@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import type { JsonValue, WorkspaceBackend, WorkspaceBackendChannelOptions, WorkspacePanelContext, WorkspacePanelNavigationV1 } from "@jmfederico/pi-web/plugin-api";
+import type { JsonValue, PairedWorkspaceBackendChannelOptions, PairedWorkspaceBackendV1, WorkspacePanelContext, WorkspacePanelNavigationV1 } from "@jmfederico/pi-web/plugin-api";
 import { Terminal } from "@xterm/xterm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TerminalBrowserRuntime } from "./TerminalBrowserRuntime";
@@ -92,7 +92,7 @@ describe("Terminal panel lifecycle", () => {
       void operation;
       return Promise.resolve([]);
     });
-    Reflect.set(passivePanel, "context", terminalContext({ backend: terminalBackend(passiveRequest) }));
+    Reflect.set(passivePanel, "context", terminalContext({ pairedBackend: terminalBackend(passiveRequest) }));
     Reflect.set(passivePanel, "runtime", new TerminalBrowserRuntime(new InMemoryTerminalSelectionMemory()));
     callPanelMethod(passivePanel, "willUpdate");
 
@@ -105,7 +105,7 @@ describe("Terminal panel lifecycle", () => {
     const explicitRequest = vi.fn((operation: string): Promise<JsonValue> =>
       Promise.resolve(operation === "terminal.create" ? terminalInfo("created-terminal") : []));
     Reflect.set(explicitPanel, "context", terminalContext({
-      backend: terminalBackend(explicitRequest),
+      pairedBackend: terminalBackend(explicitRequest),
       navigation: { ...terminalNavigation(undefined, "open-1"), set: setNavigation },
     }));
     Reflect.set(explicitPanel, "runtime", new TerminalBrowserRuntime(new InMemoryTerminalSelectionMemory()));
@@ -128,11 +128,11 @@ describe("Terminal panel lifecycle", () => {
       createSignal = options?.signal;
       return pendingCreate.promise;
     });
-    const contextA = terminalContext({ backend: terminalBackend(request) });
+    const contextA = terminalContext({ pairedBackend: terminalBackend(request) });
     const setContextBNavigation = vi.fn();
     const contextB = terminalContext({
       workspace: { id: "workspace-2", projectId: "project-2", path: "/repo", label: "other", isMain: true },
-      backend: terminalBackend(vi.fn(() => Promise.resolve([]))),
+      pairedBackend: terminalBackend(vi.fn(() => Promise.resolve([]))),
       navigation: { ...terminalNavigation(), set: setContextBNavigation },
     });
     Reflect.set(panel, "context", contextA);
@@ -184,7 +184,7 @@ describe("Terminal panel lifecycle", () => {
     const panel = createTerminalPanel();
     const runtime = new TerminalBrowserRuntime(new InMemoryTerminalSelectionMemory());
     const request = vi.fn(() => Promise.reject(new Error("offline")));
-    Reflect.set(panel, "context", terminalContext({ backend: terminalBackend(request) }));
+    Reflect.set(panel, "context", terminalContext({ pairedBackend: terminalBackend(request) }));
     Reflect.set(panel, "runtime", runtime);
     callPanelMethod(panel, "willUpdate");
     Reflect.set(panel, "visible", true);
@@ -211,7 +211,7 @@ describe("Terminal panel lifecycle", () => {
       requestSignal = options?.signal;
       return pendingRuns.promise;
     });
-    Reflect.set(panel, "context", terminalContext({ backend: terminalBackend(request) }));
+    Reflect.set(panel, "context", terminalContext({ pairedBackend: terminalBackend(request) }));
     Reflect.set(panel, "runtime", runtime);
     callPanelMethod(panel, "willUpdate");
     Reflect.set(panel, "commandRuns", [commandRun("running")]);
@@ -262,7 +262,7 @@ describe("Terminal panel lifecycle", () => {
     const panel = createTerminalPanel();
     const channel = { closed: new Promise<never>(() => undefined), send: vi.fn(), close: vi.fn() };
     const openChannel = vi.fn(() => Promise.resolve(channel));
-    const context = terminalContext({ backend: terminalBackend(vi.fn(() => Promise.resolve([])), openChannel) });
+    const context = terminalContext({ pairedBackend: terminalBackend(vi.fn(() => Promise.resolve([])), openChannel) });
     const terminal = { reset: vi.fn(), write: vi.fn(), writeln: vi.fn(), dispose: vi.fn() };
     Reflect.set(panel, "context", context);
     Reflect.set(panel, "visible", true);
@@ -284,7 +284,7 @@ describe("Terminal panel lifecycle", () => {
     const panel = createTerminalPanel();
     const channel = { closed: new Promise<never>(() => undefined), send: vi.fn(), close: vi.fn() };
     let attempt = 0;
-    const openChannel: NonNullable<WorkspaceBackend["openChannel"]> = vi.fn((operation: string, input: JsonValue, options: WorkspaceBackendChannelOptions) => {
+    const openChannel: NonNullable<PairedWorkspaceBackendV1["openChannel"]> = vi.fn((operation: string, input: JsonValue, options: PairedWorkspaceBackendChannelOptions) => {
       void operation;
       void input;
       attempt += 1;
@@ -292,7 +292,7 @@ describe("Terminal panel lifecycle", () => {
       options.onData({ type: "output", data: "replayed output", replay: true, replayComplete: true });
       return Promise.resolve(channel);
     });
-    const context = terminalContext({ backend: terminalBackend(vi.fn(() => Promise.resolve([])), openChannel) });
+    const context = terminalContext({ pairedBackend: terminalBackend(vi.fn(() => Promise.resolve([])), openChannel) });
     const terminal = { reset: vi.fn(), write: vi.fn(), writeln: vi.fn(), dispose: vi.fn() };
     Reflect.set(panel, "visible", true);
     Reflect.set(panel, "selectedId", "terminal-1");
@@ -321,7 +321,7 @@ describe("Terminal panel lifecycle", () => {
     const panel = createTerminalPanel();
     const channel = { closed: new Promise<never>(() => undefined), send: vi.fn(), close: vi.fn() };
     const openChannel = vi.fn(() => Promise.resolve(channel));
-    const context = terminalContext({ backend: terminalBackend(vi.fn(() => Promise.resolve([])), openChannel) });
+    const context = terminalContext({ pairedBackend: terminalBackend(vi.fn(() => Promise.resolve([])), openChannel) });
     const terminal = { dispose: vi.fn() };
     Reflect.set(panel, "visible", true);
     Reflect.set(panel, "selectedId", "terminal-1");
@@ -485,7 +485,7 @@ function terminalContext(overrides: Partial<WorkspacePanelContext> = {}): Worksp
     machine: { id: "local", name: "Local", kind: "local" },
     workspace: { id: "workspace-1", projectId: "project-1", path: "/repo", label: "main", isMain: true },
     files: { readFile: vi.fn(), listFiles: vi.fn(), writeFile: vi.fn(), deleteFile: vi.fn(), moveFile: vi.fn() },
-    backend: terminalBackend(
+    pairedBackend: terminalBackend(
       vi.fn(() => Promise.resolve([])),
       vi.fn(() => new Promise<never>(() => undefined)),
     ),
@@ -498,11 +498,12 @@ function terminalContext(overrides: Partial<WorkspacePanelContext> = {}): Worksp
 }
 
 function terminalBackend(
-  request: WorkspaceBackend["request"],
-  openChannel?: NonNullable<WorkspaceBackend["openChannel"]>,
-): WorkspaceBackend {
+  request: NonNullable<PairedWorkspaceBackendV1["request"]>,
+  openChannel?: NonNullable<PairedWorkspaceBackendV1["openChannel"]>,
+): PairedWorkspaceBackendV1 {
   return {
-    capabilityVersion: 1,
+    version: 1,
+    requestVersion: 1,
     request,
     ...(openChannel === undefined ? {} : { channelVersion: 1 as const, openChannel }),
   };

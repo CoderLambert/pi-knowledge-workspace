@@ -152,7 +152,7 @@ describe("buildApp PI WEB plugin routes", () => {
     const requestJson = vi.fn(() => Promise.resolve({
       statusCode: 200,
       headers: { "content-type": "application/json" },
-      body: { lifecycleVersion: 2, terminalMode: "recovery-disabled", plugins: [{ id: "remote-tools", module: "/pi-web-plugins/remote-tools/pi-web-plugin.js?v=123", backendRevision: "server-r7", backendCapabilityVersion: 1, channelVersion: 1, source: "local", scope: "local", machineSpecific: true }] },
+      body: { lifecycleVersion: 2, terminalMode: "recovery-disabled", plugins: [{ id: "remote-tools", module: "/pi-web-plugins/remote-tools/pi-web-plugin.js?v=123", backendRevision: "server-r7", pairedRequestVersion: 1, pairedChannelVersion: 1, source: "local", scope: "local", machineSpecific: true }] },
     }));
     const request = vi.fn(() => Promise.resolve({
       statusCode: 200,
@@ -168,7 +168,7 @@ describe("buildApp PI WEB plugin routes", () => {
     expect(manifestResponse.json()).toEqual({
       lifecycleVersion: 2,
       terminalMode: "recovery-disabled",
-      plugins: [{ id: "remote-tools", module: rewrittenModule, backendRevision: "server-r7", backendCapabilityVersion: 1, channelVersion: 1, source: "local", scope: "local", machineSpecific: true }],
+      plugins: [{ id: "remote-tools", module: rewrittenModule, backendRevision: "server-r7", pairedRequestVersion: 1, pairedChannelVersion: 1, source: "local", scope: "local", machineSpecific: true }],
     });
     expect(new URL(rewrittenModule, `https://gateway.example.test/api/machines/${remote.id}/pi-web-plugins/manifest.json`).toString())
       .toBe(`https://gateway.example.test/pi-web-plugins/${scopedPluginId}/pi-web-plugin.js?v=123`);
@@ -197,8 +197,8 @@ describe("buildApp PI WEB plugin routes", () => {
           id: "pi-web.terminal",
           module: "/pi-web-plugins/pi-web.terminal/browser/pi-web-plugin.js?v=terminal-r1",
           backendRevision: "terminal-server-r1",
-          backendCapabilityVersion: 1,
-          channelVersion: 1,
+          pairedRequestVersion: 1,
+          pairedChannelVersion: 1,
           source: "bundled",
           scope: "bundled",
           machineSpecific: true,
@@ -258,7 +258,7 @@ describe("buildApp PI WEB plugin routes", () => {
   it.each([
     { label: "missing", body: { plugins: [{ id: "browser-only", module: "/pi-web-plugins/browser-only/plugin.js" }] } },
     { label: "future", body: { lifecycleVersion: 3, terminalMode: "recovery-disabled", plugins: [] } },
-    { label: "recovery Terminal", body: { lifecycleVersion: 2, terminalMode: "recovery-disabled", plugins: [{ id: "pi-web.terminal", module: "/pi-web-plugins/pi-web.terminal/pi-web-plugin.js", backendRevision: "server-r1", backendCapabilityVersion: 1, channelVersion: 1, source: "bundled", scope: "bundled", machineSpecific: true }] } },
+    { label: "recovery Terminal", body: { lifecycleVersion: 2, terminalMode: "recovery-disabled", plugins: [{ id: "pi-web.terminal", module: "/pi-web-plugins/pi-web.terminal/pi-web-plugin.js", backendRevision: "server-r1", pairedRequestVersion: 1, pairedChannelVersion: 1, source: "bundled", scope: "bundled", machineSpecific: true }] } },
   ])("returns an explicit compatibility error for a $label remote lifecycle version", async ({ body }) => {
     const addResponse = await appTestContext.app.inject({ method: "POST", url: "/api/machines", payload: { name: "Remote", baseUrl: "https://remote.example.test/" } });
     const remote = addResponse.json<{ id: string }>();

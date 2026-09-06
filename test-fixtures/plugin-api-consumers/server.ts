@@ -1,4 +1,9 @@
-import type { PiWebServerPlugin } from "@jmfederico/pi-web/server-plugin-api";
+import type { PairedPluginBackendV1, PiWebServerPlugin } from "@jmfederico/pi-web/server-plugin-api";
+
+const channelOnlyBackend: PairedPluginBackendV1 = {
+  version: 1,
+  openChannel: () => ({ receive: () => undefined }),
+};
 
 const plugin: PiWebServerPlugin = {
   apiVersion: 1,
@@ -28,4 +33,5 @@ const plugin: PiWebServerPlugin = {
   },
 };
 
+export { channelOnlyBackend };
 export default plugin;

@@ -49,10 +49,10 @@ export interface PiWebPluginManifestEntry {
   module: string;
   /** Active compatible server revision from sessiond's immutable startup snapshot. */
   backendRevision?: string;
-  /** Versioned direct paired-request capability exposed as `context.backend.capabilityVersion`. */
-  backendCapabilityVersion?: 1;
-  /** Versioned bounded channel capability exposed as `context.backend.channelVersion`. */
-  channelVersion?: 1;
+  /** Versioned request capability exposed through `context.pairedBackend`. */
+  pairedRequestVersion?: 1;
+  /** Versioned channel capability exposed through `context.pairedBackend`. */
+  pairedChannelVersion?: 1;
   source: string;
   scope: PiWebPluginScope;
   machineSpecific: boolean;
@@ -104,15 +104,15 @@ export class PiWebPluginService {
       );
     }
     const plugins: PiWebPluginManifestEntry[] = [];
-    for (const { plugin, backendRevision, backendCapabilityVersion, channelVersion } of lifecycle.browserPlugins) {
+    for (const { plugin, backendRevision, pairedRequestVersion, pairedChannelVersion } of lifecycle.browserPlugins) {
       const artifact = await this.captureBrowserArtifact(plugin, backendRevision);
       if (artifact === undefined) continue;
       plugins.push({
         id: plugin.id,
         module: browserModuleUrl(plugin),
         ...(backendRevision === undefined ? {} : { backendRevision }),
-        ...(backendCapabilityVersion === undefined ? {} : { backendCapabilityVersion }),
-        ...(channelVersion === undefined ? {} : { channelVersion }),
+        ...(pairedRequestVersion === undefined ? {} : { pairedRequestVersion }),
+        ...(pairedChannelVersion === undefined ? {} : { pairedChannelVersion }),
         source: plugin.source,
         scope: plugin.scope,
         machineSpecific: plugin.machineSpecific,
@@ -266,7 +266,7 @@ function requireTerminalManifestEntry(plugins: readonly PiWebPluginManifestEntry
   if (terminal.scope !== "bundled" || terminal.source !== "bundled" || !terminal.machineSpecific) {
     throw new Error("Required Terminal browser entry is not the bundled machine-specific package");
   }
-  if (terminal.backendRevision === undefined || terminal.backendCapabilityVersion !== 1 || terminal.channelVersion !== 1) {
+  if (terminal.backendRevision === undefined || terminal.pairedRequestVersion !== 1 || terminal.pairedChannelVersion !== 1) {
     throw new Error("Required Terminal browser/server pairing is incompatible; restart or use safe start none for recovery");
   }
   if (plugins[0] !== terminal) throw new Error("Required Terminal browser entry must be activated before ordinary plugins");

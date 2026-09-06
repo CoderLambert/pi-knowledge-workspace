@@ -75,7 +75,7 @@ describe("external plugin manifests", () => {
     const fetchMock = vi.fn(() => Promise.resolve(new Response(JSON.stringify({
       lifecycleVersion: 2,
       terminalMode: "recovery-disabled",
-      plugins: [{ id: "info", module: "./info/pi-web-plugin.js?v=1", backendRevision: "server-r1", backendCapabilityVersion: 1, channelVersion: 1, machineSpecific: false }],
+      plugins: [{ id: "info", module: "./info/pi-web-plugin.js?v=1", backendRevision: "server-r1", pairedRequestVersion: 1, pairedChannelVersion: 1, machineSpecific: false }],
     }))));
     const moduleLoader = vi.fn(() => Promise.resolve({
       default: { apiVersion: 2, name: "Info", activate: () => ({ contributions: {} }) },
@@ -87,15 +87,14 @@ describe("external plugin manifests", () => {
     expect(fetchMock).toHaveBeenCalledWith(manifestUrl, { cache: "no-store" });
     expect(moduleLoader).toHaveBeenCalledWith("https://pi.example.test/test/ai/pi-web-plugins/info/pi-web-plugin.js?v=1");
     expect(result.failures).toEqual([]);
-    expect(result.registrations).toMatchObject([{ id: "info", backendRevision: "server-r1", backendCapabilityVersion: 1, channelVersion: 1, machineSpecific: false, plugin: { apiVersion: 2, name: "Info" } }]);
+    expect(result.registrations).toMatchObject([{ id: "info", backendRevision: "server-r1", pairedRequestVersion: 1, pairedChannelVersion: 1, machineSpecific: false, plugin: { apiVersion: 2, name: "Info" } }]);
   });
 
   it.each([
-    { backendCapabilityVersion: 2, backendRevision: "server-r1" },
-    { backendCapabilityVersion: 1 },
-    { channelVersion: 2, backendRevision: "server-r1" },
-    { channelVersion: 1 },
-    { channelVersion: 1, backendRevision: "server-r1" },
+    { pairedRequestVersion: 2, backendRevision: "server-r1" },
+    { pairedRequestVersion: 1 },
+    { pairedChannelVersion: 2, backendRevision: "server-r1" },
+    { pairedChannelVersion: 1 },
   ])("rejects invalid paired backend capability metadata before module import", async (backend) => {
     const moduleLoader = vi.fn(() => Promise.resolve({
       default: { apiVersion: 2, name: "Info", activate: () => ({ contributions: {} }) },
@@ -110,6 +109,27 @@ describe("external plugin manifests", () => {
     expect(moduleLoader).not.toHaveBeenCalled();
   });
 
+  it("accepts independently advertised paired request-only and channel-only capabilities", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify({
+      lifecycleVersion: 2,
+      terminalMode: "recovery-disabled",
+      plugins: [
+        { id: "request-only", module: "./request/plugin.js", backendRevision: "request-r1", pairedRequestVersion: 1 },
+        { id: "channel-only", module: "./channel/plugin.js", backendRevision: "channel-r1", pairedChannelVersion: 1 },
+      ],
+    })))));
+    const moduleLoader = vi.fn(() => Promise.resolve({
+      default: { apiVersion: 2, name: "Info", activate: () => ({ contributions: {} }) },
+    }));
+
+    const result = await loadExternalPlugins(undefined, { moduleLoader });
+
+    expect(result.registrations).toMatchObject([
+      { id: "request-only", backendRevision: "request-r1", pairedRequestVersion: 1 },
+      { id: "channel-only", backendRevision: "channel-r1", pairedChannelVersion: 1 },
+    ]);
+  });
+
   it("loads required Terminal first and stops before ordinary modules when it fails", async () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify({
       lifecycleVersion: 2,
@@ -119,8 +139,8 @@ describe("external plugin manifests", () => {
           id: "pi-web.terminal",
           module: "./pi-web.terminal/pi-web-plugin.js",
           backendRevision: "terminal-r1",
-          backendCapabilityVersion: 1,
-          channelVersion: 1,
+          pairedRequestVersion: 1,
+          pairedChannelVersion: 1,
           source: "bundled",
           scope: "bundled",
           machineSpecific: true,

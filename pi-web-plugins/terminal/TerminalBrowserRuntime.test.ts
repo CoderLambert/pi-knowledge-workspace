@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { JsonValue, WorkspaceBackend, WorkspacePanelContext } from "@jmfederico/pi-web/plugin-api";
+import type { JsonValue, PairedWorkspaceBackendV1, WorkspacePanelContext } from "@jmfederico/pi-web/plugin-api";
 import { TerminalBrowserRuntime } from "./TerminalBrowserRuntime";
 import { InMemoryTerminalSelectionMemory } from "./terminalSelection";
 
@@ -141,7 +141,7 @@ describe("Terminal browser runtime", () => {
   it("fails closed when the required paired backend is absent", async () => {
     const runtime = new TerminalBrowserRuntime();
     const context = workspaceContext("local", vi.fn());
-    Reflect.deleteProperty(context, "backend");
+    Reflect.deleteProperty(context, "pairedBackend");
 
     await expect(runtime.refresh(context)).rejects.toThrow("Required Terminal paired backend is unavailable");
   });
@@ -149,14 +149,14 @@ describe("Terminal browser runtime", () => {
 
 function workspaceContext(
   machineId: string,
-  request: WorkspaceBackend["request"],
+  request: NonNullable<PairedWorkspaceBackendV1["request"]>,
   navigation: Partial<NonNullable<WorkspacePanelContext["navigation"]>> = {},
 ): WorkspacePanelContext {
   return {
     machine: { id: machineId, name: machineId, kind: machineId === "local" ? "local" : "remote" },
     workspace: { id: "workspace-1", projectId: "project-1", path: "/repo", label: "main", isMain: true },
     files: { readFile: vi.fn(), listFiles: vi.fn(), writeFile: vi.fn(), deleteFile: vi.fn(), moveFile: vi.fn() },
-    backend: { capabilityVersion: 1, request },
+    pairedBackend: { version: 1, requestVersion: 1, request },
     host: { requestRender: vi.fn() },
     prompt: { insertText: vi.fn(), getText: vi.fn(() => ""), getSelection: vi.fn(() => null) },
     terminal: { open: vi.fn(), runCommand: vi.fn() },

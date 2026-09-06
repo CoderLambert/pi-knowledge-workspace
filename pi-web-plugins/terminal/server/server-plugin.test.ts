@@ -191,7 +191,9 @@ function trackedService(): TerminalService {
 }
 
 function backendRequest(backend: PairedPluginBackendV1, context: PairedPluginRequestContext): Promise<JsonValue> {
-  return Promise.resolve().then(() => backend.request(context));
+  const request = backend.request?.bind(backend);
+  if (request === undefined) throw new Error("Expected Terminal paired request handler");
+  return Promise.resolve().then(() => request(context));
 }
 
 function requestContext(operation: string, input: JsonValue, workspaceId = "workspace-1"): PairedPluginRequestContext {

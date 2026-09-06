@@ -1,10 +1,13 @@
 export { api, configApi, filesApi, machinesApi, machineStatusApi, noticesApi, piPackagesApi, piWebApi, pluginsApi, projectsApi, SessionTreeForkUnavailableError, sessionsApi, trustApi, workspacesApi } from "./api/clients";
 export {
-  openPluginBackendChannel,
-  pluginBackendChannelPath,
-  pluginBackendChannelUrl,
+  openPairedPluginBackendChannel,
+  pairedPluginBackendChannelPath,
+  pairedPluginBackendChannelUrl,
+  pairedPluginBackendRequestPath,
+  pairedPluginBackendRequestUrl,
   pluginBackendRequestPath,
   pluginBackendRequestUrl,
+  requestPairedPluginBackend,
   requestPluginBackend,
 } from "./api/pluginBackends";
 export { globalSessionEvents, realtimeEvents, sessionEvents } from "./api/sockets";

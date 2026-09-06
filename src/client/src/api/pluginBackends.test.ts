@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PLUGIN_BACKEND_RESPONSE_BODY_MAX_BYTES } from "../../../shared/pluginBackendProtocol";
 import {
+  pairedPluginBackendRequestPath,
+  pairedPluginBackendRequestUrl,
   pluginBackendRequestPath,
   pluginBackendRequestUrl,
+  requestPairedPluginBackend,
   requestPluginBackend,
   type PluginBackendRequestTarget,
 } from "./pluginBackends";
@@ -24,21 +27,31 @@ afterEach(() => {
 });
 
 describe("browser plugin backend helper", () => {
-  it("builds local and remote application-relative paths with encoded dynamic segments", () => {
+  it("keeps owner-backed and paired routes distinct with encoded dynamic segments", () => {
     expect(pluginBackendRequestPath({ ...target, machineId: "local" }, "cards.summary")).toBe(
       "api/plugin-backends/board.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/cards.summary",
     );
     expect(pluginBackendRequestPath(target, "cards.summary")).toBe(
       "api/machines/remote%20%2F%20one/plugin-backends/board.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/cards.summary",
     );
+    expect(pairedPluginBackendRequestPath({ ...target, machineId: "local" }, "cards.summary")).toBe(
+      "api/paired-plugin-backends/board.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/cards.summary",
+    );
+    expect(pairedPluginBackendRequestPath(target, "cards.summary")).toBe(
+      "api/machines/remote%20%2F%20one/paired-plugin-backends/board.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/cards.summary",
+    );
   });
 
   it("resolves the helper exactly once under a nested deployment base", () => {
-    expect(pluginBackendRequestUrl(target, "cards.summary", {
+    const resolutionOptions = {
       viteBaseUrl: "./",
       documentBaseUrl: "https://pi.example.test/test/ai/",
-    })).toBe(
+    };
+    expect(pluginBackendRequestUrl(target, "cards.summary", resolutionOptions)).toBe(
       "https://pi.example.test/test/ai/api/machines/remote%20%2F%20one/plugin-backends/board.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/cards.summary",
+    );
+    expect(pairedPluginBackendRequestUrl(target, "cards.summary", resolutionOptions)).toBe(
+      "https://pi.example.test/test/ai/api/machines/remote%20%2F%20one/paired-plugin-backends/board.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/cards.summary",
     );
   });
 
@@ -65,6 +78,20 @@ describe("browser plugin backend helper", () => {
       body: JSON.stringify({ revision: "server-r1", input: { cards: ["alpha", "beta"], includeClosed: false } }),
       signal: controller.signal,
     });
+  });
+
+  it("sends paired requests only through the paired route", async () => {
+    const fetchMock = vi.fn<(url: string | URL | Request, init?: RequestInit) => Promise<Response>>(() => Promise.resolve(new Response("null", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await requestPairedPluginBackend(target, "cards.summary", null);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://pi.example.test/api/machines/remote%20%2F%20one/paired-plugin-backends/board.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/cards.summary",
+    );
   });
 
   it("rejects invalid requests and attributed non-success responses consistently", async () => {

@@ -55,7 +55,7 @@ import { sessionServiceDependencies } from "./sessiond/sessionServiceDependencie
 import { registerWorkspaceCatalogRoutes } from "./sessiond/workspaceCatalogRoutes.js";
 import { registerPluginBackendChannelRoutes } from "./sessiond/pluginBackendChannelRoutes.js";
 import { installPluginBackendChannelWebSocketPayloadLimit } from "./webSocketBridge.js";
-import { registerPluginBackendRoutes } from "./sessiond/pluginBackendRoutes.js";
+import { registerPairedPluginBackendRoutes, registerPluginBackendRoutes } from "./sessiond/pluginBackendRoutes.js";
 import { registerWorkspaceRemovalRoutes } from "./sessiond/workspaceRemovalRoutes.js";
 import { createWorkspaceProviderRuntimeSnapshot } from "./workspaces/workspaceCatalog.js";
 import { WorkspaceRemovalService } from "./workspaces/workspaceRemovalService.js";
@@ -359,6 +359,11 @@ function registerSessionDaemonRoutes({ eventHub, machineStatus, statusAttributio
     providerRuntime: workspaceProviderRuntime,
   });
   registerPluginBackendRoutes(app, {
+    projects,
+    backends: workspaceProviders,
+    onWorkspacesMutated: () => { statusAttribution.invalidate(); },
+  });
+  registerPairedPluginBackendRoutes(app, {
     projects,
     backends: pluginBackends,
     onWorkspacesMutated: () => { statusAttribution.invalidate(); },

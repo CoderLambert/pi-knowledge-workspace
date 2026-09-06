@@ -78,7 +78,7 @@ describe("server plugin runtime", () => {
     expect(imported).toEqual(["alpha", "bad-activate", "bad-api", "bad-import", "bad-start", "omega"]);
     expect(events).toEqual(["start:alpha", "start:bad-start", "rollback:bad-start", "start:omega"]);
     expect(runtime.healthRecords()).toEqual([
-      expect.objectContaining({ pluginId: "alpha", state: "active", name: "Alpha", browserRevision: "browser-7", settingsRevision: "settings-1", machineSpecific: true, backendCapabilityVersion: 1, channelVersion: 1 }),
+      expect.objectContaining({ pluginId: "alpha", state: "active", name: "Alpha", browserRevision: "browser-7", settingsRevision: "settings-1", machineSpecific: true, pairedRequestVersion: 1, pairedChannelVersion: 1 }),
       expect.objectContaining({ pluginId: "bad-activate", state: "failed", phase: "activate", message: "activate exploded" }),
       expect.objectContaining({ pluginId: "bad-api", state: "incompatible", phase: "validate", message: "Unsupported server plugin API version: 2" }),
       expect.objectContaining({ pluginId: "bad-import", state: "failed", phase: "import", message: "import exploded" }),
@@ -684,6 +684,35 @@ describe("server plugin runtime", () => {
     expect(inspection?.error).toContain("timed out");
   });
 
+  it("publishes paired request and channel capabilities independently", async () => {
+    const runtime = await createServerPluginRuntime({
+      catalog: { snapshot: () => Promise.resolve(testSnapshot([
+        entry("channel-only"),
+        entry("empty"),
+        entry("request-only"),
+      ])) },
+      importer: (url) => {
+        const pluginId = pluginIdFromUrl(url);
+        const pairedBackend = pluginId === "request-only"
+          ? { version: 1, request: () => null }
+          : pluginId === "channel-only"
+            ? { version: 1, openChannel: () => ({ receive: () => undefined }) }
+            : { version: 1 };
+        return Promise.resolve(pluginModule(pluginId, { pairedBackend }));
+      },
+      logger: testLogger(),
+    });
+
+    expect(runtime.healthRecords()).toEqual([
+      expect.objectContaining({ pluginId: "channel-only", state: "active", pairedChannelVersion: 1 }),
+      expect.objectContaining({ pluginId: "empty", state: "incompatible" }),
+      expect.objectContaining({ pluginId: "request-only", state: "active", pairedRequestVersion: 1 }),
+    ]);
+    expect(runtime.healthRecords()[0]).not.toHaveProperty("pairedRequestVersion");
+    expect(runtime.healthRecords()[2]).not.toHaveProperty("pairedChannelVersion");
+    expect(runtime.pairedBackendContributions().map(({ pluginId }) => pluginId)).toEqual(["channel-only", "request-only"]);
+  });
+
   it("publishes validated snapshots rather than mutable activation properties", async () => {
     const provider = testProvider();
     const mutableActivation: Record<string, unknown> = {
@@ -723,8 +752,8 @@ describe("server plugin runtime", () => {
     expect(runtime.providerContributions().map((contribution) => contribution.pluginId)).toEqual(["mutable"]);
     expect(runtime.pairedBackendContributions().map((contribution) => contribution.pluginId)).toEqual(["mutable"]);
     expect(Object.isFrozen(runtime.pairedBackendContributions()[0]?.backend)).toBe(true);
-    expect(runtime.healthRecords().find(({ pluginId }) => pluginId === "mutable")).toMatchObject({ channelVersion: 1 });
-    await expect(Promise.resolve(runtime.pairedBackendContributions()[0]?.backend.request({
+    expect(runtime.healthRecords().find(({ pluginId }) => pluginId === "mutable")).toMatchObject({ pairedRequestVersion: 1, pairedChannelVersion: 1 });
+    await expect(Promise.resolve(runtime.pairedBackendContributions()[0]?.backend.request?.({
       project: { id: "p", name: "P", path: "/p" },
       workspace: { id: "w", projectId: "p", path: "/p", label: "P", isMain: true },
       operation: "status",
@@ -786,8 +815,8 @@ describe("server plugin runtime", () => {
       ["non-json-settings", "incompatible", "validate"],
       ["plural", "incompatible", "validate"],
     ]);
-    expect(records[0]?.message).toContain("pairedBackend must be a version 1 request backend");
-    expect(records[1]?.message).toContain("optional channel opener");
+    expect(records[0]?.message).toContain("pairedBackend must be version 1 with at least one request or channel handler");
+    expect(records[1]?.message).toContain("pairedBackend must be version 1 with at least one request or channel handler");
     expect(records[2]?.message).toContain("must not contain cycles");
     expect(records[3]?.message).toContain("must contain only JSON values");
     expect(records[4]?.message).toBe("Server plugins may contribute only one workspaceProvider");

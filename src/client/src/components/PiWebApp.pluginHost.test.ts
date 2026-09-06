@@ -279,8 +279,8 @@ describe("PiWebApp plugin host", () => {
       sourcePluginId: "pi-web.terminal",
       machineSpecific: true,
       backendRevision: "local-terminal-r1",
-      backendCapabilityVersion: 1,
-      channelVersion: 1,
+      pairedRequestVersion: 1,
+      pairedChannelVersion: 1,
       plugin: {
         apiVersion: 2,
         name: "Terminal",
@@ -297,7 +297,7 @@ describe("PiWebApp plugin host", () => {
                   machine: context.machine,
                   workspace: context.workspace,
                   files: context.files,
-                  ...(context.backend === undefined ? {} : { backend: context.backend }),
+                  ...(context.pairedBackend === undefined ? {} : { pairedBackend: context.pairedBackend }),
                   host: context.host,
                   prompt: context.prompt,
                   terminal: context.terminal,
@@ -319,8 +319,8 @@ describe("PiWebApp plugin host", () => {
         registrationPluginId: "pi-web.terminal",
         sourcePluginId: "pi-web.terminal",
         backendRevision: "local-terminal-r1",
-        backendCapabilityVersion: 1,
-        channelVersion: 1,
+        pairedRequestVersion: 1,
+        pairedChannelVersion: 1,
       },
       facade: testTerminalFacade(),
     });
@@ -808,8 +808,8 @@ describe("PiWebApp plugin host", () => {
         id: "pi-web.terminal",
         machineSpecific: true,
         backendRevision: "terminal-r1",
-        backendCapabilityVersion: 1,
-        channelVersion: 1,
+        pairedRequestVersion: 1,
+        pairedChannelVersion: 1,
         plugin: requiredTerminalPlugin(),
       }],
       failures: [{ entry: manifestEntry("files"), error: failure }],
@@ -1229,8 +1229,8 @@ describe("PiWebApp plugin host", () => {
         machineId: remoteMachine.id,
         machineSpecific: true,
         backendRevision: "remote-terminal-r7",
-        backendCapabilityVersion: 1,
-        channelVersion: 1,
+        pairedRequestVersion: 1,
+        pairedChannelVersion: 1,
         plugin: requiredTerminalPlugin(new TerminalFacade()),
       }],
       failures: [],
@@ -1240,7 +1240,7 @@ describe("PiWebApp plugin host", () => {
 
     await expect(handle.completed).resolves.toEqual(run);
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(requestedUrl).toBe(`${window.location.origin}/api/machines/remote-1/plugin-backends/pi-web.terminal/projects/project-1/workspaces/workspace-1/terminal.run`);
+    expect(requestedUrl).toBe(`${window.location.origin}/api/machines/remote-1/paired-plugin-backends/pi-web.terminal/projects/project-1/workspaces/workspace-1/terminal.run`);
     const requestBody = requestedInit?.body;
     if (typeof requestBody !== "string") throw new Error("Expected serialized Terminal backend request body");
     expect(JSON.parse(requestBody)).toEqual({
@@ -1338,8 +1338,8 @@ describe("PiWebApp plugin host", () => {
           id: "pi-web.terminal",
           machineSpecific: true,
           backendRevision: "terminal-r1",
-          backendCapabilityVersion: 1,
-          channelVersion: 1,
+          pairedRequestVersion: 1,
+          pairedChannelVersion: 1,
           plugin: requiredTerminalPlugin(),
         }],
         failures: [],
@@ -1401,8 +1401,8 @@ describe("PiWebApp plugin host", () => {
         id: "pi-web.terminal",
         machineSpecific: true,
         backendRevision: "terminal-r1",
-        backendCapabilityVersion: 1,
-        channelVersion: 1,
+        pairedRequestVersion: 1,
+        pairedChannelVersion: 1,
         plugin: requiredTerminalPlugin(),
       }],
       failures: [],
@@ -1455,8 +1455,8 @@ describe("PiWebApp plugin host", () => {
       id: "pi-web.terminal",
       machineSpecific: true,
       backendRevision: "terminal-r1",
-      backendCapabilityVersion: 1 as const,
-      channelVersion: 1 as const,
+      pairedRequestVersion: 1 as const,
+      pairedChannelVersion: 1 as const,
       plugin: requiredTerminalPlugin(),
     };
     const ordinaryRegistration = {
@@ -1519,8 +1519,8 @@ describe("PiWebApp plugin host", () => {
           id: "pi-web.terminal",
           machineSpecific: true,
           backendRevision: "terminal-r1",
-          backendCapabilityVersion: 1,
-          channelVersion: 1,
+          pairedRequestVersion: 1,
+          pairedChannelVersion: 1,
           plugin: {
             apiVersion: 2,
             name: "Terminal",
@@ -1570,8 +1570,8 @@ describe("PiWebApp plugin host", () => {
           id: "pi-web.terminal",
           machineSpecific: true,
           backendRevision: "terminal-r1",
-          backendCapabilityVersion: 1,
-          channelVersion: 1,
+          pairedRequestVersion: 1,
+          pairedChannelVersion: 1,
           plugin: requiredTerminalPlugin(),
         },
         { id: "retryable", machineSpecific: false, plugin: retryable },
@@ -1756,7 +1756,7 @@ function registerFilesRuntimePanel(
                 machine: context.machine,
                 workspace: context.workspace,
                 files,
-                ...(context.backend === undefined ? {} : { backend: context.backend }),
+                ...(context.pairedBackend === undefined ? {} : { pairedBackend: context.pairedBackend }),
                 host: context.host,
                 prompt: context.prompt,
                 terminal: context.terminal,
@@ -1797,8 +1797,8 @@ function installTestTerminalComposition(app: PiWebApp, machineId: string): void 
       ...(machineId === "local" ? {} : { machineId }),
       machineSpecific: true,
       backendRevision: `${machineId}-terminal-r1`,
-      backendCapabilityVersion: 1,
-      channelVersion: 1,
+      pairedRequestVersion: 1,
+      pairedChannelVersion: 1,
       plugin: requiredTerminalPlugin(),
     });
   }
@@ -1809,8 +1809,8 @@ function installTestTerminalComposition(app: PiWebApp, machineId: string): void 
       registrationPluginId: runtimePluginId,
       sourcePluginId: "pi-web.terminal",
       backendRevision: `${machineId}-terminal-r1`,
-      backendCapabilityVersion: 1,
-      channelVersion: 1,
+      pairedRequestVersion: 1,
+      pairedChannelVersion: 1,
     },
     facade: testTerminalFacade(),
   });

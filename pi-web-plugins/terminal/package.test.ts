@@ -127,8 +127,8 @@ describe("bundled Terminal package", () => {
         terminalMode: "required",
         plugins: [{
           id: "pi-web.terminal",
-          backendCapabilityVersion: 1,
-          channelVersion: 1,
+          pairedRequestVersion: 1,
+          pairedChannelVersion: 1,
           source: "bundled",
           scope: "bundled",
           machineSpecific: true,

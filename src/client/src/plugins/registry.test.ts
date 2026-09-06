@@ -8,7 +8,7 @@ import { corePlugin } from "./core";
 import { PluginRegistry, installWorkspaceLabelScope, installWorkspacePanelScope } from "./registry";
 import { themePackPlugin } from "./themes";
 import type { PiWebPlugin, PluginRuntimeContext, QualifiedContributionId, ThemeTokens, WorkspaceFiles, WorkspaceHost, WorkspaceInvalidation, WorkspaceLabelContext, WorkspaceLabelItem, WorkspacePanelContext, WorkspacePanelContribution, WorkspacePluginBinding } from "./types";
-import { createPluginWorkspaceBackend } from "./workspaceBackend";
+import { createPairedPluginWorkspaceBackend } from "./workspaceBackend";
 import type { PluginBackendRequestTarget } from "../api/pluginBackends";
 
 function createContext(statePatch: Partial<AppState> = {}) {
@@ -873,8 +873,8 @@ describe("PluginRegistry", () => {
       machineId: "remote-1",
       sourcePluginId: "board-tools",
       backendRevision: "server-r7",
-      backendCapabilityVersion: 1,
-      channelVersion: 1,
+      pairedRequestVersion: 1,
+      pairedChannelVersion: 1,
       plugin: {
         apiVersion: 2,
         name: "Board Tools",
@@ -887,14 +887,14 @@ describe("PluginRegistry", () => {
                 id: "workspace.board",
                 title: "Board",
                 render: (context) => {
-                  void requiredBackend(context.backend).request("cards.summary", { includeClosed: false });
+                  void requiredPairedBackend(context.pairedBackend).request?.("cards.summary", { includeClosed: false });
                   return html`<p>Board</p>`;
                 },
               }],
               workspaceLabels: [{
                 id: "board-count",
                 items: (context) => {
-                  void requiredBackend(context.backend).request("cards.count", null);
+                  void requiredPairedBackend(context.pairedBackend).request?.("cards.count", null);
                   return [{ type: "text", text: "2 cards" }];
                 },
               }],
@@ -906,28 +906,28 @@ describe("PluginRegistry", () => {
     const panelBase = createWorkspacePanelContext("remote-1");
     const panelContext = installWorkspacePanelScope(panelBase, (binding) => ({
       ...panelBase,
-      backend: requiredBackend(createPluginWorkspaceBackend(binding, panelBase.workspace, panelBase.machine.id, (target, operation, input) => {
+      pairedBackend: requiredPairedBackend(createPairedPluginWorkspaceBackend(binding, panelBase.workspace, panelBase.machine.id, (target, operation, input) => {
         observedBindings.push(binding);
         observedRequests.push({ target, operation, input });
         return Promise.resolve(null);
-      })),
+      }, vi.fn())),
     }));
     const labelBase = createWorkspaceLabelContext("remote-1");
     const labelContext = installWorkspaceLabelScope(labelBase, (binding) => ({
       ...labelBase,
-      backend: requiredBackend(createPluginWorkspaceBackend(binding, labelBase.workspace, labelBase.machine.id, (target, operation, input) => {
+      pairedBackend: requiredPairedBackend(createPairedPluginWorkspaceBackend(binding, labelBase.workspace, labelBase.machine.id, (target, operation, input) => {
         observedBindings.push(binding);
         observedRequests.push({ target, operation, input });
         return Promise.resolve(null);
-      })),
+      }, vi.fn())),
     }));
 
     registry.getWorkspacePanels().find(({ localId }) => localId === "workspace.board")?.render(panelContext);
     expect(registry.getWorkspaceLabelItems(labelContext)).toEqual([{ type: "text", text: "2 cards" }]);
 
     expect(observedBindings).toEqual([
-      { registrationPluginId, sourcePluginId: "board-tools", backendRevision: "server-r7", backendCapabilityVersion: 1, channelVersion: 1 },
-      { registrationPluginId, sourcePluginId: "board-tools", backendRevision: "server-r7", backendCapabilityVersion: 1, channelVersion: 1 },
+      { registrationPluginId, sourcePluginId: "board-tools", backendRevision: "server-r7", pairedRequestVersion: 1, pairedChannelVersion: 1 },
+      { registrationPluginId, sourcePluginId: "board-tools", backendRevision: "server-r7", pairedRequestVersion: 1, pairedChannelVersion: 1 },
     ]);
     expect(observedRequests).toEqual([
       {
@@ -955,20 +955,21 @@ describe("PluginRegistry", () => {
             id: "workspace.pair",
             title: name,
             render: (context: WorkspacePanelContext) => {
-              void requiredBackend(context.backend).request("pair.check", null);
+              void requiredPairedBackend(context.pairedBackend).request?.("pair.check", null);
               return html`<p>${name}</p>`;
             },
           }],
         },
       }),
     });
-    registry.register({ id: "pair-tools", machineSpecific: true, backendRevision: "gateway-r1", plugin: pairedPlugin("Gateway pair") });
+    registry.register({ id: "pair-tools", machineSpecific: true, backendRevision: "gateway-r1", pairedRequestVersion: 1, plugin: pairedPlugin("Gateway pair") });
     registry.register({
       id: remotePluginId,
       machineId: "remote-1",
       sourcePluginId: "pair-tools",
       machineSpecific: true,
       backendRevision: "remote-r2",
+      pairedRequestVersion: 1,
       plugin: pairedPlugin("Remote pair"),
     });
     const requests: PluginBackendRequestTarget[] = [];
@@ -977,10 +978,10 @@ describe("PluginRegistry", () => {
       const base = createWorkspacePanelContext(machineId);
       const context = installWorkspacePanelScope(base, (binding) => ({
         ...base,
-        backend: requiredBackend(createPluginWorkspaceBackend(binding, base.workspace, machineId, (target) => {
+        pairedBackend: requiredPairedBackend(createPairedPluginWorkspaceBackend(binding, base.workspace, machineId, (target) => {
           requests.push(target);
           return Promise.resolve(null);
-        })),
+        }, vi.fn())),
       }));
       const visible = registry.getWorkspacePanels().filter((panel) => panel.visible?.(context) !== false);
       expect(visible).toHaveLength(1);
@@ -1173,7 +1174,7 @@ function createWorkspacePanelContext(machineId: string, prompt: WorkspacePanelCo
   };
 }
 
-function requiredBackend(backend: WorkspacePanelContext["backend"]): NonNullable<WorkspacePanelContext["backend"]> {
+function requiredPairedBackend(backend: WorkspacePanelContext["pairedBackend"]): NonNullable<WorkspacePanelContext["pairedBackend"]> {
   if (backend === undefined) throw new Error("Expected a paired workspace backend");
   return backend;
 }

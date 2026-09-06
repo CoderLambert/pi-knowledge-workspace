@@ -1,12 +1,13 @@
 import type {
   JsonValue,
+  PairedWorkspaceBackendV1,
   PiWebPlugin,
   Workspace,
   WorkspaceBackend,
-  WorkspaceBackendV1,
   WorkspaceFiles,
   WorkspaceFilesCapabilityV1,
   WorkspaceFilesContextValue,
+  WorkspacePanelContext,
   WorkspacePanelFiles,
 } from "@jmfederico/pi-web/plugin-api";
 
@@ -49,16 +50,24 @@ function capabilityV1(files: WorkspaceFilesContextValue): WorkspaceFilesCapabili
   return files.capabilityVersion === 1 ? files : undefined;
 }
 
-function pairedBackendV1(backend: WorkspaceBackend): WorkspaceBackendV1 | undefined {
-  return isPairedBackendV1(backend) ? backend : undefined;
+function requestOwnerBackend(backend: WorkspaceBackend): Promise<JsonValue> {
+  return backend.request("fixture.owner-summary", null);
 }
 
-function isPairedBackendV1(backend: WorkspaceBackend): backend is WorkspaceBackendV1 {
-  return backend.capabilityVersion === 1;
+async function requestPairedBackend(context: WorkspacePanelContext): Promise<JsonValue | undefined> {
+  const backend: PairedWorkspaceBackendV1 | undefined = context.pairedBackend;
+  if (backend?.requestVersion !== 1 || backend.request === undefined) return undefined;
+  return await backend.request("fixture.summary", null);
+}
+
+function openPairedBackendChannel(context: WorkspacePanelContext): void {
+  const backend = context.pairedBackend;
+  if (backend?.channelVersion !== 1 || backend.openChannel === undefined) return;
+  void backend.openChannel("fixture.watch", null, { onData: echoJson });
 }
 
 const echoJson = (value: JsonValue): JsonValue => value;
-export { capabilityV1, echoJson, pairedBackendV1, plugin };
+export { capabilityV1, echoJson, openPairedBackendChannel, plugin, requestOwnerBackend, requestPairedBackend };
 export type {
   BrowserWorkspace,
   ExtendedWorkspaceFiles,

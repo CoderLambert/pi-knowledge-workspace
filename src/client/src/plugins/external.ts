@@ -10,8 +10,8 @@ export interface PluginManifestEntry {
   id: string;
   module: string;
   backendRevision?: string;
-  backendCapabilityVersion?: 1;
-  channelVersion?: 1;
+  pairedRequestVersion?: 1;
+  pairedChannelVersion?: 1;
   source?: string;
   scope?: string;
   machineSpecific: boolean;
@@ -56,8 +56,8 @@ export async function loadExternalPlugins(manifestUrl = "pi-web-plugins/manifest
         plugin,
         machineSpecific: entry.machineSpecific,
         ...(entry.backendRevision === undefined ? {} : { backendRevision: entry.backendRevision }),
-        ...(entry.backendCapabilityVersion === undefined ? {} : { backendCapabilityVersion: entry.backendCapabilityVersion }),
-        ...(entry.channelVersion === undefined ? {} : { channelVersion: entry.channelVersion }),
+        ...(entry.pairedRequestVersion === undefined ? {} : { pairedRequestVersion: entry.pairedRequestVersion }),
+        ...(entry.pairedChannelVersion === undefined ? {} : { pairedChannelVersion: entry.pairedChannelVersion }),
         ...(options.machineId === undefined ? {} : { machineId: options.machineId, sourcePluginId: entry.id }),
       });
     } catch (error) {
@@ -100,16 +100,15 @@ function parseManifest(value: unknown): PluginManifest {
       throw new Error(`Reserved plugin manifest id: ${id}`);
     }
     const backendRevision = parseBackendRevision(entry["backendRevision"]);
-    const backendCapabilityVersion = parseBackendCapabilityVersion(entry["backendCapabilityVersion"]);
-    const channelVersion = parseChannelVersion(entry["channelVersion"]);
-    if ((backendCapabilityVersion !== undefined || channelVersion !== undefined) && backendRevision === undefined) throw new Error("Invalid plugin manifest entry");
-    if (channelVersion !== undefined && backendCapabilityVersion === undefined) throw new Error("Invalid plugin manifest entry");
+    const pairedRequestVersion = parsePairedCapabilityVersion(entry["pairedRequestVersion"]);
+    const pairedChannelVersion = parsePairedCapabilityVersion(entry["pairedChannelVersion"]);
+    if ((pairedRequestVersion !== undefined || pairedChannelVersion !== undefined) && backendRevision === undefined) throw new Error("Invalid plugin manifest entry");
     return {
       id,
       module: entry["module"],
       ...(backendRevision === undefined ? {} : { backendRevision }),
-      ...(backendCapabilityVersion === undefined ? {} : { backendCapabilityVersion }),
-      ...(channelVersion === undefined ? {} : { channelVersion }),
+      ...(pairedRequestVersion === undefined ? {} : { pairedRequestVersion }),
+      ...(pairedChannelVersion === undefined ? {} : { pairedChannelVersion }),
       ...(source === undefined ? {} : { source }),
       ...(scope === undefined ? {} : { scope }),
       machineSpecific: parseMachineSpecific(entry["machineSpecific"]),
@@ -125,7 +124,7 @@ function parseManifest(value: unknown): PluginManifest {
     if (terminal === undefined || plugins[0] !== terminal || !terminal.machineSpecific) {
       throw new Error("Required Terminal plugin manifest entry is unavailable or out of order");
     }
-    if (terminal.backendRevision === undefined || terminal.backendCapabilityVersion !== 1 || terminal.channelVersion !== 1) {
+    if (terminal.backendRevision === undefined || terminal.pairedRequestVersion !== 1 || terminal.pairedChannelVersion !== 1) {
       throw new Error("Required Terminal plugin manifest entry is incompatible");
     }
   } else if (terminal !== undefined) {
@@ -172,13 +171,7 @@ function parseBackendRevision(value: unknown): string | undefined {
   }
 }
 
-function parseBackendCapabilityVersion(value: unknown): 1 | undefined {
-  if (value === undefined) return undefined;
-  if (value !== 1) throw new Error("Invalid plugin manifest entry");
-  return value;
-}
-
-function parseChannelVersion(value: unknown): 1 | undefined {
+function parsePairedCapabilityVersion(value: unknown): 1 | undefined {
   if (value === undefined) return undefined;
   if (value !== 1) throw new Error("Invalid plugin manifest entry");
   return value;

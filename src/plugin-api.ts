@@ -214,20 +214,25 @@ export interface WorkspaceFilesCapabilityV1 extends WorkspaceFiles {
 export type WorkspaceFilesContextValue = LegacyWorkspaceFiles | WorkspaceFilesCapabilityV1;
 export type WorkspacePanelFiles = WorkspaceFiles;
 
-export interface WorkspaceBackendRequestOptions {
+/** JSON-only request path to the server module that currently owns this workspace. */
+export interface WorkspaceBackend {
+  request(operation: string, input: JsonValue): Promise<JsonValue>;
+}
+
+export interface PairedWorkspaceBackendRequestOptions {
   /** Cancels this bounded request through local or federated host transport. */
   readonly signal?: AbortSignal;
 }
 
-/** Callbacks and cancellation for one bounded paired-backend channel. */
-export interface WorkspaceBackendChannelOptions {
+/** Callbacks and cancellation for one bounded package-paired backend channel. */
+export interface PairedWorkspaceBackendChannelOptions {
   /** Cancels the channel open or closes the live channel through every host hop. */
   readonly signal?: AbortSignal;
   /** Receives one plugin-authored JSON frame after the channel is ready. */
   readonly onData: (data: JsonValue) => void;
 }
 
-export interface WorkspaceBackendChannelClose {
+export interface PairedWorkspaceBackendChannelClose {
   readonly code: number;
   readonly reason: string;
   readonly wasClean: boolean;
@@ -235,32 +240,23 @@ export interface WorkspaceBackendChannelClose {
   readonly error?: Readonly<{ code: string; message: string }>;
 }
 
-export interface WorkspaceBackendChannel {
-  readonly closed: Promise<WorkspaceBackendChannelClose>;
+export interface PairedWorkspaceBackendChannel {
+  readonly closed: Promise<PairedWorkspaceBackendChannelClose>;
   /** Queue one bounded JSON frame or throw if validation/queue limits fail. */
   send(data: JsonValue): void;
   close(reason?: string): void;
 }
 
-/** JSON-only request path to this browser package's active server entry. */
-export interface WorkspaceBackend {
-  /** Present as `1` only for a direct paired backend; absent on legacy owner-backed helpers. */
-  readonly capabilityVersion?: 1;
-  /** Present as `1` only when the matching server entry exposes bounded channels. */
+/**
+ * Exact revision-paired path to this browser package's active server entry.
+ * Request and channel support are advertised independently.
+ */
+export interface PairedWorkspaceBackendV1 {
+  readonly version: 1;
+  readonly requestVersion?: 1;
   readonly channelVersion?: 1;
-  request(operation: string, input: JsonValue, options?: WorkspaceBackendRequestOptions): Promise<JsonValue>;
-  openChannel?(operation: string, input: JsonValue, options: WorkspaceBackendChannelOptions): Promise<WorkspaceBackendChannel>;
-}
-
-/** Feature-detected direct paired backend, independent of workspace ownership. */
-export interface WorkspaceBackendV1 extends WorkspaceBackend {
-  readonly capabilityVersion: 1;
-}
-
-/** Feature-detected bounded channel addition on a direct paired backend. */
-export interface WorkspaceBackendChannelV1 extends WorkspaceBackendV1 {
-  readonly channelVersion: 1;
-  openChannel(operation: string, input: JsonValue, options: WorkspaceBackendChannelOptions): Promise<WorkspaceBackendChannel>;
+  request?(operation: string, input: JsonValue, options?: PairedWorkspaceBackendRequestOptions): Promise<JsonValue>;
+  openChannel?(operation: string, input: JsonValue, options: PairedWorkspaceBackendChannelOptions): Promise<PairedWorkspaceBackendChannel>;
 }
 
 export interface WorkspaceHost {
@@ -274,8 +270,10 @@ export interface WorkspaceContext {
   workspace: Workspace;
   state?: PluginRuntimeState;
   files: WorkspaceFilesContextValue;
-  /** Present only when this browser entry has a paired active server backend. */
+  /** Legacy request helper for the server plugin that currently owns this workspace. */
   backend?: WorkspaceBackend;
+  /** Exact package-paired request/channel capabilities, independent of workspace ownership. */
+  pairedBackend?: PairedWorkspaceBackendV1;
   host: WorkspaceHost;
 }
 

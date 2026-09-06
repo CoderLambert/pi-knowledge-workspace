@@ -231,7 +231,7 @@ describe("PiWebPluginService", () => {
     const service = new PiWebPluginService({ catalog, runtimeProvider: activeRuntimeProvider(catalog, ["dual"], ["dual"]) });
 
     const manifest = await service.manifest();
-    expect(manifest).toMatchObject({ plugins: [{ id: "dual", machineSpecific: true, backendCapabilityVersion: 1, channelVersion: 1 }] });
+    expect(manifest).toMatchObject({ plugins: [{ id: "dual", machineSpecific: true, pairedRequestVersion: 1, pairedChannelVersion: 1 }] });
     expect(manifest.plugins[0]?.backendRevision).toMatch(/^sha256:[a-f\d]{64}$/u);
     const plugins = await service.plugins();
     expect(plugins.plugins[0]).toMatchObject({ id: "dual", enabled: true, machineSpecific: true });
@@ -743,8 +743,8 @@ function recoveryRuntimeProvider(): WorkspaceProviderRuntimeReader {
 
 function activeRuntimeProvider(
   catalog: PiWebPluginCatalog,
-  backendCapabilityPluginIds: readonly string[] = [],
-  channelPluginIds: readonly string[] = [],
+  pairedRequestPluginIds: readonly string[] = [],
+  pairedChannelPluginIds: readonly string[] = [],
 ): WorkspaceProviderRuntimeReader {
   const activeSnapshot = catalog.snapshot().then((snapshot) => {
     const records = snapshot.plugins.flatMap((plugin) => plugin.serverModule === undefined ? [] : [{
@@ -755,8 +755,8 @@ function activeRuntimeProvider(
       ...(plugin.browserModule === undefined ? {} : { browserRevision: plugin.browserModule.revision }),
       settingsRevision: plugin.settingsRevision,
       machineSpecific: plugin.machineSpecific,
-      ...(backendCapabilityPluginIds.includes(plugin.id) ? { backendCapabilityVersion: 1 as const } : {}),
-      ...(channelPluginIds.includes(plugin.id) ? { channelVersion: 1 as const } : {}),
+      ...(pairedRequestPluginIds.includes(plugin.id) ? { pairedRequestVersion: 1 as const } : {}),
+      ...(pairedChannelPluginIds.includes(plugin.id) ? { pairedChannelVersion: 1 as const } : {}),
       state: plugin.enabled ? "active" as const : "disabled" as const,
       ...(plugin.enabled ? { name: plugin.id } : { message: "disabled in PI WEB config" }),
     }]);

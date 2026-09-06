@@ -122,7 +122,7 @@ describe("buildApp remote machine proxy routes", () => {
     expect(request).toHaveBeenCalledWith("POST", "/api/sessions/s1/tree/fork", forkBody, { timeoutMs: SESSION_TREE_FORK_PROXY_TIMEOUT_MS });
   });
 
-  it("proxies only the allowlisted paired backend shape with its bounded cancellable deadline", async () => {
+  it("proxies distinct owner-backed and paired backend routes with the same bounded cancellable deadline", async () => {
     const addResponse = await appTestContext.app.inject({ method: "POST", url: "/api/machines", payload: { name: "Remote", baseUrl: "https://remote.example.test/" } });
     const remote = addResponse.json<{ id: string }>();
     const request = vi.fn<MachineClient["request"]>((method, path, body) => Promise.resolve({
@@ -133,26 +133,26 @@ describe("buildApp remote machine proxy routes", () => {
     appTestContext.remoteClient = fakeRemoteClient({ request });
     const payload = { revision: "server-r1", input: { cards: ["alpha"], includeClosed: false } };
 
-    const response = await appTestContext.app.inject({
-      method: "POST",
-      url: `/api/machines/${remote.id}/plugin-backends/board-tools/projects/${encodeURIComponent("p 1")}/workspaces/${encodeURIComponent("w 1")}/cards.summary`,
-      payload,
-    });
+    for (const collection of ["plugin-backends", "paired-plugin-backends"] as const) {
+      const response = await appTestContext.app.inject({
+        method: "POST",
+        url: `/api/machines/${remote.id}/${collection}/board-tools/projects/${encodeURIComponent("p 1")}/workspaces/${encodeURIComponent("w 1")}/cards.summary`,
+        payload,
+      });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
-      method: "POST",
-      path: "/api/plugin-backends/board-tools/projects/p%201/workspaces/w%201/cards.summary",
-      body: payload,
-    });
-    expect(request.mock.calls[0]?.slice(0, 3)).toEqual([
-      "POST",
-      "/api/plugin-backends/board-tools/projects/p%201/workspaces/w%201/cards.summary",
-      payload,
-    ]);
-    expect(request.mock.calls[0]?.[3]?.timeoutMs).toBe(PLUGIN_BACKEND_FEDERATION_TIMEOUT_MS);
-    expect(request.mock.calls[0]?.[3]?.signal).toBeInstanceOf(AbortSignal);
-    expect(request.mock.calls[0]?.[3]?.signal?.aborted).toBe(false);
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        method: "POST",
+        path: `/api/${collection}/board-tools/projects/p%201/workspaces/w%201/cards.summary`,
+        body: payload,
+      });
+    }
+    expect(request).toHaveBeenCalledTimes(2);
+    for (const call of request.mock.calls) {
+      expect(call[3]?.timeoutMs).toBe(PLUGIN_BACKEND_FEDERATION_TIMEOUT_MS);
+      expect(call[3]?.signal).toBeInstanceOf(AbortSignal);
+      expect(call[3]?.signal?.aborted).toBe(false);
+    }
   });
 
   it("maps an old remote provider-backend route to an explicit lifecycle compatibility error", async () => {

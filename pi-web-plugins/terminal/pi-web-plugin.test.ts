@@ -88,7 +88,7 @@ function workspaceContext(machineId: string): WorkspacePanelContext {
     machine: { id: machineId, name: machineId, kind: machineId === "local" ? "local" : "remote" },
     workspace: { id: "workspace-1", projectId: "project-1", path: "/repo", label: "main", isMain: true },
     files: { readFile: vi.fn(), listFiles: vi.fn(), writeFile: vi.fn(), deleteFile: vi.fn(), moveFile: vi.fn() },
-    backend: { capabilityVersion: 1, channelVersion: 1, request: vi.fn(() => Promise.resolve([])), openChannel: vi.fn() },
+    pairedBackend: { version: 1, requestVersion: 1, channelVersion: 1, request: vi.fn(() => Promise.resolve([])), openChannel: vi.fn() },
     host: { requestRender: vi.fn() },
     prompt: { insertText: vi.fn(), getText: vi.fn(() => ""), getSelection: vi.fn(() => null) },
     terminal: { open: vi.fn(), runCommand: vi.fn() },

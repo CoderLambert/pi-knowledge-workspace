@@ -11,8 +11,8 @@ interface RemotePluginManifestEntry {
   id: string;
   module: string;
   backendRevision?: string;
-  backendCapabilityVersion?: 1;
-  channelVersion?: 1;
+  pairedRequestVersion?: 1;
+  pairedChannelVersion?: 1;
   source?: string;
   scope?: string;
   machineSpecific?: boolean;
@@ -182,20 +182,17 @@ function parseRemoteManifest(value: unknown): RemotePluginManifest {
       throw new Error(`Reserved remote PI WEB plugin id: ${entry["id"]}`);
     }
     const backendRevision = parseRemoteBackendRevision(entry["backendRevision"]);
-    const backendCapabilityVersion = parseRemoteBackendCapabilityVersion(entry["backendCapabilityVersion"]);
-    const channelVersion = parseRemoteChannelVersion(entry["channelVersion"]);
-    if ((backendCapabilityVersion !== undefined || channelVersion !== undefined) && backendRevision === undefined) {
-      throw new Error("Invalid remote PI WEB plugin manifest entry");
-    }
-    if (channelVersion !== undefined && backendCapabilityVersion === undefined) {
+    const pairedRequestVersion = parseRemotePairedCapabilityVersion(entry["pairedRequestVersion"]);
+    const pairedChannelVersion = parseRemotePairedCapabilityVersion(entry["pairedChannelVersion"]);
+    if ((pairedRequestVersion !== undefined || pairedChannelVersion !== undefined) && backendRevision === undefined) {
       throw new Error("Invalid remote PI WEB plugin manifest entry");
     }
     return {
       id: entry["id"],
       module: entry["module"],
       ...(backendRevision === undefined ? {} : { backendRevision }),
-      ...(backendCapabilityVersion === undefined ? {} : { backendCapabilityVersion }),
-      ...(channelVersion === undefined ? {} : { channelVersion }),
+      ...(pairedRequestVersion === undefined ? {} : { pairedRequestVersion }),
+      ...(pairedChannelVersion === undefined ? {} : { pairedChannelVersion }),
       ...(source === undefined ? {} : { source }),
       ...(scope === undefined ? {} : { scope }),
       ...(parseRemoteMachineSpecific(entry["machineSpecific"])),
@@ -211,7 +208,7 @@ function parseRemoteManifest(value: unknown): RemotePluginManifest {
     if (terminal === undefined || plugins[0] !== terminal || terminal.machineSpecific !== true) {
       throw new RemotePluginLifecycleCompatibilityError("The remote required Terminal plugin is missing or out of order. Update and restart PI WEB on the remote machine.");
     }
-    if (terminal.backendRevision === undefined || terminal.backendCapabilityVersion !== 1 || terminal.channelVersion !== 1) {
+    if (terminal.backendRevision === undefined || terminal.pairedRequestVersion !== 1 || terminal.pairedChannelVersion !== 1) {
       throw new RemotePluginLifecycleCompatibilityError("The remote required Terminal plugin is incompatible. Update and restart PI WEB on the remote machine.");
     }
   } else if (terminal !== undefined) {
@@ -248,13 +245,7 @@ function parseRemoteBackendRevision(value: unknown): string | undefined {
   }
 }
 
-function parseRemoteBackendCapabilityVersion(value: unknown): 1 | undefined {
-  if (value === undefined) return undefined;
-  if (value !== 1) throw new Error("Invalid remote PI WEB plugin manifest entry");
-  return value;
-}
-
-function parseRemoteChannelVersion(value: unknown): 1 | undefined {
+function parseRemotePairedCapabilityVersion(value: unknown): 1 | undefined {
   if (value === undefined) return undefined;
   if (value !== 1) throw new Error("Invalid remote PI WEB plugin manifest entry");
   return value;

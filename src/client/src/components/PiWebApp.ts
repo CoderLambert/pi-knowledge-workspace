@@ -37,7 +37,7 @@ import { themePackPlugin } from "../plugins/themes";
 import { loadExternalPlugins, type ExternalPluginLoadResult } from "../plugins/external";
 import { REQUIRED_TERMINAL_PLUGIN_ID, type TerminalPluginMode } from "../../../shared/requiredTerminalPlugin";
 import { PluginRegistry, installPluginRuntimeScope, installWorkspaceLabelScope, installWorkspacePanelScope } from "../plugins/registry";
-import { createPluginWorkspaceBackend } from "../plugins/workspaceBackend";
+import { createPairedPluginWorkspaceBackend, createPluginWorkspaceBackend } from "../plugins/workspaceBackend";
 import { requiredTerminalUnavailableError, snapshotRequiredTerminalBrowserFacade, type RequiredTerminalBrowserComposition, type WorkspaceContributionNavigationV1 } from "../plugins/requiredTerminalFacade";
 import { createWorkspaceFiles as createPluginWorkspaceFiles } from "../plugins/workspaceFiles";
 import { contributionQueryFromRecord, isContributionQueryLocalKey, patchContributionQueryRecord, readContributionQuery, readContributionQueryRecord, setContributionQueryKey, writeContributionQueryRecord, type ContributionQueryRecord } from "../namespacedQueryArgs";
@@ -996,8 +996,8 @@ export class PiWebApp extends LitElement {
 
   private workspaceTerminal(origin: string, workspace: Workspace, machineId: string): WorkspacePanelTerminal {
     const composition = this.requiredTerminalByMachine.get(machineId);
-    const backend = composition === undefined ? undefined : createPluginWorkspaceBackend(composition.binding, workspace, machineId);
-    if (composition === undefined || backend === undefined) {
+    const pairedBackend = composition === undefined ? undefined : createPairedPluginWorkspaceBackend(composition.binding, workspace, machineId);
+    if (composition === undefined || pairedBackend === undefined) {
       const error = requiredTerminalUnavailableError(machineId);
       return Object.freeze({
         open: () => { this.setState({ error: error.message }); },
@@ -1008,7 +1008,7 @@ export class PiWebApp extends LitElement {
       origin,
       registrationPluginId: composition.binding.registrationPluginId,
       workspace,
-      backend,
+      pairedBackend,
       host: {
         navigateWorkspaceContribution: (targetWorkspace, navigation) =>
           this.navigateRuntimeWorkspaceContribution(machineId, targetWorkspace, navigation),
@@ -1586,12 +1586,14 @@ export class PiWebApp extends LitElement {
     const machine = pluginMachineFromState(this.state);
     const createContext = (binding: WorkspacePluginBinding): WorkspaceLabelContext => {
       const backend = createPluginWorkspaceBackend(binding, workspace, machine.id);
+      const pairedBackend = createPairedPluginWorkspaceBackend(binding, workspace, machine.id);
       return installWorkspaceLabelScope({
         machine,
         workspace,
         state: this.state,
         files: this.createWorkspaceFiles(workspace, machine),
         ...(backend === undefined ? {} : { backend }),
+        ...(pairedBackend === undefined ? {} : { pairedBackend }),
         host: this.createWorkspaceHost(),
       }, createContext);
     };
@@ -1623,12 +1625,14 @@ export class PiWebApp extends LitElement {
       navigationAliases: readonly QualifiedContributionId[] = [],
     ): WorkspacePanelContext => {
       const backend = createPluginWorkspaceBackend(binding, workspace, machineId);
+      const pairedBackend = createPairedPluginWorkspaceBackend(binding, workspace, machineId);
       return installWorkspacePanelScope({
         machine,
         workspace,
         state: this.state,
         files: this.createWorkspaceFiles(workspace, machine),
         ...(backend === undefined ? {} : { backend }),
+        ...(pairedBackend === undefined ? {} : { pairedBackend }),
         prompt: this.createPromptEditor(),
         terminal: this.workspaceTerminal(binding.registrationPluginId, workspace, machineId),
         ...(contributionId === undefined ? {} : {
@@ -2176,10 +2180,10 @@ export class PiWebApp extends LitElement {
         ? this.state.workspaces.filter((workspace) => workspace.projectId === project.id)
         : [...new Map(pendingRuns.map((run) => [run.workspaceId, { id: run.workspaceId, projectId: run.projectId }])).values()];
       const results = await Promise.allSettled(queryWorkspaces.map(async (workspace) => {
-        const backend = createPluginWorkspaceBackend(composition.binding, workspace, machineId);
-        if (backend === undefined) throw requiredTerminalUnavailableError(machineId);
+        const pairedBackend = createPairedPluginWorkspaceBackend(composition.binding, workspace, machineId);
+        if (pairedBackend === undefined) throw requiredTerminalUnavailableError(machineId);
         return composition.facade.listCommandRuns({
-          backend,
+          pairedBackend,
           filter: { metadata: filter.metadata },
           signal: controller.signal,
         });
@@ -2871,23 +2875,23 @@ function sameWorkspacePluginBinding(left: WorkspacePluginBinding, right: Workspa
   return left.registrationPluginId === right.registrationPluginId
     && left.sourcePluginId === right.sourcePluginId
     && left.backendRevision === right.backendRevision
-    && left.backendCapabilityVersion === right.backendCapabilityVersion
-    && left.channelVersion === right.channelVersion;
+    && left.pairedRequestVersion === right.pairedRequestVersion
+    && left.pairedChannelVersion === right.pairedChannelVersion;
 }
 
 function requiredTerminalPluginBinding(registration: PiWebPluginRegistration): WorkspacePluginBinding {
   if ((registration.sourcePluginId ?? registration.id) !== REQUIRED_TERMINAL_PLUGIN_ID
     || registration.backendRevision === undefined
-    || registration.backendCapabilityVersion !== 1
-    || registration.channelVersion !== 1) {
+    || registration.pairedRequestVersion !== 1
+    || registration.pairedChannelVersion !== 1) {
     throw new Error("Required Terminal browser entry does not have a matching paired backend/channel revision");
   }
   return Object.freeze({
     registrationPluginId: registration.id,
     sourcePluginId: REQUIRED_TERMINAL_PLUGIN_ID,
     backendRevision: registration.backendRevision,
-    backendCapabilityVersion: 1,
-    channelVersion: 1,
+    pairedRequestVersion: 1,
+    pairedChannelVersion: 1,
   });
 }
 

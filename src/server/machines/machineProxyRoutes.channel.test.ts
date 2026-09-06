@@ -58,7 +58,7 @@ describe("machine plugin backend channel proxy", () => {
     registerMachineProxyRoutes(app, { remoteClient: () => remoteClient }, admissions);
     await app.listen({ host: "127.0.0.1", port: 0 });
 
-    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote%20one/plugin-backends/terminal/projects/p%201/workspaces/w%201/channels/terminal.attach`);
+    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote%20one/paired-plugin-backends/terminal/projects/p%201/workspaces/w%201/channels/terminal.attach`);
     sockets.push(browser);
     await waitForOpen(browser);
 
@@ -86,7 +86,7 @@ describe("machine plugin backend channel proxy", () => {
     remote.socket.send(lateServerData);
     await expect(browserData).resolves.toBe(lateServerData);
     expect(connections).toEqual([{
-      path: "/api/plugin-backends/terminal/projects/p%201/workspaces/w%201/channels/terminal.attach",
+      path: "/api/paired-plugin-backends/terminal/projects/p%201/workspaces/w%201/channels/terminal.attach",
       maxPayload: PLUGIN_BACKEND_CHANNEL_DATA_FRAME_MAX_BYTES,
     }]);
 
@@ -116,13 +116,13 @@ describe("machine plugin backend channel proxy", () => {
     registerMachineProxyRoutes(app, { remoteClient }, admissions);
     await app.listen({ host: "127.0.0.1", port: 0 });
 
-    const local = new WebSocket(`${fastifyServerUrl(app)}/api/plugin-backends/terminal/projects/local-project/workspaces/local-workspace/channels/attach`);
+    const local = new WebSocket(`${fastifyServerUrl(app)}/api/paired-plugin-backends/terminal/projects/local-project/workspaces/local-workspace/channels/attach`);
     sockets.push(local);
     await waitForOpen(local);
     const localUpstream = await localUpstreamConnected;
     expect(admissions.activeCount).toBe(1);
 
-    const federated = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote-one/plugin-backends/other.tools/projects/remote-project/workspaces/remote-workspace/channels/attach`);
+    const federated = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote-one/paired-plugin-backends/other.tools/projects/remote-project/workspaces/remote-workspace/channels/attach`);
     sockets.push(federated);
     const errorFrame = nextMessage(federated).then((text) => parsePluginBackendChannelServerEnvelope(text));
     const federatedClosed = nextClose(federated);
@@ -157,13 +157,13 @@ describe("machine plugin backend channel proxy", () => {
     }, admissions);
     await app.listen({ host: "127.0.0.1", port: 0 });
 
-    const first = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote/plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
+    const first = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote/paired-plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
     sockets.push(first);
     await waitForOpen(first);
     await remoteClientCalled;
     expect(admissions.activeCount).toBe(1);
 
-    const second = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote/plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
+    const second = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote/paired-plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
     sockets.push(second);
     const errorFrame = nextMessage(second).then((text) => parsePluginBackendChannelServerEnvelope(text));
     const rejected = nextClose(second);
@@ -185,7 +185,7 @@ describe("machine plugin backend channel proxy", () => {
     registerMachineProxyRoutes(app, { remoteClient }, admissions);
     await app.listen({ host: "127.0.0.1", port: 0 });
 
-    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/machines/local/plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
+    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/machines/local/paired-plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
     sockets.push(browser);
     const closed = nextClose(browser);
     await waitForOpen(browser);
@@ -202,7 +202,7 @@ describe("machine plugin backend channel proxy", () => {
     }, admissions);
     await app.listen({ host: "127.0.0.1", port: 0 });
 
-    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote/plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
+    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote/paired-plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
     sockets.push(browser);
     const closed = nextClose(browser);
     await waitForOpen(browser);
@@ -228,7 +228,7 @@ describe("machine plugin backend channel proxy", () => {
     registerMachineProxyRoutes(app, { remoteClient: remoteClientCalled }, admissions);
     await app.listen({ host: "127.0.0.1", port: 0 });
 
-    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote/plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
+    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote/paired-plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
     sockets.push(browser);
     await waitForOpen(browser);
     await vi.waitFor(() => { expect(remoteClientCalled).toHaveBeenCalledOnce(); });
@@ -249,7 +249,7 @@ describe("machine plugin backend channel proxy", () => {
     registerMachineProxyRoutes(app, { remoteClient }, admissions);
     await app.listen({ host: "127.0.0.1", port: 0 });
 
-    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote/plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
+    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote/paired-plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
     sockets.push(browser);
     const closed = nextClose(browser);
     await waitForOpen(browser);
@@ -285,7 +285,7 @@ describe("machine plugin backend channel proxy", () => {
     registerMachineProxyRoutes(app, { remoteClient: () => Promise.resolve(client) }, admissions);
     await app.listen({ host: "127.0.0.1", port: 0 });
 
-    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote/plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
+    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/machines/remote/paired-plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
     sockets.push(browser);
     const browserClosed = nextClose(browser);
     await waitForOpen(browser);

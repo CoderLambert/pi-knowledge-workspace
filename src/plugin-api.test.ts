@@ -10,11 +10,11 @@ import type {
   PluginContributions,
   Workspace,
   WorkspaceBackend,
-  WorkspaceBackendChannel,
-  WorkspaceBackendChannelOptions,
-  WorkspaceBackendChannelV1,
-  WorkspaceBackendRequestOptions,
-  WorkspaceBackendV1,
+  PairedWorkspaceBackendChannel,
+  PairedWorkspaceBackendChannelOptions,
+  PairedWorkspaceBackendRequestOptions,
+  PairedWorkspaceBackendV1,
+  WorkspaceContext,
   WorkspaceFiles,
   WorkspaceFilesCapabilityV1,
   WorkspaceFilesContextValue,
@@ -104,17 +104,22 @@ describe("public browser plugin API", () => {
     expectTypeOf<ReadonlyKeys<Pick<WorkspaceFilesCapabilityV1, "capabilityVersion" | "defaultUploadFolder" | "maxInlinePreviewBytes">>>().toEqualTypeOf<"capabilityVersion" | "defaultUploadFolder" | "maxInlinePreviewBytes">();
   });
 
-  it("adds cancellable direct paired backend feature detection without breaking v2 request implementations", () => {
+  it("keeps the owner-backed helper unchanged and exposes paired request and channel detection separately", () => {
+    type PairedBackendIsOptional = IsOptional<WorkspaceContext, "pairedBackend">;
+    type PairedRequestIsOptional = IsOptional<PairedWorkspaceBackendV1, "request">;
+    type PairedChannelIsOptional = IsOptional<PairedWorkspaceBackendV1, "openChannel">;
     expectTypeOf<ExistingV2WorkspaceBackend>().toExtend<WorkspaceBackend>();
-    expectTypeOf<WorkspaceBackendV1>().toExtend<WorkspaceBackend>();
-    expectTypeOf<WorkspaceBackendV1["capabilityVersion"]>().toEqualTypeOf<1>();
-    expectTypeOf<WorkspaceBackendChannelV1>().toExtend<WorkspaceBackendV1>();
-    expectTypeOf<WorkspaceBackendChannelV1["channelVersion"]>().toEqualTypeOf<1>();
-    expectTypeOf<WorkspaceBackendChannelV1["openChannel"]>().toBeFunction();
-    expectTypeOf<ReadonlyKeys<WorkspaceBackendV1>>().toEqualTypeOf<"capabilityVersion" | "channelVersion">();
-    expectTypeOf<ReadonlyKeys<WorkspaceBackendRequestOptions>>().toEqualTypeOf<"signal">();
-    expectTypeOf<ReadonlyKeys<WorkspaceBackendChannelOptions>>().toEqualTypeOf<keyof WorkspaceBackendChannelOptions>();
-    expectTypeOf<ReadonlyKeys<Pick<WorkspaceBackendChannel, "closed">>>().toEqualTypeOf<"closed">();
+    expectTypeOf<keyof WorkspaceBackend>().toEqualTypeOf<"request">();
+    expectTypeOf<PairedWorkspaceBackendV1["version"]>().toEqualTypeOf<1>();
+    expectTypeOf<PairedWorkspaceBackendV1["requestVersion"]>().toEqualTypeOf<1 | undefined>();
+    expectTypeOf<PairedWorkspaceBackendV1["channelVersion"]>().toEqualTypeOf<1 | undefined>();
+    expectTypeOf<PairedBackendIsOptional>().toEqualTypeOf<true>();
+    expectTypeOf<PairedRequestIsOptional>().toEqualTypeOf<true>();
+    expectTypeOf<PairedChannelIsOptional>().toEqualTypeOf<true>();
+    expectTypeOf<ReadonlyKeys<PairedWorkspaceBackendV1>>().toEqualTypeOf<"version" | "requestVersion" | "channelVersion">();
+    expectTypeOf<ReadonlyKeys<PairedWorkspaceBackendRequestOptions>>().toEqualTypeOf<"signal">();
+    expectTypeOf<ReadonlyKeys<PairedWorkspaceBackendChannelOptions>>().toEqualTypeOf<keyof PairedWorkspaceBackendChannelOptions>();
+    expectTypeOf<ReadonlyKeys<Pick<PairedWorkspaceBackendChannel, "closed">>>().toEqualTypeOf<"closed">();
   });
 
   it("adds optional versioned panel navigation without changing browser API v2 compatibility", () => {

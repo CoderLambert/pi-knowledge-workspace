@@ -7,9 +7,9 @@ import {
   serializePluginBackendChannelReadyEnvelope,
 } from "../../../shared/pluginBackendProtocol";
 import {
-  openPluginBackendChannel,
-  pluginBackendChannelPath,
-  pluginBackendChannelUrl,
+  openPairedPluginBackendChannel,
+  pairedPluginBackendChannelPath,
+  pairedPluginBackendChannelUrl,
   type PluginBackendRequestTarget,
 } from "./pluginBackends";
 
@@ -39,26 +39,26 @@ afterEach(async () => {
   await new Promise<void>((resolve) => { server.close(() => { resolve(); }); });
 });
 
-describe("browser plugin backend channel helper", () => {
+describe("browser paired plugin backend channel helper", () => {
   it("builds encoded local and federated paths and resolves the WebSocket URL once", () => {
-    expect(pluginBackendChannelPath({ ...target, machineId: "local" }, "terminal.attach")).toBe(
-      "api/plugin-backends/terminal.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/channels/terminal.attach",
+    expect(pairedPluginBackendChannelPath({ ...target, machineId: "local" }, "terminal.attach")).toBe(
+      "api/paired-plugin-backends/terminal.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/channels/terminal.attach",
     );
-    expect(pluginBackendChannelPath(target, "terminal.attach")).toBe(
-      "api/machines/remote%20%2F%20one/plugin-backends/terminal.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/channels/terminal.attach",
+    expect(pairedPluginBackendChannelPath(target, "terminal.attach")).toBe(
+      "api/machines/remote%20%2F%20one/paired-plugin-backends/terminal.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/channels/terminal.attach",
     );
-    expect(pluginBackendChannelUrl(target, "terminal.attach", {
+    expect(pairedPluginBackendChannelUrl(target, "terminal.attach", {
       viteBaseUrl: "./",
       documentBaseUrl: "https://pi.example.test/test/ai/",
     })).toBe(
-      "wss://pi.example.test/test/ai/api/machines/remote%20%2F%20one/plugin-backends/terminal.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/channels/terminal.attach",
+      "wss://pi.example.test/test/ai/api/machines/remote%20%2F%20one/paired-plugin-backends/terminal.tools/projects/project%20%2F%20one/workspaces/workspace%20%231/channels/terminal.attach",
     );
   });
 
   it("waits for ready, exchanges bounded JSON frames, and reports attributed closure", async () => {
     const connected = nextConnection(server);
     const observedData: unknown[] = [];
-    const opened = openPluginBackendChannel(
+    const opened = openPairedPluginBackendChannel(
       { ...target, machineId: "local" },
       "terminal.attach",
       { terminalId: "t1" },
@@ -95,7 +95,7 @@ describe("browser plugin backend channel helper", () => {
 
   it("attributes a browser transport error even when socket teardown reports code 1000", async () => {
     const socket = new FakeBrowserSocket();
-    const opened = openPluginBackendChannel(
+    const opened = openPairedPluginBackendChannel(
       { ...target, machineId: "local" },
       "terminal.attach",
       null,
@@ -118,7 +118,7 @@ describe("browser plugin backend channel helper", () => {
   it("cancels an opening channel and rejects invalid outbound data before sending", async () => {
     const connected = nextConnection(server);
     const controller = new AbortController();
-    const opened = openPluginBackendChannel(
+    const opened = openPairedPluginBackendChannel(
       { ...target, machineId: "local" },
       "terminal.attach",
       null,

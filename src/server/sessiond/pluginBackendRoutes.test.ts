@@ -8,7 +8,7 @@ import type {
 } from "../plugins/serverPluginRuntime.js";
 import type { Project } from "../types.js";
 import { WorkspaceProviderRegistry } from "../workspaces/workspaceProviderRegistry.js";
-import { registerPluginBackendRoutes } from "./pluginBackendRoutes.js";
+import { registerPairedPluginBackendRoutes, registerPluginBackendRoutes } from "./pluginBackendRoutes.js";
 
 const project: Project = {
   id: "project one",
@@ -92,11 +92,11 @@ describe("session daemon plugin backend routes", () => {
       },
     };
     const backends = new PluginBackendRegistry({ contributions: [contribution], workspaces });
-    registerPluginBackendRoutes(app, { projects: projectReader(), backends, onWorkspacesMutated: vi.fn() });
+    registerPairedPluginBackendRoutes(app, { projects: projectReader(), backends, onWorkspacesMutated: vi.fn() });
 
     const response = await app.inject({
       method: "POST",
-      url: `/plugin-backends/board/projects/${encodeURIComponent(project.id)}/workspaces/${workspaceId}/cards.summary`,
+      url: `/paired-plugin-backends/board/projects/${encodeURIComponent(project.id)}/workspaces/${workspaceId}/cards.summary`,
       payload: { revision: "server-r1", input: { cards: 2 } },
     });
 

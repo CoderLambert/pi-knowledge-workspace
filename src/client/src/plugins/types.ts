@@ -15,8 +15,8 @@ export interface PiWebPluginRegistration {
   machineId?: string;
   sourcePluginId?: PluginId;
   backendRevision?: string;
-  backendCapabilityVersion?: 1;
-  channelVersion?: 1;
+  pairedRequestVersion?: 1;
+  pairedChannelVersion?: 1;
   machineSpecific?: boolean;
 }
 
@@ -24,8 +24,8 @@ export interface WorkspacePluginBinding {
   registrationPluginId: PluginId;
   sourcePluginId: PluginId;
   backendRevision?: string;
-  backendCapabilityVersion?: 1;
-  channelVersion?: 1;
+  pairedRequestVersion?: 1;
+  pairedChannelVersion?: 1;
 }
 
 export interface PiWebPlugin {
@@ -115,33 +115,38 @@ export interface WorkspaceFilesCapabilityV1 extends WorkspaceFiles {
 
 export type WorkspaceFilesContextValue = LegacyWorkspaceFiles | WorkspaceFilesCapabilityV1;
 
-export interface WorkspaceBackendRequestOptions {
+export interface WorkspaceBackend {
+  request(operation: string, input: JsonValue): Promise<JsonValue>;
+}
+
+export interface PairedWorkspaceBackendRequestOptions {
   readonly signal?: AbortSignal;
 }
 
-export interface WorkspaceBackendChannelOptions {
+export interface PairedWorkspaceBackendChannelOptions {
   readonly signal?: AbortSignal;
   readonly onData: (data: JsonValue) => void;
 }
 
-export interface WorkspaceBackendChannelClose {
+export interface PairedWorkspaceBackendChannelClose {
   readonly code: number;
   readonly reason: string;
   readonly wasClean: boolean;
   readonly error?: Readonly<{ code: string; message: string }>;
 }
 
-export interface WorkspaceBackendChannel {
-  readonly closed: Promise<WorkspaceBackendChannelClose>;
+export interface PairedWorkspaceBackendChannel {
+  readonly closed: Promise<PairedWorkspaceBackendChannelClose>;
   send(data: JsonValue): void;
   close(reason?: string): void;
 }
 
-export interface WorkspaceBackend {
-  readonly capabilityVersion?: 1;
+export interface PairedWorkspaceBackendV1 {
+  readonly version: 1;
+  readonly requestVersion?: 1;
   readonly channelVersion?: 1;
-  request(operation: string, input: JsonValue, options?: WorkspaceBackendRequestOptions): Promise<JsonValue>;
-  openChannel?(operation: string, input: JsonValue, options: WorkspaceBackendChannelOptions): Promise<WorkspaceBackendChannel>;
+  request?(operation: string, input: JsonValue, options?: PairedWorkspaceBackendRequestOptions): Promise<JsonValue>;
+  openChannel?(operation: string, input: JsonValue, options: PairedWorkspaceBackendChannelOptions): Promise<PairedWorkspaceBackendChannel>;
 }
 
 export interface WorkspaceHost {
@@ -154,6 +159,7 @@ export interface WorkspaceContext {
   state: AppState;
   files: WorkspaceFilesContextValue;
   backend?: WorkspaceBackend;
+  pairedBackend?: PairedWorkspaceBackendV1;
   host: WorkspaceHost;
 }
 

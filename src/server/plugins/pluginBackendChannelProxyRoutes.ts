@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { WebSocket } from "ws";
-import { PLUGIN_BACKEND_CHANNEL_DATA_FRAME_MAX_BYTES, PLUGIN_BACKEND_CHANNEL_ROUTE_PATH } from "../../shared/pluginBackendProtocol.js";
+import { PAIRED_PLUGIN_BACKEND_CHANNEL_ROUTE_PATH, PLUGIN_BACKEND_CHANNEL_DATA_FRAME_MAX_BYTES } from "../../shared/pluginBackendProtocol.js";
 import {
   type PluginBackendChannelProxyAdmissionPool,
   pluginBackendChannelProxyAdmissionPool,
@@ -29,7 +29,7 @@ export function registerPluginBackendChannelProxyRoutes(
   admissions: PluginBackendChannelProxyAdmissionPool = pluginBackendChannelProxyAdmissionPool(app),
 ): void {
   app.get<{ Params: PluginBackendChannelProxyParams }>(
-    `${prefix}${PLUGIN_BACKEND_CHANNEL_ROUTE_PATH}`,
+    `${prefix}${PAIRED_PLUGIN_BACKEND_CHANNEL_ROUTE_PATH}`,
     { websocket: true },
     (socket, request) => {
       const upstreamPath = daemonPluginBackendChannelPath(request.params);
@@ -62,7 +62,7 @@ export function registerPluginBackendChannelProxyRoutes(
 
 function daemonPluginBackendChannelPath(params: PluginBackendChannelProxyParams): string {
   return [
-    "/plugin-backends",
+    "/paired-plugin-backends",
     encodeURIComponent(params.pluginId),
     "projects",
     encodeURIComponent(params.projectId),

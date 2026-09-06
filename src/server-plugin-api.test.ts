@@ -52,7 +52,7 @@ type ReadonlyKeys<Value> = {
 type WritableKeys<Value> = Exclude<keyof Value, ReadonlyKeys<Value>>;
 
 describe("public server plugin API", () => {
-  it("supports lifecycle-owned workspace providers and direct paired JSON requests", async () => {
+  it("supports lifecycle-owned workspace providers and package-paired JSON capabilities", async () => {
     const observedSignals: AbortSignal[] = [];
     const provider: WorkspaceProvider = {
       fallback: false,
@@ -136,6 +136,13 @@ describe("public server plugin API", () => {
       "fallback" | "probe" | "list" | "request" | "prepareRemove"
     >();
     expectTypeOf<keyof PairedPluginBackendV1>().toEqualTypeOf<"version" | "request" | "openChannel">();
+    const requestOnly: PairedPluginBackendV1 = { version: 1, request: () => null };
+    const channelOnly: PairedPluginBackendV1 = {
+      version: 1,
+      openChannel: () => ({ receive: () => undefined }),
+    };
+    expect(typeof requestOnly.request).toBe("function");
+    expect(typeof channelOnly.openChannel).toBe("function");
     expectTypeOf<keyof PairedPluginChannel>().toEqualTypeOf<"receive" | "closed" | "close">();
     expectTypeOf<keyof PairedPluginChannelOpenContext>().toEqualTypeOf<"project" | "workspace" | "operation" | "input" | "signal" | "send">();
     expectTypeOf<keyof PairedPluginChannelCloseContext>().toEqualTypeOf<"code" | "reason" | "signal">();
@@ -182,7 +189,7 @@ async function exerciseActivation(activation: ServerPluginActivation, input: Pro
   const request: ProviderRequestContext = { project: input, workspace, operation: "status", input: { paths: [] }, signal };
   await provider.request?.(request);
   await provider.prepareRemove?.({ project: input, workspace, signal });
-  await activation.pairedBackend?.request({
+  await activation.pairedBackend?.request?.({
     project: input,
     workspace: {
       id: "workspace-1",

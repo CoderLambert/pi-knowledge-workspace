@@ -49,7 +49,7 @@ describe("local plugin backend channel proxy", () => {
     }, "/api", admissions);
     await app.listen({ host: "127.0.0.1", port: 0 });
 
-    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/plugin-backends/terminal.tools/projects/project%20one/workspaces/workspace%20one/channels/terminal.attach`);
+    const browser = new WebSocket(`${fastifyServerUrl(app)}/api/paired-plugin-backends/terminal.tools/projects/project%20one/workspaces/workspace%20one/channels/terminal.attach`);
     sockets.push(browser);
     const upstreamSocket = await upstreamConnected;
     await waitForOpen(browser);
@@ -74,7 +74,7 @@ describe("local plugin backend channel proxy", () => {
     upstreamSocket.send(lateServerData);
     await expect(forwardedLateServerData).resolves.toBe(lateServerData);
     expect(connections).toEqual([{
-      path: "/plugin-backends/terminal.tools/projects/project%20one/workspaces/workspace%20one/channels/terminal.attach",
+      path: "/paired-plugin-backends/terminal.tools/projects/project%20one/workspaces/workspace%20one/channels/terminal.attach",
       maxPayload: PLUGIN_BACKEND_CHANNEL_DATA_FRAME_MAX_BYTES,
     }]);
 
@@ -104,14 +104,14 @@ describe("local plugin backend channel proxy", () => {
     }, "/api", admissions);
     await app.listen({ host: "127.0.0.1", port: 0 });
 
-    const first = new WebSocket(`${fastifyServerUrl(app)}/api/plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
+    const first = new WebSocket(`${fastifyServerUrl(app)}/api/paired-plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
     sockets.push(first);
     await waitForOpen(first);
     const daemonSocket = await daemonConnected;
     expect(connectionCount).toBe(1);
     expect(admissions.activeCount).toBe(1);
 
-    const second = new WebSocket(`${fastifyServerUrl(app)}/api/plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
+    const second = new WebSocket(`${fastifyServerUrl(app)}/api/paired-plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
     sockets.push(second);
     const errorFrame = nextMessage(second).then((text) => parsePluginBackendChannelServerEnvelope(text));
     const rejected = nextClose(second);
@@ -154,7 +154,7 @@ describe("local plugin backend channel proxy", () => {
       }, "/api", admissions);
       await app.listen({ host: "127.0.0.1", port: 0 });
 
-      const browser = new WebSocket(`${fastifyServerUrl(app)}/api/plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
+      const browser = new WebSocket(`${fastifyServerUrl(app)}/api/paired-plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
       sockets.push(browser);
       const closed = nextClose(browser);
       await waitForOpen(browser);
@@ -199,7 +199,7 @@ describe("local plugin backend channel proxy", () => {
       }, "/api", admissions);
       await app.listen({ host: "127.0.0.1", port: 0 });
 
-      const browser = new WebSocket(`${fastifyServerUrl(app)}/api/plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
+      const browser = new WebSocket(`${fastifyServerUrl(app)}/api/paired-plugin-backends/terminal/projects/p/workspaces/w/channels/attach`);
       sockets.push(browser);
       await waitForOpen(browser);
       await accepted;

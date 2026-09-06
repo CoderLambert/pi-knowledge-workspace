@@ -5,7 +5,7 @@ import { styleMap, type StyleInfo } from "lit/directives/style-map.js";
 import { Terminal, type ITerminalOptions, type ITheme } from "@xterm/xterm";
 import { FitAddon, type ITerminalDimensions } from "@xterm/addon-fit";
 import xtermStyles from "@xterm/xterm/css/xterm.css?inline";
-import type { TerminalCommandRun, WorkspaceBackendChannel, WorkspaceBackendChannelClose, WorkspacePanelContext } from "@jmfederico/pi-web/plugin-api";
+import type { PairedWorkspaceBackendChannel, PairedWorkspaceBackendChannelClose, TerminalCommandRun, WorkspacePanelContext } from "@jmfederico/pi-web/plugin-api";
 import { writeClipboardText } from "./clipboard";
 import { selectFallbackTerminal, selectPreferredTerminal } from "./terminalSelection";
 import { TerminalBackendClient, terminalChannelFailureMessage, terminalInputFrames, type TerminalClientFrame, type TerminalInfo, type TerminalServerFrame, type TerminalSize } from "./terminalProtocol";
@@ -63,7 +63,7 @@ export class TerminalPanel extends LitElement {
 
   private terminal: Terminal | undefined;
   private fitAddon: FitAddon | undefined;
-  private channel: WorkspaceBackendChannel | undefined;
+  private channel: PairedWorkspaceBackendChannel | undefined;
   private channelAbort: AbortController | undefined;
   private channelGeneration = 0;
   private channelReconnectAttempt = 0;
@@ -591,7 +591,7 @@ export class TerminalPanel extends LitElement {
     terminal.writeln(`\r\n[terminal error: ${frame.message}]`);
   }
 
-  private handleChannelClosed(generation: number, terminalId: string, terminal: Terminal, close: WorkspaceBackendChannelClose): void {
+  private handleChannelClosed(generation: number, terminalId: string, terminal: Terminal, close: PairedWorkspaceBackendChannelClose): void {
     if (!this.channelIsCurrent(generation, terminalId, terminal)) return;
     this.channel = undefined;
     const failure = terminalChannelFailureMessage(close);
@@ -755,8 +755,8 @@ export class TerminalPanel extends LitElement {
   }
 
   private backendClient(context: WorkspacePanelContext): TerminalBackendClient {
-    if (context.backend === undefined) throw new Error("Required Terminal paired backend is unavailable");
-    return new TerminalBackendClient(context.backend);
+    if (context.pairedBackend === undefined) throw new Error("Required Terminal paired backend is unavailable");
+    return new TerminalBackendClient(context.pairedBackend);
   }
 
   private renderCommandRunNotice() {

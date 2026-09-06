@@ -2,8 +2,8 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import type { WebSocket } from "ws";
 import { FEDERATED_HTTP_ROUTES, FEDERATED_WEBSOCKET_ROUTES, WORKSPACE_FILE_PREVIEW_ROUTE_PATH, type FederatedHttpRouteSpec } from "../../shared/federatedRoutes.js";
 import {
+  PAIRED_PLUGIN_BACKEND_CHANNEL_ROUTE_PATH,
   PLUGIN_BACKEND_CHANNEL_DATA_FRAME_MAX_BYTES,
-  PLUGIN_BACKEND_CHANNEL_ROUTE_PATH,
 } from "../../shared/pluginBackendProtocol.js";
 import { mergeSelectedMachineConfig, parsePiWebConfigResponseBody, parseSelectedMachineConfigRequest, selectedMachineConfigResponse } from "../configRoutes.js";
 import {
@@ -85,7 +85,7 @@ export function registerMachineProxyRoutes(
         request.params.machineId,
         request.url,
         socket,
-        path === PLUGIN_BACKEND_CHANNEL_ROUTE_PATH
+        path === PAIRED_PLUGIN_BACKEND_CHANNEL_ROUTE_PATH
           ? {
               admissions: pluginChannelAdmissions,
               scope: {
@@ -153,7 +153,7 @@ async function proxyHttpRequest(
         error: "Remote machine plugin lifecycle is incompatible",
         code: "plugin-lifecycle-incompatible",
         machineId,
-        detail: "The remote machine does not support workspace provider backend requests. Update and restart PI WEB on the remote machine.",
+        detail: "The remote machine does not support this plugin backend route. Update and restart PI WEB on the remote machine.",
       });
     }
     reply.code(upstream.statusCode);
@@ -338,7 +338,9 @@ function isUnknownRemotePluginBackendRoute(
   statusCode: number,
   body: NodeJS.ReadableStream | Buffer | undefined,
 ): boolean {
-  if (!spec.path.startsWith("/plugin-backends/") || statusCode !== 404 || !(body instanceof Buffer)) return false;
+  if ((!spec.path.startsWith("/plugin-backends/") && !spec.path.startsWith("/paired-plugin-backends/"))
+    || statusCode !== 404
+    || !(body instanceof Buffer)) return false;
   try {
     const value: unknown = JSON.parse(body.toString("utf8"));
     if (!isRecord(value) || value["statusCode"] !== 404 || value["error"] !== "Not Found") return false;

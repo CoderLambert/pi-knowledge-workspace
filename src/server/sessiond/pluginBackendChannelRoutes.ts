@@ -3,6 +3,7 @@ import { WebSocket, type RawData } from "ws";
 import type { JsonValue } from "../../shared/apiTypes.js";
 import { isPiWebPluginId } from "../../shared/pluginIds.js";
 import {
+  PAIRED_PLUGIN_BACKEND_CHANNEL_ROUTE_PATH,
   parsePluginBackendChannelClientEnvelope,
   PLUGIN_BACKEND_CHANNEL_DATA_FRAME_MAX_BYTES,
   PLUGIN_BACKEND_CHANNEL_DRAIN_TIMEOUT_MS,
@@ -11,7 +12,6 @@ import {
   PLUGIN_BACKEND_CHANNEL_OPEN_TIMEOUT_MS,
   PLUGIN_BACKEND_CHANNEL_QUEUE_MAX_BYTES,
   PLUGIN_BACKEND_CHANNEL_QUEUE_MAX_FRAMES,
-  PLUGIN_BACKEND_CHANNEL_ROUTE_PATH,
   PLUGIN_BACKEND_CHANNEL_SERVER_TO_BROWSER_QUEUE_MAX_BYTES,
   PLUGIN_BACKEND_CHANNEL_TEARDOWN_TIMEOUT_MS,
   requirePluginBackendOperation,
@@ -71,7 +71,7 @@ export function registerPluginBackendChannelRoutes(
   prefix = "",
 ): void {
   app.get<{ Params: PluginBackendChannelRouteParams }>(
-    `${prefix}${PLUGIN_BACKEND_CHANNEL_ROUTE_PATH}`,
+    `${prefix}${PAIRED_PLUGIN_BACKEND_CHANNEL_ROUTE_PATH}`,
     { websocket: true },
     (socket, request) => {
       const controller = new PluginBackendChannelSocketController(socket, request.params, dependencies, app.log);

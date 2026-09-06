@@ -56,11 +56,11 @@ export class TerminalBrowserRuntime {
   }
 
   async refresh(context: WorkspacePanelContext): Promise<void> {
-    const backend = context.backend;
-    if (backend === undefined) throw new Error("Required Terminal paired backend is unavailable");
+    const pairedBackend = context.pairedBackend;
+    if (pairedBackend === undefined) throw new Error("Required Terminal paired backend is unavailable");
     const state = this.workspaceState(context);
     if (state.refresh !== undefined) return state.refresh;
-    const refresh = new TerminalBackendClient(backend).list().then((terminals) => {
+    const refresh = new TerminalBackendClient(pairedBackend).list().then((terminals) => {
       this.updateTerminals(context, terminals);
     }).catch((error: unknown) => {
       state.refreshFailed = true;

@@ -115,7 +115,7 @@ describe("PluginBackendRegistry", () => {
     })).resolves.toEqual({ path: project.path, provider: null });
   });
 
-  it("preserves the legacy owner-only provider request fallback", async () => {
+  it("keeps owner-backed requests private and never redirects them when the same package adds a channel", async () => {
     const request = vi.fn<NonNullable<WorkspaceProvider["request"]>>(({ workspace, operation }) => Promise.resolve({
       privateData: workspace.data ?? null,
       operation,
@@ -133,16 +133,24 @@ describe("PluginBackendRegistry", () => {
     })]);
     const workspaceId = (await workspaces.resolve(project)).workspaces[0]?.id;
     if (workspaceId === undefined) throw new Error("Expected provider workspace");
-    const registry = new PluginBackendRegistry({ contributions: [], workspaces });
-
-    await expect(registry.request({
+    const paired = new PluginBackendRegistry({
+      contributions: [channelContribution("git", () => ({ receive: () => undefined }))],
+      workspaces,
+    });
+    const backendRequest = {
       pluginId: "git",
       moduleRevision: "git-r1",
       project,
       workspaceId,
       operation: "git.status",
       input: null,
-    })).resolves.toEqual({ privateData: { head: "abc123" }, operation: "git.status" });
+    };
+
+    await expect(paired.request(backendRequest))
+      .rejects.toMatchObject({ code: "operation-unavailable", statusCode: 501 });
+    expect(request).not.toHaveBeenCalled();
+    await expect(workspaces.request(backendRequest))
+      .resolves.toEqual({ privateData: { head: "abc123" }, operation: "git.status" });
     expect(request).toHaveBeenCalledOnce();
   });
 
@@ -188,7 +196,6 @@ describe("PluginBackendRegistry", () => {
           }],
           diagnostics: [],
         }),
-        request: () => Promise.resolve(null),
       },
     });
     await expect(invalidScope.request({ ...base, operation: "notes.list", input: null }))
@@ -591,7 +598,7 @@ function providerContribution(pluginId: string, provider: WorkspaceProvider): Se
 
 function backendContribution(
   pluginId: string,
-  request: ServerPluginPairedBackendContribution["backend"]["request"],
+  request: NonNullable<ServerPluginPairedBackendContribution["backend"]["request"]>,
 ): ServerPluginPairedBackendContribution {
   return {
     pluginId,
@@ -609,8 +616,13 @@ function channelContribution(
   openChannel: NonNullable<ServerPluginPairedBackendContribution["backend"]["openChannel"]>,
 ): ServerPluginPairedBackendContribution {
   return {
-    ...backendContribution(pluginId, () => null),
-    backend: Object.freeze({ version: 1, request: () => null, openChannel }),
+    pluginId,
+    pluginName: pluginId,
+    packageRoot: `/plugins/${pluginId}`,
+    source: "fixture",
+    scope: "local",
+    moduleRevision: `${pluginId}-r1`,
+    backend: Object.freeze({ version: 1, openChannel }),
   };
 }
 

@@ -42,8 +42,8 @@ import {
 export interface PluginBackendRegistryOptions {
   /** Healthy direct contributions from one immutable server-plugin snapshot. */
   contributions: readonly ServerPluginPairedBackendContribution[];
-  /** Authoritative workspace resolver and legacy owner-backed request fallback. */
-  workspaces: Pick<WorkspaceProviderRegistry, "resolve" | "request">;
+  /** Authoritative workspace resolver for browser-visible paired scope. */
+  workspaces: Pick<WorkspaceProviderRegistry, "resolve">;
   callbackTimeoutMs?: number;
   dispatchTimeoutMs?: number;
   channelCallbackTimeoutMs?: number;
@@ -130,11 +130,7 @@ export function eligiblePluginBackendContributions(
   }));
 }
 
-/**
- * Dispatches a browser plugin only to its revision-matched server entry. Direct
- * paired backends may address any host-resolved workspace; older provider
- * backends retain their owner-only behavior through the explicit fallback.
- */
+/** Dispatches only to a browser package's revision-matched paired server entry. */
 export class PluginBackendRegistry {
   private readonly contributions: readonly ServerPluginPairedBackendContribution[];
   private readonly callbackTimeoutMs: number;
@@ -420,19 +416,25 @@ export class PluginBackendRegistry {
     const contribution = this.contributions.find((candidate) => candidate.pluginId === pluginId);
 
     if (contribution === undefined) {
-      return await this.options.workspaces.request({
-        ...request,
-        pluginId,
-        moduleRevision,
-        operation,
-        input,
-      }, dispatchSignal);
+      throw backendError(
+        "inactive-plugin",
+        409,
+        `Server plugin ${pluginId} does not expose a paired backend for operation ${operation}`,
+      );
     }
     if (contribution.moduleRevision !== moduleRevision) {
       throw backendError(
         "stale-plugin-revision",
         409,
         `Server plugin ${pluginId} backend revision is stale for operation ${operation}; reload after the session daemon restarts`,
+      );
+    }
+    const pairedRequest = contribution.backend.request?.bind(contribution.backend);
+    if (pairedRequest === undefined) {
+      throw backendError(
+        "operation-unavailable",
+        501,
+        `Server plugin ${pluginId} does not expose paired request operation ${operation}`,
       );
     }
     if (request.workspaceId === "") {
@@ -489,7 +491,7 @@ export class PluginBackendRegistry {
         pluginId,
         operation,
         this.callbackTimeoutMs,
-        (callbackSignal) => contribution.backend.request(Object.freeze({ ...context, signal: callbackSignal })),
+        (callbackSignal) => pairedRequest(Object.freeze({ ...context, signal: callbackSignal })),
         dispatchSignal,
       );
     } catch (error) {

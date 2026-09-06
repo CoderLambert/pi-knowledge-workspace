@@ -5,7 +5,7 @@ import type {
   QualifiedContributionId,
   TerminalCommandRunStatus,
   Workspace,
-  WorkspaceBackend,
+  PairedWorkspaceBackendV1,
   WorkspacePanelTerminal,
   WorkspaceTerminalCommandInput,
 } from "@jmfederico/pi-web/plugin-api";
@@ -29,12 +29,12 @@ export interface RequiredTerminalWorkspaceBindingV1 {
   readonly origin: string;
   readonly registrationPluginId: string;
   readonly workspace: Workspace;
-  readonly backend: WorkspaceBackend;
+  readonly pairedBackend: PairedWorkspaceBackendV1;
   readonly host: RequiredTerminalFacadeHostV1;
 }
 
 export interface RequiredTerminalCommandRunQueryV1 {
-  readonly backend: WorkspaceBackend;
+  readonly pairedBackend: PairedWorkspaceBackendV1;
   readonly filter?: Readonly<{
     terminalId?: string;
     statuses?: readonly TerminalCommandRunStatus[];
@@ -74,7 +74,7 @@ export class TerminalFacade implements RequiredTerminalBrowserFacadeV1 {
   }
 
   createWorkspaceTerminal(binding: RequiredTerminalWorkspaceBindingV1): WorkspacePanelTerminal {
-    const client = new TerminalBackendClient(binding.backend);
+    const client = new TerminalBackendClient(binding.pairedBackend);
     return Object.freeze({
       open: (options?: { terminalId?: string | undefined }) => { this.openTerminal(binding, options); },
       runCommand: async (input: WorkspaceTerminalCommandInput): Promise<TerminalCommandRunHandle> => {
@@ -107,7 +107,7 @@ export class TerminalFacade implements RequiredTerminalBrowserFacadeV1 {
       ...(query.filter?.statuses === undefined ? {} : { statuses: [...query.filter.statuses] }),
       ...(query.filter?.metadata === undefined ? {} : { metadata: { ...query.filter.metadata } }),
     };
-    return new TerminalBackendClient(query.backend).listCommandRuns(filter, query.signal);
+    return new TerminalBackendClient(query.pairedBackend).listCommandRuns(filter, query.signal);
   }
 
   parseCommandRun(value: unknown): TerminalCommandRun {

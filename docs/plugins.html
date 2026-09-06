@@ -115,13 +115,13 @@
                 <li><strong>Workspace tools and panels</strong> next to Files and Terminal.</li>
                 <li><strong>Workspace labels</strong> in the workspace list, header, and status bar.</li>
                 <li><strong>Browser-public assets</strong> served only from an explicit <code>browserRoot</code>.</li>
-                <li><strong>Browser helpers</strong> for files, terminals, prompts, rendering, and paired backends.</li>
+                <li><strong>Browser helpers</strong> for files, terminals, prompts, rendering, owner-backed requests, and package-paired backends.</li>
                 <li><strong>One workspace provider</strong> from an optional sessiond server entry.</li>
-                <li><strong>One paired JSON backend</strong> callable by that package's browser entry for any host-resolved workspace.</li>
+                <li><strong>One package-paired backend</strong> with independently optional JSON requests and bounded duplex channels.</li>
               </ul>
               <p>
                 The server API is deliberately narrow: lifecycle callbacks, scoped logging/settings, bounded argv
-                execution, one workspace provider, one direct paired JSON backend, owner-backed compatibility requests,
+                execution, one workspace provider, one package-paired backend, owner-backed provider requests,
                 and removal planning. Plugins receive no raw
                 Fastify access, arbitrary routes, concrete services, generic event bus, Pi model-provider registration,
                 or general server hooks.
@@ -323,8 +323,8 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
               <p>
                 Browser entries default-export <code>{ apiVersion: 2, name, activate }</code>. The host rejects v1 with
                 an attributed unsupported-version error; no browser-v1 shim is provided. Server entries remain on
-                <code>apiVersion: 1</code>. A server activation may independently contribute one version-1 direct
-                paired backend with optional bounded channels and one workspace provider; the paired backend does not need to own the addressed
+                <code>apiVersion: 1</code>. A server activation may independently contribute one version-1 package-paired
+                backend with requests, bounded channels, or both, and one workspace provider; the paired backend does not need to own the addressed
                 workspace. During migration, replace browser-v1 Git aliases, including top-level
                 <code>workspace.branch</code>, with provider metadata and
                 <code>refreshWorkspacePanels()</code>/<code>onInvalidate()</code>. Generic presentation uses the
@@ -374,12 +374,14 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
 
               <h3>Workspace files, navigation, and invalidation</h3>
               <p>
-                Workspace-files capability v1, paired-backend requests/channels, contribution navigation v1, and scoped invalidation are additive parts of
-                browser API v2. Existing v2 plugins that extend or implement the five-operation
-                <code>WorkspaceFiles</code> or <code>WorkspacePanelFiles</code> base remain source compatible;
+                Workspace-files capability v1, package-paired requests/channels, contribution navigation v1, and scoped invalidation are additive parts of
+                browser API v2. Existing v2 plugins that implement the original owner-backed
+                <code>WorkspaceBackend.request(operation, input)</code> shape remain source compatible, as do plugins that extend or implement the five-operation
+                <code>WorkspaceFiles</code> or <code>WorkspacePanelFiles</code> base;
                 callback contexts use the separate discriminated <code>WorkspaceFilesContextValue</code>. Check
-                <code>context.files.capabilityVersion === 1</code> before using the added file methods, check
-                <code>context.backend.channelVersion === 1</code> and <code>openChannel</code> before opening a channel, and treat <code>context.navigation</code> and the second <code>onInvalidate</code> argument as optional on older
+                <code>context.files.capabilityVersion === 1</code> before using the added file methods. Detect
+                <code>context.pairedBackend.requestVersion === 1</code> plus <code>request</code>, and
+                <code>context.pairedBackend.channelVersion === 1</code> plus <code>openChannel</code>, independently. Treat <code>context.navigation</code> and the second <code>onInvalidate</code> argument as optional on older
                 hosts.
               </p>
               <ul>
@@ -397,13 +399,14 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
             <section id="provider-contract">
               <h2>Paired backend and workspace provider contracts</h2>
               <p>
-                A version-1 paired backend receives only cloned, frozen host-resolved project/workspace data, bounded
-                JSON, and an operation-scoped cancellation signal. The matching revision-paired browser entry can call
-                it for a kernel-folder workspace or a workspace owned by another provider. Input is limited to 256 KiB,
+                A version-1 package-paired backend implements requests, channels, or both; those capabilities are independently optional and detected.
+                It receives only cloned, frozen host-resolved project/workspace data, bounded
+                JSON, and scoped cancellation signals. The matching revision-paired browser entry can call
+                it for a kernel-folder workspace or a workspace owned by another provider, without receiving that provider's private data. Input is limited to 256 KiB,
                 output to 8 MiB, callbacks to 10 seconds, sessiond dispatch to 25 seconds, and federation to 30 seconds.
               </p>
               <p>
-                The same backend can optionally implement <code>openChannel()</code>. The host supplies frozen scope,
+                A paired backend can implement <code>openChannel()</code> with or without a request handler. The host supplies frozen scope,
                 bounded JSON open input, a channel-lifetime signal, and a bounded synchronous <code>send()</code> function;
                 the plugin returns <code>receive()</code>, optional plugin-owned <code>closed</code>, and optional once-only
                 <code>close()</code> members. Resolve <code>closed</code> only after the final <code>send()</code>; the host
@@ -436,7 +439,7 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
               <p>
                 A server module default-exports <code>{ apiVersion: 1, name, activate }</code>. Activation may return
                 cooperative <code>start</code>, <code>stop</code>, and <code>health</code> callbacks plus at most one
-                provider. Every activation, lifecycle, provider, request, channel-receive, and channel-close signal is scoped to that one invocation and
+                provider and one paired backend. Every activation, lifecycle, provider, request, channel-receive, and channel-close signal is scoped to that one invocation and
                 is aborted when it times out or settles. The <code>openChannel()</code> signal is the deliberate exception:
                 it lasts until disconnect, failure, expiry, or shutdown. Release plugin-global resources in explicit
                 <code>stop()</code>. Server code is never hot-reloaded.
@@ -455,15 +458,16 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
                 operation in the foreground, and treat shell exit 0 as successful completion.
               </p>
               <p>
-                Panels and labels receive optional <code>context.backend</code> only when their browser entry has a
-                paired active server backend. Its manifest carries the active <code>backendRevision</code>, advertises
-                direct requests with <code>backendCapabilityVersion: 1</code>, and advertises channels with
-                <code>channelVersion: 1</code>. Check <code>context.backend.capabilityVersion === 1</code> for direct paired
-                dispatch independent of workspace ownership; helpers without that marker retain the legacy owner-only
-                <code>WorkspaceProvider.request()</code> path. PI WEB binds
-                <code>backend.request(operation, input, { signal? })</code> and feature-detected
-                <code>backend.openChannel(operation, input, { signal?, onData })</code> to the original plugin id, active backend
-                revision, selected machine, project, and workspace, carries cancellation through federation, and
+                Panels and labels keep the optional owner-backed <code>context.backend</code> contract:
+                <code>backend.request(operation, input)</code> dispatches only through the current workspace owner's
+                <code>WorkspaceProvider.request()</code> and preserves access to that provider's private workspace data.
+                The separate optional <code>context.pairedBackend</code> dispatches only to the browser package's
+                revision-matched server contribution, independent of ownership. Its manifest carries
+                <code>backendRevision</code> and advertises requests with <code>pairedRequestVersion: 1</code> and channels
+                with <code>pairedChannelVersion: 1</code>; either marker can appear alone. Check the matching marker and
+                method independently before calling <code>pairedBackend.request(operation, input, { signal? })</code> or
+                <code>pairedBackend.openChannel(operation, input, { signal?, onData })</code>. PI WEB binds both contracts
+                to the selected machine, project, and workspace, preserves their distinct owner/package authority, carries paired cancellation through federation, and
                 attributes stale, missing, invalid, failed, cancelled, timed-out, and bounded-channel failures. Plugins should never
                 construct PI WEB backend or machine API URLs. Panels can implement
                 <code>onInvalidate</code> and actions can call <code>refreshWorkspacePanels()</code>; route aliases and
@@ -497,7 +501,8 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
                 the Terminal panel and navigation action, Xterm UI and browser state, PTY/replay and command-run
                 service, and its paired request/channel protocol. Normal and <code>bundled-only</code> startup activates
                 it before ordinary plugins and publishes its browser entry only while the matching bundled server entry
-                is active, healthy, and revision-matched. The browser entry uses that workspace-scoped backend for local
+                is active, healthy, revision-matched, and supplies both paired capabilities. The browser entry uses
+                <code>context.pairedBackend</code> for local
                 and selected remote machines, including selection, reconnect/replay, mobile keys, copy behavior,
                 command-run display, and cleanup, instead of calling Terminal-specific application routes.
               </p>
@@ -540,7 +545,7 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
               <h3>Git</h3>
               <p>
                 <strong>Git</strong> is enabled by default and is PI WEB's bundled fallback workspace provider. It
-                discovers worktrees, owns Git removal plans and status/diff requests, and adds the paired Git panel. An
+                discovers worktrees, owns Git removal plans and status/diff requests, and adds the owner-backed Git panel. An
                 enabled primary third-party provider can claim a project before Git. Disabling <code>git</code> and
                 restarting sessiond leaves the kernel folder workspace plus generic Files, Terminal, and Session features;
                 reload the browser so Git contributions disappear.
@@ -707,13 +712,14 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
               <p>
                 With <a href="machines">machine federation</a>, the gateway loads compatible browser entries from the
                 selected remote machine while server entries stay in that target's sessiond. Actions, panels, labels,
-                file/terminal helpers, <code>context.backend.request()</code>, and bounded paired channels all follow the selected machine.
+                file/terminal helpers, owner-backed <code>context.backend.request()</code>, and package-paired
+                <code>context.pairedBackend</code> requests/channels all follow the selected machine.
                 Activation <code>pluginId</code>, paired backend identity, and workspace-provider ownership keep the
                 stable source id; <code>runtimePluginId</code> may be machine-scoped so qualified contributions remain
                 host-unique.
               </p>
               <ul>
-                <li>Paired backend requests and channels carry the source plugin id and active target revision through bounded gateway transports.</li>
+                <li>Owner-backed requests retain workspace-provider ownership; paired requests and channels carry the source plugin id and active target revision through distinct bounded gateway transports.</li>
                 <li>Server-backed browser code is served only for an exact active package/source/scope/settings/revision pairing.</li>
                 <li><code>machineSpecific</code> decides whether a browser-only gateway copy is portable; dual entries are always machine-specific.</li>
                 <li>Remote theme contributions remain ignored because themes are app-wide.</li>

@@ -127,10 +127,13 @@ export interface ServerPluginHealth {
   details?: JsonObject;
 }
 
-/** JSON request capability for this package's matching browser entry. */
+/**
+ * Capabilities for this package's matching browser entry. Request and channel
+ * handlers are independently optional, but an activation must supply at least one.
+ */
 export interface PairedPluginBackendV1 {
   readonly version: 1;
-  request(context: PairedPluginRequestContext): MaybePromise<JsonValue>;
+  request?(context: PairedPluginRequestContext): MaybePromise<JsonValue>;
   /** Open one finite-lived, host-bounded duplex channel. */
   openChannel?(context: PairedPluginChannelOpenContext): MaybePromise<PairedPluginChannel>;
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { JsonValue, TerminalCommandRun, Workspace, WorkspaceBackend } from "@jmfederico/pi-web/plugin-api";
+import type { JsonValue, PairedWorkspaceBackendV1, TerminalCommandRun, Workspace } from "@jmfederico/pi-web/plugin-api";
 import { TerminalFacade } from "./TerminalFacade";
 
 const workspace: Workspace = {
@@ -45,7 +45,7 @@ describe("Terminal facade", () => {
       origin: "actions",
       registrationPluginId: "pi-web.terminal",
       workspace,
-      backend: backend(request),
+      pairedBackend: backend(request),
       host: { navigateWorkspaceContribution },
     });
 
@@ -77,7 +77,7 @@ describe("Terminal facade", () => {
       origin: "actions",
       registrationPluginId: "pi-web.terminal",
       workspace,
-      backend: backend(request),
+      pairedBackend: backend(request),
       host: { navigateWorkspaceContribution: vi.fn() },
     });
 
@@ -99,7 +99,7 @@ describe("Terminal facade", () => {
       origin: "actions",
       registrationPluginId: "pi-web.terminal",
       workspace,
-      backend: backend(request),
+      pairedBackend: backend(request),
       host: { navigateWorkspaceContribution: vi.fn() },
     });
 
@@ -116,7 +116,7 @@ describe("Terminal facade", () => {
       origin: "actions",
       registrationPluginId: "machine.remote.pi-web.terminal",
       workspace,
-      backend: backend(vi.fn(() => Promise.resolve(null))),
+      pairedBackend: backend(vi.fn(() => Promise.resolve(null))),
       host: { navigateWorkspaceContribution },
     });
 
@@ -149,7 +149,7 @@ describe("Terminal facade", () => {
     const facade = new TerminalFacade();
 
     await expect(facade.listCommandRuns({
-      backend: backend(request),
+      pairedBackend: backend(request),
       filter: { statuses: ["running"], metadata: { "pi.operation": "workspace.delete" } },
       signal: controller.signal,
     })).resolves.toEqual([runningRun]);
@@ -166,14 +166,14 @@ describe("Terminal facade", () => {
       origin: "actions",
       registrationPluginId: "pi-web.terminal",
       workspace,
-      backend: { request: () => Promise.resolve(null) },
+      pairedBackend: { version: 1 },
       host: { navigateWorkspaceContribution: vi.fn() },
-    })).toThrow("Required Terminal paired backend capability v1 is unavailable");
+    })).toThrow("Required Terminal paired request capability v1 is unavailable");
   });
 });
 
-function backend(request: WorkspaceBackend["request"]): WorkspaceBackend {
-  return { capabilityVersion: 1, request };
+function backend(request: NonNullable<PairedWorkspaceBackendV1["request"]>): PairedWorkspaceBackendV1 {
+  return { version: 1, requestVersion: 1, request };
 }
 
 function runJson(run: TerminalCommandRun): JsonValue {

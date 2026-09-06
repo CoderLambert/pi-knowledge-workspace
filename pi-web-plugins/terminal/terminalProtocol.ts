@@ -3,9 +3,9 @@ import type {
   JsonValue,
   TerminalCommandRun,
   TerminalCommandRunStatus,
-  WorkspaceBackend,
-  WorkspaceBackendChannel,
-  WorkspaceBackendChannelClose,
+  PairedWorkspaceBackendChannel,
+  PairedWorkspaceBackendChannelClose,
+  PairedWorkspaceBackendV1,
   WorkspaceTerminalCommandInput,
 } from "@jmfederico/pi-web/plugin-api";
 
@@ -86,29 +86,31 @@ export interface TerminalAttachOptions {
 
 /** Typed client for the Terminal package's private paired-backend protocol. */
 export class TerminalBackendClient {
-  constructor(private readonly backend: WorkspaceBackend) {
-    requireRequestBackend(backend);
+  private readonly request: NonNullable<PairedWorkspaceBackendV1["request"]>;
+
+  constructor(private readonly backend: PairedWorkspaceBackendV1) {
+    this.request = requireRequestBackend(backend);
   }
 
   async list(signal?: AbortSignal): Promise<TerminalInfo[]> {
-    return parseTerminalInfoArray(await this.backend.request("terminal.list", null, signal === undefined ? undefined : { signal }));
+    return parseTerminalInfoArray(await this.request("terminal.list", null, signal === undefined ? undefined : { signal }));
   }
 
   async create(size?: TerminalSize, signal?: AbortSignal): Promise<TerminalInfo> {
     const input: JsonValue = size === undefined ? {} : { cols: size.cols, rows: size.rows };
-    return parseTerminalInfo(await this.backend.request("terminal.create", input, signal === undefined ? undefined : { signal }));
+    return parseTerminalInfo(await this.request("terminal.create", input, signal === undefined ? undefined : { signal }));
   }
 
   async close(terminalId: string, signal?: AbortSignal): Promise<void> {
-    parseClosed(await this.backend.request("terminal.close", { terminalId }, signal === undefined ? undefined : { signal }));
+    parseClosed(await this.request("terminal.close", { terminalId }, signal === undefined ? undefined : { signal }));
   }
 
   async continue(terminalId: string, signal?: AbortSignal): Promise<TerminalInfo> {
-    return parseTerminalInfo(await this.backend.request("terminal.continue", { terminalId }, signal === undefined ? undefined : { signal }));
+    return parseTerminalInfo(await this.request("terminal.continue", { terminalId }, signal === undefined ? undefined : { signal }));
   }
 
   async runCommand(origin: string, input: WorkspaceTerminalCommandInput, signal?: AbortSignal): Promise<TerminalCommandRun> {
-    return parseTerminalCommandRun(await this.backend.request("terminal.run", {
+    return parseTerminalCommandRun(await this.request("terminal.run", {
       origin,
       title: input.title,
       command: input.command,
@@ -117,19 +119,19 @@ export class TerminalBackendClient {
   }
 
   async listCommandRuns(filter: TerminalCommandRunFilter = {}, signal?: AbortSignal): Promise<TerminalCommandRun[]> {
-    return parseTerminalCommandRunArray(await this.backend.request("terminal.list-runs", terminalCommandRunFilterInput(filter), signal === undefined ? undefined : { signal }));
+    return parseTerminalCommandRunArray(await this.request("terminal.list-runs", terminalCommandRunFilterInput(filter), signal === undefined ? undefined : { signal }));
   }
 
   async getCommandRun(runId: string, signal?: AbortSignal): Promise<TerminalCommandRun | undefined> {
-    const value = await this.backend.request("terminal.get-run", { runId }, signal === undefined ? undefined : { signal });
+    const value = await this.request("terminal.get-run", { runId }, signal === undefined ? undefined : { signal });
     return value === null ? undefined : parseTerminalCommandRun(value);
   }
 
   async cancelCommandRun(runId: string, signal?: AbortSignal): Promise<TerminalCommandRun> {
-    return parseTerminalCommandRun(await this.backend.request("terminal.cancel-run", { runId }, signal === undefined ? undefined : { signal }));
+    return parseTerminalCommandRun(await this.request("terminal.cancel-run", { runId }, signal === undefined ? undefined : { signal }));
   }
 
-  async attach(options: TerminalAttachOptions): Promise<WorkspaceBackendChannel> {
+  async attach(options: TerminalAttachOptions): Promise<PairedWorkspaceBackendChannel> {
     const openChannel = requireChannelBackend(this.backend);
     return openChannel("terminal.attach", {
       terminalId: options.terminalId,
@@ -141,13 +143,14 @@ export class TerminalBackendClient {
   }
 }
 
-function requireRequestBackend(backend: WorkspaceBackend): void {
-  if (backend.capabilityVersion !== 1) {
-    throw new Error("Required Terminal paired backend capability v1 is unavailable");
+function requireRequestBackend(backend: PairedWorkspaceBackendV1): NonNullable<PairedWorkspaceBackendV1["request"]> {
+  if (backend.requestVersion !== 1 || backend.request === undefined) {
+    throw new Error("Required Terminal paired request capability v1 is unavailable");
   }
+  return backend.request.bind(backend);
 }
 
-function requireChannelBackend(backend: WorkspaceBackend): NonNullable<WorkspaceBackend["openChannel"]> {
+function requireChannelBackend(backend: PairedWorkspaceBackendV1): NonNullable<PairedWorkspaceBackendV1["openChannel"]> {
   if (backend.channelVersion !== 1 || backend.openChannel === undefined) {
     throw new Error("Required Terminal paired channel v1 is unavailable");
   }
@@ -216,7 +219,7 @@ export function parseTerminalServerFrame(value: unknown): TerminalServerFrame {
   throw new Error("Invalid Terminal channel frame");
 }
 
-export function terminalChannelFailureMessage(close: WorkspaceBackendChannelClose): string | undefined {
+export function terminalChannelFailureMessage(close: PairedWorkspaceBackendChannelClose): string | undefined {
   if (close.error !== undefined) return `${close.error.code}: ${close.error.message}`;
   if (close.code === 1000 && close.wasClean) return undefined;
   return close.reason === "" ? `Terminal channel closed with code ${String(close.code)}` : close.reason;

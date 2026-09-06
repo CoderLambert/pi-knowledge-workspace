@@ -507,6 +507,13 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
                 command-run display, and cleanup, instead of calling Terminal-specific application routes.
               </p>
               <p>
+                Terminal's activation-only <code>requiredTerminalFacade</code> and
+                <code>requiredTerminalService</code> values are privileged host-only composition ports for the bundled
+                product. They are intentionally absent from the public browser and server declarations and are not
+                third-party plugin APIs. External plugins use the public <code>context.pairedBackend</code> and
+                <code>ServerPluginActivation.pairedBackend</code> contracts instead.
+              </p>
+              <p>
                 Ordinary config, Settings, and <code>pi-web plugins disable pi-web.terminal</code> cannot disable Terminal.
                 Canonical contribution ids use <code>pi-web.terminal:*</code>; the released
                 <code>core:workspace.terminal</code> and <code>core:view.terminal</code> aliases remain supported.

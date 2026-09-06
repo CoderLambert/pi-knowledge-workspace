@@ -10,6 +10,7 @@ export const TERMINAL_SOFT_KEYS_ELEMENT = terminalSoftKeysElementName("pi-web.te
 
 const terminalCustomElementOwnersKey = Symbol.for("pi-web.terminal.custom-element-owners.v1");
 
+/** Bundled Terminal's privileged host-only composition result; not part of browser plugin API v2. */
 export interface TerminalPluginActivation extends PluginActivationResult {
   readonly requiredTerminalFacade: RequiredTerminalBrowserFacadeV1;
 }

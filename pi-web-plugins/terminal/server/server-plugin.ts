@@ -29,6 +29,7 @@ interface RequiredTerminalServiceContribution {
   bindActivitySink(sink: TerminalActivitySink): void;
 }
 
+/** Bundled Terminal's privileged host-only composition result; not part of server plugin API v1. */
 interface TerminalActivation extends ServerPluginActivation {
   requiredTerminalService: RequiredTerminalServiceContribution;
 }

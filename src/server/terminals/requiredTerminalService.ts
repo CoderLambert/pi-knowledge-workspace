@@ -30,7 +30,7 @@ export interface RequiredTerminalActivitySink {
   removeTerminal(terminalId: string, cwd?: string): void;
 }
 
-/** Narrow core composition port supplied only by the required Terminal entry. */
+/** Privileged host-only composition port supplied by the required bundled Terminal; not third-party API. */
 export interface RequiredTerminalService {
   closeForCwd(cwd: string): void;
   runCommand(options: RunTerminalCommandOptions): TerminalCommandRun;

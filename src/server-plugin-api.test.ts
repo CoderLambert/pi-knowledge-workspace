@@ -131,6 +131,7 @@ describe("public server plugin API", () => {
     >();
     expectTypeOf<keyof ServerPluginNoticeReporterV1>().toEqualTypeOf<"version" | "record">();
     expectTypeOf<keyof ServerPluginNoticeInput>().toEqualTypeOf<"severity" | "message" | "scope" | "context">();
+    expectTypeOf<keyof ServerPluginActivation>().toEqualTypeOf<"workspaceProvider" | "pairedBackend" | "start" | "stop" | "health">();
     expectTypeOf<keyof ServerPluginNoticeScope>().toEqualTypeOf<"projectId" | "workspaceId" | "sessionId">();
     expectTypeOf<keyof WorkspaceProvider>().toEqualTypeOf<
       "fallback" | "probe" | "list" | "request" | "prepareRemove"

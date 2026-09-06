@@ -79,6 +79,7 @@ declare class ImplementedWorkspacePanelFiles implements WorkspacePanelFiles {
 
 describe("public browser plugin API", () => {
   it("keeps host-owned activation and workspace snapshots readonly", () => {
+    expectTypeOf<keyof PluginActivationResult>().toEqualTypeOf<"contributions">();
     expectTypeOf<ReadonlyKeys<PluginActivationContext>>().toEqualTypeOf<keyof PluginActivationContext>();
     expectTypeOf<ReadonlyKeys<Workspace>>().toEqualTypeOf<keyof Workspace>();
     expectTypeOf<ReadonlyKeys<WorkspaceProviderMetadata>>().toEqualTypeOf<keyof WorkspaceProviderMetadata>();

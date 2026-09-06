@@ -29,6 +29,7 @@ export interface RequiredTerminalCommandRunQueryV1 {
   readonly signal?: AbortSignal;
 }
 
+/** Privileged host-only composition port supplied by the required bundled Terminal; not third-party API. */
 export interface RequiredTerminalBrowserFacadeV1 {
   readonly version: 1;
   createWorkspaceTerminal(binding: RequiredTerminalWorkspaceBindingV1): WorkspacePanelTerminal;

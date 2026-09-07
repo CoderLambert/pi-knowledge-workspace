@@ -154,8 +154,8 @@ export interface PairedPluginRequestContext {
 /**
  * Host-resolved channel scope. `signal` remains live for the channel lifetime
  * and is aborted on disconnect, failure, expiry, or shutdown. `send()` clones
- * and bounds one JSON frame synchronously; it throws and closes the channel on
- * invalid data or host queue overflow.
+ * and bounds one JSON frame synchronously; success means queue acceptance, not
+ * remote receipt. Invalid data or host queue overflow throws and closes the channel.
  */
 export interface PairedPluginChannelOpenContext {
     readonly project: ProjectInput;

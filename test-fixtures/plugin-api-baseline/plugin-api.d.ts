@@ -195,7 +195,7 @@ export interface PairedWorkspaceBackendChannelClose {
 }
 export interface PairedWorkspaceBackendChannel {
     readonly closed: Promise<PairedWorkspaceBackendChannelClose>;
-    /** Queue one bounded JSON frame or throw if validation/queue limits fail. */
+    /** Queue one bounded JSON frame or throw. Success means queue acceptance, not remote receipt. */
     send(data: JsonValue): void;
     close(reason?: string): void;
 }

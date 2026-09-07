@@ -11,6 +11,7 @@ import {
   createBoundedTextWebSocketSender,
   createBufferedSender,
   installPluginBackendChannelWebSocketPayloadLimit,
+  markPluginBackendChannelUpgradeRequest,
 } from "./webSocketBridge.js";
 
 const servers = new Set<WebSocketServer>();
@@ -58,10 +59,25 @@ describe("bridgeSockets", () => {
 });
 
 describe("plugin backend channel upgrade payload limit", () => {
-  it("caps current direct and federated paired routes without narrowing unrelated upgrades", async () => {
+  it("caps marked paired upgrades without narrowing unmarked upgrades", async () => {
     const defaultMaxPayload = 8 * 1024 * 1024;
+    const pairedPaths = [
+      "/paired-plugin-backends/pi-web.terminal/projects/p/workspaces/w/channels/terminal.attach",
+      "/api/paired-plugin-backends/pi-web.terminal/projects/p/workspaces/w/channels/terminal.attach?admission=denied",
+      "/api/machines/remote-one/paired-plugin-backends/pi-web.terminal/projects/p/workspaces/w/channels/terminal.attach",
+    ];
+    const unrelatedPaths = [
+      "/plugin-backends/pi-web.terminal/projects/p/workspaces/w/channels/terminal.attach",
+      "/api/sessions/session-1/socket",
+    ];
     const socketServer = new WebSocketServer({ host: "127.0.0.1", port: 0, maxPayload: defaultMaxPayload });
     servers.add(socketServer);
+    const pairedPathSet = new Set(pairedPaths);
+    socketServer.on("headers", (_headers, request) => {
+      if (request.url !== undefined && pairedPathSet.has(request.url)) {
+        markPluginBackendChannelUpgradeRequest(request);
+      }
+    });
     installPluginBackendChannelWebSocketPayloadLimit(socketServer);
     const receiverLimits = new Map<string, number>();
     socketServer.on("connection", (socket, request) => {
@@ -72,16 +88,6 @@ describe("plugin backend channel upgrade payload limit", () => {
       }
     });
     await waitForListening(socketServer);
-
-    const pairedPaths = [
-      "/paired-plugin-backends/pi-web.terminal/projects/p/workspaces/w/channels/terminal.attach",
-      "/api/paired-plugin-backends/pi-web.terminal/projects/p/workspaces/w/channels/terminal.attach?admission=denied",
-      "/api/machines/remote-one/paired-plugin-backends/pi-web.terminal/projects/p/workspaces/w/channels/terminal.attach",
-    ];
-    const unrelatedPaths = [
-      "/plugin-backends/pi-web.terminal/projects/p/workspaces/w/channels/terminal.attach",
-      "/api/sessions/session-1/socket",
-    ];
 
     for (const path of [...pairedPaths, ...unrelatedPaths]) {
       const client = new WebSocket(`${serverUrl(socketServer)}${path}`);

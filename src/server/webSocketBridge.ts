@@ -1,3 +1,4 @@
+import type { IncomingMessage } from "node:http";
 import { WebSocket, type Data, type RawData, type WebSocketServer } from "ws";
 import {
   boundedPluginBackendChannelCloseReason,
@@ -12,6 +13,7 @@ import {
 } from "../shared/pluginBackendProtocol.js";
 
 const pluginChannelLimitedServers = new WeakSet<WebSocketServer>();
+const pendingPluginBackendChannelUpgrades = new WeakSet<IncomingMessage>();
 
 export class PluginBackendChannelTransportFrameError extends Error {
   override name = "PluginBackendChannelTransportFrameError";
@@ -57,6 +59,11 @@ export function decodeBoundedPluginBackendChannelTextFrame(
   }
 }
 
+/** Mark a Fastify-matched paired-channel request before ws allocates its receiver. */
+export function markPluginBackendChannelUpgradeRequest(request: IncomingMessage): void {
+  pendingPluginBackendChannelUpgrades.add(request);
+}
+
 /** Select the plugin-channel ingress cap before ws allocates its receiver. */
 export function installPluginBackendChannelWebSocketPayloadLimit(server: WebSocketServer): void {
   if (pluginChannelLimitedServers.has(server)) return;
@@ -66,7 +73,7 @@ export function installPluginBackendChannelWebSocketPayloadLimit(server: WebSock
     // The ws `headers` event runs synchronously immediately before setSocket()
     // reads this option. Reset every unrelated upgrade so session protocols keep
     // the server's configured allowance.
-    server.options.maxPayload = isPluginBackendChannelUpgradePath(request.url)
+    server.options.maxPayload = pendingPluginBackendChannelUpgrades.delete(request)
       ? PLUGIN_BACKEND_CHANNEL_OPEN_FRAME_MAX_BYTES
       : defaultMaxPayload;
   });
@@ -366,24 +373,6 @@ export function setPluginBackendChannelSocketPayloadLimit(socket: WebSocket, max
   if (!Reflect.set(receiver, "_maxPayload", maxPayload)) {
     throw new Error("Plugin backend channel transport cannot apply its payload limit");
   }
-}
-
-function isPluginBackendChannelUpgradePath(rawUrl: string | undefined): boolean {
-  if (rawUrl === undefined) return false;
-  // Match the raw request target that Fastify routes. WHATWG URL parsing
-  // normalizes percent-encoded complete dot segments before ws allocates its
-  // receiver, even though Fastify retains those segments as route parameters.
-  const queryIndex = rawUrl.indexOf("?");
-  const pathname = queryIndex === -1 ? rawUrl : rawUrl.slice(0, queryIndex);
-  const segments = pathname.split("/").filter((segment) => segment !== "");
-  let index = 0;
-  if (segments[index] === "api") index += 1;
-  if (segments[index] === "machines") index += 2;
-  return segments.length - index === 8
-    && segments[index] === "paired-plugin-backends"
-    && segments[index + 2] === "projects"
-    && segments[index + 4] === "workspaces"
-    && segments[index + 6] === "channels";
 }
 
 function transportFrameCloseCode(error: unknown): number {

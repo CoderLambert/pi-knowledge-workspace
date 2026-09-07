@@ -136,7 +136,7 @@ describe("plugin backend channel end-to-end teardown and receive drain", () => {
     transport.destroy();
   });
 
-  it.each(channelKinds)("preallocates and physically bounds encoded-dot admission rejections through %s", async (kind) => {
+  it.each(channelKinds)("preallocates and physically bounds equivalent admission targets through %s", async (kind) => {
     const topology = await createTopology(() => ({ receive: () => undefined }), { maxTotal: 1 });
     const rawSockets: NetSocket[] = [];
     try {
@@ -147,15 +147,16 @@ describe("plugin backend channel end-to-end teardown and receive drain", () => {
         expect(topology.registry.activeChannelCount()).toBe(1);
       });
 
-      const deniedPath = encodedDotChannelRequestPath(kind);
-      const denied = await Promise.all(Array.from(
-        { length: 3 },
-        async () => openRawWebSocket(topology.url(kind), deniedPath),
+      const deniedTargets = equivalentChannelRequestTargets(kind, topology.url(kind));
+      const denied = await Promise.all(deniedTargets.map(
+        async (requestTarget) => openRawWebSocket(topology.url(kind), requestTarget),
       ));
       rawSockets.push(...denied);
-      expect(topology.receiverPayloadLimits(kind, deniedPath)).toEqual(
-        Array.from({ length: 3 }, () => PLUGIN_BACKEND_CHANNEL_OPEN_FRAME_MAX_BYTES),
-      );
+      for (const requestTarget of deniedTargets) {
+        expect(topology.receiverPayloadLimits(kind, requestTarget)).toEqual([
+          PLUGIN_BACKEND_CHANNEL_OPEN_FRAME_MAX_BYTES,
+        ]);
+      }
       await vi.waitFor(() => {
         expect(topology.physicalSocketCounts(kind)).toEqual(expectedPhysicalCounts(kind, 1));
         expect(topology.registry.activeChannelCount()).toBe(1);
@@ -332,11 +333,19 @@ function expectedProxyAdmissions(kind: ChannelKind, count: number): { local: num
   };
 }
 
-function encodedDotChannelRequestPath(kind: ChannelKind): string {
-  const channelPath = "/paired-plugin-backends/pi-web.terminal/projects/%2e%2e/workspaces/workspace-one/channels/terminal.attach";
-  if (kind === "direct") return channelPath;
-  if (kind === "local-proxy") return `/api${channelPath}`;
-  return `/api/machines/remote${channelPath}`;
+function equivalentChannelRequestTargets(kind: ChannelKind, urlValue: string): readonly string[] {
+  const channelPath = "/paired-plugin-backends/pi-web.terminal/projects/project-one/workspaces/workspace-one/channels/terminal.attach";
+  const topologyPath = kind === "direct"
+    ? channelPath
+    : kind === "local-proxy"
+      ? `/api${channelPath}`
+      : `/api/machines/remote${channelPath}`;
+  const url = new URL(urlValue);
+  return [
+    topologyPath.replace("/project-one/", "/%2e%2e/"),
+    topologyPath.replace("/projects/", "/pro%6aects/"),
+    `http://${url.host}${topologyPath}`,
+  ];
 }
 
 function captureReceiverPayloadLimits(server: WebSocketServer): Map<string, number[]> {

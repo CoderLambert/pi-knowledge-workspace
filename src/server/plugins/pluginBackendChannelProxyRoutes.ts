@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { WebSocket } from "ws";
 import { PAIRED_PLUGIN_BACKEND_CHANNEL_ROUTE_PATH, PLUGIN_BACKEND_CHANNEL_DATA_FRAME_MAX_BYTES } from "../../shared/pluginBackendProtocol.js";
+import { markPluginBackendChannelUpgradeRequest } from "../webSocketBridge.js";
 import {
   type PluginBackendChannelProxyAdmissionPool,
   pluginBackendChannelProxyAdmissionPool,
@@ -30,7 +31,13 @@ export function registerPluginBackendChannelProxyRoutes(
 ): void {
   app.get<{ Params: PluginBackendChannelProxyParams }>(
     `${prefix}${PAIRED_PLUGIN_BACKEND_CHANNEL_ROUTE_PATH}`,
-    { websocket: true },
+    {
+      websocket: true,
+      onRequest(request, _reply, done) {
+        markPluginBackendChannelUpgradeRequest(request.raw);
+        done();
+      },
+    },
     (socket, request) => {
       const upstreamPath = daemonPluginBackendChannelPath(request.params);
       void coordinatePluginBackendChannelProxy({

@@ -16,7 +16,7 @@ import {
   PluginBackendChannelProxyConnectionError,
 } from "../plugins/pluginBackendChannelProxyCoordinator.js";
 import { requestCancellation } from "../requestCancellation.js";
-import { bridgeSockets } from "../webSocketBridge.js";
+import { bridgeSockets, markPluginBackendChannelUpgradeRequest } from "../webSocketBridge.js";
 import { applyWorkspaceFilePreviewErrorResponsePolicy, applyWorkspaceFilePreviewResponsePolicy } from "../workspaces/filePreviewResponseHeaders.js";
 import { workspaceFilePreviewErrorResponsePolicy, workspaceFilePreviewResponsePolicy, type WorkspaceFilePreviewResponsePolicy } from "../workspaces/filePreviewResponsePolicy.js";
 import { DEFAULT_REMOTE_REQUEST_TIMEOUT_MS, RemoteMachineRequestError, type MachineClient, type MachineJsonResponse, type MachineRequestOptions } from "./machineClient.js";
@@ -79,25 +79,40 @@ export function registerMachineProxyRoutes(
   }
 
   for (const path of REMOTE_WEBSOCKET_ROUTES) {
-    app.get<{ Params: MachineProxyWebSocketParams }>(`/api/machines/:machineId${path}`, { websocket: true }, async (socket, request) => {
-      await proxyWebSocket(
-        machines,
-        request.params.machineId,
-        request.url,
-        socket,
-        path === PAIRED_PLUGIN_BACKEND_CHANNEL_ROUTE_PATH
+    const isPluginBackendChannel = path === PAIRED_PLUGIN_BACKEND_CHANNEL_ROUTE_PATH;
+    app.get<{ Params: MachineProxyWebSocketParams }>(
+      `/api/machines/:machineId${path}`,
+      {
+        websocket: true,
+        ...(isPluginBackendChannel
           ? {
-              admissions: pluginChannelAdmissions,
-              scope: {
-                authorityId: request.params.machineId,
-                pluginId: request.params.pluginId,
-                projectId: request.params.projectId,
-                workspaceId: request.params.workspaceId,
+              onRequest(request, _reply, done) {
+                markPluginBackendChannelUpgradeRequest(request.raw);
+                done();
               },
             }
-          : undefined,
-      );
-    });
+          : {}),
+      },
+      async (socket, request) => {
+        await proxyWebSocket(
+          machines,
+          request.params.machineId,
+          request.url,
+          socket,
+          isPluginBackendChannel
+            ? {
+                admissions: pluginChannelAdmissions,
+                scope: {
+                  authorityId: request.params.machineId,
+                  pluginId: request.params.pluginId,
+                  projectId: request.params.projectId,
+                  workspaceId: request.params.workspaceId,
+                },
+              }
+            : undefined,
+        );
+      },
+    );
   }
 }
 

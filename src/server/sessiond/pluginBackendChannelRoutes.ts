@@ -30,6 +30,7 @@ import {
 import {
   closePluginBackendChannelWebSocket,
   createBoundedTextWebSocketSender,
+  markPluginBackendChannelUpgradeRequest,
   setPluginBackendChannelSocketPayloadLimit,
 } from "../webSocketBridge.js";
 import type { Project } from "../types.js";
@@ -72,7 +73,13 @@ export function registerPluginBackendChannelRoutes(
 ): void {
   app.get<{ Params: PluginBackendChannelRouteParams }>(
     `${prefix}${PAIRED_PLUGIN_BACKEND_CHANNEL_ROUTE_PATH}`,
-    { websocket: true },
+    {
+      websocket: true,
+      onRequest(request, _reply, done) {
+        markPluginBackendChannelUpgradeRequest(request.raw);
+        done();
+      },
+    },
     (socket, request) => {
       const controller = new PluginBackendChannelSocketController(socket, request.params, dependencies, app.log);
       controller.start();

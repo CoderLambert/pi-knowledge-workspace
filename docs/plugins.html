@@ -416,7 +416,9 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
                 revision, operation, project/workspace scope, and plugin contribution. Intermediate local and federated
                 hops forward opaque, bounded UTF-8 text without parsing host envelopes or plugin payload fields.
                 Data frames are limited to 64 KiB JSON and queues to 128 frames per direction at each physical hop, with
-                1 MiB browser-to-server and 1.25 MiB server-to-browser byte bounds. One aggregate edge cap allows 128
+                1 MiB browser-to-server and 1.25 MiB server-to-browser byte bounds. A successful <code>send()</code>
+                confirms host queue acceptance, not peer delivery; channels expose no drain signal, so plugins that need
+                continuity should reconnect and replay from their own state. One aggregate edge cap allows 128
                 physically alive proxy channels per web/API process and is shared by local and federated routes. Sessiond
                 separately and authoritatively admits 128 total channels, 32 per plugin, and 8 per plugin/workspace; both
                 accounting layers include channels awaiting connection/open or physical teardown. Each edge has a

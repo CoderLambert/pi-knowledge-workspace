@@ -399,8 +399,9 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
             <section id="provider-contract">
               <h2>Paired backend and workspace provider contracts</h2>
               <p>
-                A version-1 package-paired backend implements requests, channels, or both; those capabilities are independently optional and detected.
-                It receives only cloned, frozen host-resolved project/workspace data, bounded
+                A version-1 package-paired backend implements requests, channels, or both; its public type requires at
+                least one handler, and the capabilities are independently detected. It receives only cloned, frozen
+                host-resolved project/workspace data, bounded
                 JSON, and scoped cancellation signals. The matching revision-paired browser entry can call
                 it for a kernel-folder workspace or a workspace owned by another provider, without receiving that provider's private data. Input is limited to 256 KiB,
                 output to 8 MiB, callbacks to 10 seconds, sessiond dispatch to 25 seconds, and federation to 30 seconds.
@@ -460,8 +461,9 @@ import type { PairedPluginBackendV1, PiWebServerPlugin, WorkspaceProvider } from
                 operation in the foreground, and treat shell exit 0 as successful completion.
               </p>
               <p>
-                Panels and labels keep the optional owner-backed <code>context.backend</code> contract:
-                <code>backend.request(operation, input)</code> dispatches only through the current workspace owner's
+                Panels and labels keep the optional owner-backed <code>context.backend</code> contract. The host supplies
+                it only when the contribution's source plugin is the current workspace owner and that provider advertises
+                request support. <code>backend.request(operation, input)</code> dispatches only through the current workspace owner's
                 <code>WorkspaceProvider.request()</code> and preserves access to that provider's private workspace data.
                 The separate optional <code>context.pairedBackend</code> dispatches only to the browser package's
                 revision-matched server contribution, independent of ownership. Its manifest carries

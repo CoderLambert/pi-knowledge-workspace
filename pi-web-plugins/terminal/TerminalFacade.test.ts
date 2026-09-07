@@ -166,6 +166,7 @@ describe("Terminal facade", () => {
       origin: "actions",
       registrationPluginId: "pi-web.terminal",
       workspace,
+      // @ts-expect-error Exercise the runtime guard against a malformed host capability.
       pairedBackend: { version: 1 },
       host: { navigateWorkspaceContribution: vi.fn() },
     })).toThrow("Required Terminal paired request capability v1 is unavailable");

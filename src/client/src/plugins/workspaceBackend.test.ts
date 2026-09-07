@@ -7,13 +7,17 @@ import {
   type PluginBackendRequester,
 } from "./workspaceBackend";
 
-const workspace: Workspace = {
+const providerlessWorkspace: Workspace = {
   id: "workspace one",
   projectId: "project one",
   path: "/repo",
   label: "main",
   isMain: true,
   effectiveConfig: {},
+};
+
+const workspace: Workspace = {
+  ...providerlessWorkspace,
   provider: {
     pluginId: "changes.owner",
     capabilities: { request: true, remove: false },
@@ -39,6 +43,30 @@ describe("plugin workspace backend", () => {
       projectId: "project one",
       workspaceId: "workspace one",
     }, "status", null);
+  });
+
+  it("omits the owner-backed helper when the contribution cannot service the current workspace", () => {
+    const binding = {
+      registrationPluginId: "machine.remote.changes.owner",
+      sourcePluginId: "changes.owner",
+      backendRevision: "remote-r2",
+    };
+
+    expect(createPluginWorkspaceBackend(binding, providerlessWorkspace, "remote one", vi.fn())).toBeUndefined();
+    expect(createPluginWorkspaceBackend(binding, {
+      ...workspace,
+      provider: {
+        pluginId: "different.owner",
+        capabilities: { request: true, remove: false },
+      },
+    }, "remote one", vi.fn())).toBeUndefined();
+    expect(createPluginWorkspaceBackend(binding, {
+      ...workspace,
+      provider: {
+        pluginId: "changes.owner",
+        capabilities: { request: false, remove: false },
+      },
+    }, "remote one", vi.fn())).toBeUndefined();
   });
 
   it("binds paired capabilities to the contribution source, revision, workspace, and machine", async () => {

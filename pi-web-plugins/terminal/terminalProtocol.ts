@@ -144,14 +144,14 @@ export class TerminalBackendClient {
 }
 
 function requireRequestBackend(backend: PairedWorkspaceBackendV1): NonNullable<PairedWorkspaceBackendV1["request"]> {
-  if (backend.requestVersion !== 1 || backend.request === undefined) {
+  if (backend.requestVersion !== 1) {
     throw new Error("Required Terminal paired request capability v1 is unavailable");
   }
   return backend.request.bind(backend);
 }
 
 function requireChannelBackend(backend: PairedWorkspaceBackendV1): NonNullable<PairedWorkspaceBackendV1["openChannel"]> {
-  if (backend.channelVersion !== 1 || backend.openChannel === undefined) {
+  if (backend.channelVersion !== 1) {
     throw new Error("Required Terminal paired channel v1 is unavailable");
   }
   return backend.openChannel.bind(backend);

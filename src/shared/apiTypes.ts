@@ -437,11 +437,10 @@ export interface SessionRef {
 export type ServerNoticeSeverity = "info" | "warning" | "error";
 
 /** Browser-visibility selectors for one server notice. */
-export interface ServerNoticeScope {
-  projectId?: string;
-  workspaceId?: string;
-  sessionId?: string;
-}
+export type ServerNoticeScope =
+  | { projectId: string; workspaceId?: string; sessionId?: string }
+  | { projectId?: string; workspaceId: string; sessionId?: string }
+  | { projectId?: string; workspaceId?: string; sessionId: string };
 
 /** One independent server-created event retained until dismissal, eligible plugin eviction, or daemon end. */
 export interface ServerNotice {

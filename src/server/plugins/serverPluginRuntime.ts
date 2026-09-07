@@ -609,13 +609,20 @@ function snapshotPairedPluginBackend(value: unknown): PairedPluginBackendV1 {
   }
   const request = value.request?.bind(value);
   const openChannel = value.openChannel?.bind(value);
-  return Object.freeze({
-    version: 1,
-    ...(request === undefined ? {} : { request: (context: PairedPluginRequestContext) => request(context) }),
-    ...(openChannel === undefined ? {} : {
-      openChannel: async (context: PairedPluginChannelOpenContext) => snapshotPairedPluginChannel(await openChannel(context)),
-    }),
-  });
+  const snapshotRequest = request === undefined
+    ? undefined
+    : (context: PairedPluginRequestContext): JsonValue | Promise<JsonValue> => request(context);
+  const snapshotOpenChannel = openChannel === undefined
+    ? undefined
+    : async (context: PairedPluginChannelOpenContext): Promise<PairedPluginChannel> => (
+        snapshotPairedPluginChannel(await openChannel(context))
+      );
+  if (snapshotRequest !== undefined && snapshotOpenChannel !== undefined) {
+    return Object.freeze({ version: 1, request: snapshotRequest, openChannel: snapshotOpenChannel });
+  }
+  if (snapshotRequest !== undefined) return Object.freeze({ version: 1, request: snapshotRequest });
+  if (snapshotOpenChannel !== undefined) return Object.freeze({ version: 1, openChannel: snapshotOpenChannel });
+  throw new IncompatibleServerPluginError("Server plugin pairedBackend must include a request or channel handler");
 }
 
 function isPairedPluginBackend(value: unknown): value is PairedPluginBackendV1 {

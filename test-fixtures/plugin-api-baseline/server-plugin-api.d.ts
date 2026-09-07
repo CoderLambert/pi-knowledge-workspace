@@ -29,11 +29,19 @@ export interface ServerPluginActivationContext {
 }
 export type ServerPluginNoticeSeverity = "info" | "warning" | "error";
 /** Browser-visibility selectors, matched only against the selected machine context; each id is at most 512 characters. */
-export interface ServerPluginNoticeScope {
-    readonly projectId?: string;
+export type ServerPluginNoticeScope = {
+    readonly projectId: string;
     readonly workspaceId?: string;
     readonly sessionId?: string;
-}
+} | {
+    readonly projectId?: string;
+    readonly workspaceId: string;
+    readonly sessionId?: string;
+} | {
+    readonly projectId?: string;
+    readonly workspaceId?: string;
+    readonly sessionId: string;
+};
 /** Plugin-authored notice data. The host supplies the immutable source identity. */
 export interface ServerPluginNoticeInput {
     readonly severity: ServerPluginNoticeSeverity;
@@ -102,15 +110,20 @@ export interface ServerPluginHealth {
     details?: JsonObject;
 }
 /**
- * Capabilities for this package's matching browser entry. Request and channel
- * handlers are independently optional, but an activation must supply at least one.
+ * Capabilities for this package's matching browser entry. An activation may
+ * supply a request handler, a channel handler, or both, but never neither.
  */
-export interface PairedPluginBackendV1 {
+export type PairedPluginBackendV1 = {
     readonly version: 1;
-    request?(context: PairedPluginRequestContext): MaybePromise<JsonValue>;
+    request(context: PairedPluginRequestContext): MaybePromise<JsonValue>;
     /** Open one finite-lived, host-bounded duplex channel. */
     openChannel?(context: PairedPluginChannelOpenContext): MaybePromise<PairedPluginChannel>;
-}
+} | {
+    readonly version: 1;
+    request?: undefined;
+    /** Open one finite-lived, host-bounded duplex channel. */
+    openChannel(context: PairedPluginChannelOpenContext): MaybePromise<PairedPluginChannel>;
+};
 /** Channel instance returned by `openChannel()` after the host validates scope. */
 export interface PairedPluginChannel {
     /** Consume one browser-authored JSON frame in accepted order within a host-bounded invocation. */

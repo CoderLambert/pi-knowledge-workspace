@@ -32,10 +32,12 @@ export type PluginBackendChannelOpener = (
 /** Preserve the browser-v2 owner-backed helper independently of paired contributions. */
 export function createPluginWorkspaceBackend(
   binding: WorkspacePluginBinding,
-  workspace: Pick<Workspace, "id" | "projectId">,
+  workspace: Pick<Workspace, "id" | "projectId" | "provider">,
   machineId: string,
   request: PluginBackendRequester = requestPluginBackend,
 ): WorkspaceBackend | undefined {
+  const provider = workspace.provider;
+  if (provider?.pluginId !== binding.sourcePluginId || !provider.capabilities.request) return undefined;
   const target = pluginBackendTarget(binding, workspace, machineId);
   if (target === undefined) return undefined;
   return {
@@ -51,20 +53,33 @@ export function createPairedPluginWorkspaceBackend(
   request: PluginBackendRequester = requestPairedPluginBackend,
   openChannel: PluginBackendChannelOpener = openPairedPluginBackendChannel,
 ): PairedWorkspaceBackendV1 | undefined {
-  if (binding.pairedRequestVersion === undefined && binding.pairedChannelVersion === undefined) return undefined;
+  if (binding.pairedRequestVersion !== 1 && binding.pairedChannelVersion !== 1) return undefined;
   const target = pluginBackendTarget(binding, workspace, machineId);
   if (target === undefined) return undefined;
-  return {
-    version: 1,
-    ...(binding.pairedRequestVersion === undefined ? {} : {
-      requestVersion: binding.pairedRequestVersion,
+  if (binding.pairedRequestVersion === 1 && binding.pairedChannelVersion === 1) {
+    return {
+      version: 1,
+      requestVersion: 1,
+      channelVersion: 1,
       request: (operation: string, input: JsonValue, options?: PairedWorkspaceBackendRequestOptions) => request(target, operation, input, options),
-    }),
-    ...(binding.pairedChannelVersion === undefined ? {} : {
-      channelVersion: binding.pairedChannelVersion,
       openChannel: (operation, input, options) => openChannel(target, operation, input, options),
-    }),
-  };
+    };
+  }
+  if (binding.pairedRequestVersion === 1) {
+    return {
+      version: 1,
+      requestVersion: 1,
+      request: (operation: string, input: JsonValue, options?: PairedWorkspaceBackendRequestOptions) => request(target, operation, input, options),
+    };
+  }
+  if (binding.pairedChannelVersion === 1) {
+    return {
+      version: 1,
+      channelVersion: 1,
+      openChannel: (operation, input, options) => openChannel(target, operation, input, options),
+    };
+  }
+  return undefined;
 }
 
 function pluginBackendTarget(

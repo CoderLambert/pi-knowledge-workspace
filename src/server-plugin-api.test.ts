@@ -137,6 +137,18 @@ describe("public server plugin API", () => {
       "fallback" | "probe" | "list" | "request" | "prepareRemove"
     >();
     expectTypeOf<keyof PairedPluginBackendV1>().toEqualTypeOf<"version" | "request" | "openChannel">();
+    type EmptyNoticeScopeIsValid = Record<never, never> extends ServerPluginNoticeScope ? true : false;
+    type ProjectNoticeScopeIsValid = { readonly projectId: string } extends ServerPluginNoticeScope ? true : false;
+    type EmptyPairedBackendIsValid = { readonly version: 1 } extends PairedPluginBackendV1 ? true : false;
+    type PairedRequest = NonNullable<PairedPluginBackendV1["request"]>;
+    type PairedChannel = NonNullable<PairedPluginBackendV1["openChannel"]>;
+    type RequestOnlyBackendIsValid = { readonly version: 1; request: PairedRequest } extends PairedPluginBackendV1 ? true : false;
+    type ChannelOnlyBackendIsValid = { readonly version: 1; openChannel: PairedChannel } extends PairedPluginBackendV1 ? true : false;
+    expectTypeOf<EmptyNoticeScopeIsValid>().toEqualTypeOf<false>();
+    expectTypeOf<ProjectNoticeScopeIsValid>().toEqualTypeOf<true>();
+    expectTypeOf<EmptyPairedBackendIsValid>().toEqualTypeOf<false>();
+    expectTypeOf<RequestOnlyBackendIsValid>().toEqualTypeOf<true>();
+    expectTypeOf<ChannelOnlyBackendIsValid>().toEqualTypeOf<true>();
     const requestOnly: PairedPluginBackendV1 = { version: 1, request: () => null };
     const channelOnly: PairedPluginBackendV1 = {
       version: 1,

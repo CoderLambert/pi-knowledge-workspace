@@ -702,7 +702,7 @@ interface ServerPluginActivation {
 }
 ```
 
-A server plugin may contribute at most one `workspaceProvider` and one version-1 `pairedBackend`. Either contribution is optional and independent: a paired backend does not need to own or provide workspaces. Within `pairedBackend`, `request` and `openChannel` are independently optional, but at least one must be present; only the required bundled Terminal must provide both. The host-owned frozen activation context contains its `pluginId`, `packageRoot`, JSON settings snapshot, scoped logger, activation `AbortSignal`, an optional version-1 `notices` reporter, and an argv-based `execFile()` helper. `execFile()` has host-owned timeout/output bounds; pass the current callback's signal into every command request. The API exposes no shell parser, Fastify instance, route registration, concrete service, event bus, or service locator.
+A server plugin may contribute at most one `workspaceProvider` and one version-1 `pairedBackend`. Either contribution is optional and independent: a paired backend does not need to own or provide workspaces. A paired backend may provide `request`, `openChannel`, or both, and its public type requires at least one; only the required bundled Terminal must provide both. The host-owned frozen activation context contains its `pluginId`, `packageRoot`, JSON settings snapshot, scoped logger, activation `AbortSignal`, an optional version-1 `notices` reporter, and an argv-based `execFile()` helper. `execFile()` has host-owned timeout/output bounds; pass the current callback's signal into every command request. The API exposes no shell parser, Fastify instance, route registration, concrete service, event bus, or service locator.
 
 Every activation, lifecycle, provider, request, channel `receive`, and channel `close` signal is scoped to that one invocation. The host aborts it when the invocation times out or settles. The deliberate exception is the signal passed to `openChannel()`: it remains live for that channel's finite lifetime and is aborted on disconnect, failure, expiry, or shutdown. Do not treat any other callback signal as a plugin-lifetime shutdown notification; release plugin-global resources in the explicit `stop()` callback. Deadlines remain cooperative, so plugins must observe each supplied signal.
 
@@ -734,11 +734,17 @@ Every accepted call is an independent occurrence; v1 has no deduplication, updat
 ### Paired backend contract
 
 ```ts
-interface PairedPluginBackendV1 {
-  readonly version: 1;
-  request?(context: PairedPluginRequestContext): JsonValue | Promise<JsonValue>;
-  openChannel?(context: PairedPluginChannelOpenContext): PairedPluginChannel | Promise<PairedPluginChannel>;
-}
+type PairedPluginBackendV1 =
+  | {
+      readonly version: 1;
+      request(context: PairedPluginRequestContext): JsonValue | Promise<JsonValue>;
+      openChannel?(context: PairedPluginChannelOpenContext): PairedPluginChannel | Promise<PairedPluginChannel>;
+    }
+  | {
+      readonly version: 1;
+      request?: undefined;
+      openChannel(context: PairedPluginChannelOpenContext): PairedPluginChannel | Promise<PairedPluginChannel>;
+    };
 
 interface PairedPluginChannelOpenContext {
   readonly project: ProjectInput;
@@ -1285,7 +1291,7 @@ interface WorkspaceBackend {
 }
 ```
 
-It always dispatches through the current workspace owner's `WorkspaceProvider.request()`. The server callback receives that provider's private workspace `data`; no other plugin can retrieve it. Use this helper for provider-owned operations, as bundled Git and the standalone workspace-provider example do. The unversioned helper deliberately has no channel or cancellation marker, and adding a package-paired channel does not redirect its requests.
+The host supplies this helper only when the contribution's source plugin is the current workspace owner and that provider advertises request support. It always dispatches through that owner's `WorkspaceProvider.request()`. The server callback receives that provider's private workspace `data`; no other plugin can retrieve it. Use this helper for provider-owned operations, as bundled Git and the standalone workspace-provider example do. The unversioned helper deliberately has no channel or cancellation marker, and adding a package-paired channel does not redirect its requests.
 
 Use the separate optional `context.pairedBackend` when a browser package needs to call its own revision-matched `ServerPluginActivation.pairedBackend`, independently of workspace ownership. Feature-detect paired requests:
 

@@ -40,7 +40,10 @@ export function parseServerNoticeScope(value: unknown, label: string): ServerNot
     }
     scope[key] = id;
   }
-  return Object.freeze(scope);
+  if (scope.projectId !== undefined) return Object.freeze({ ...scope, projectId: scope.projectId });
+  if (scope.workspaceId !== undefined) return Object.freeze({ ...scope, workspaceId: scope.workspaceId });
+  if (scope.sessionId !== undefined) return Object.freeze({ ...scope, sessionId: scope.sessionId });
+  throw new Error(`${label} must contain at least one visibility selector`);
 }
 
 export function isPluginServerNoticeSource(source: string | undefined): source is `plugin:${string}` {

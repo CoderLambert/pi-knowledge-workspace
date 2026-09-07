@@ -105,10 +105,18 @@ describe("public browser plugin API", () => {
     expectTypeOf<ReadonlyKeys<Pick<WorkspaceFilesCapabilityV1, "capabilityVersion" | "defaultUploadFolder" | "maxInlinePreviewBytes">>>().toEqualTypeOf<"capabilityVersion" | "defaultUploadFolder" | "maxInlinePreviewBytes">();
   });
 
-  it("keeps the owner-backed helper unchanged and exposes paired request and channel detection separately", () => {
+  it("keeps the owner-backed helper unchanged and models paired capabilities as valid detectable combinations", () => {
     type PairedBackendIsOptional = IsOptional<WorkspaceContext, "pairedBackend">;
     type PairedRequestIsOptional = IsOptional<PairedWorkspaceBackendV1, "request">;
     type PairedChannelIsOptional = IsOptional<PairedWorkspaceBackendV1, "openChannel">;
+    type PairedRequest = NonNullable<PairedWorkspaceBackendV1["request"]>;
+    type PairedChannel = NonNullable<PairedWorkspaceBackendV1["openChannel"]>;
+    type EmptyBackendIsValid = { readonly version: 1 } extends PairedWorkspaceBackendV1 ? true : false;
+    type RequestMarkerWithoutMethodIsValid = { readonly version: 1; readonly requestVersion: 1 } extends PairedWorkspaceBackendV1 ? true : false;
+    type RequestMethodWithoutMarkerIsValid = { readonly version: 1; request: PairedRequest } extends PairedWorkspaceBackendV1 ? true : false;
+    type ChannelMarkerWithoutMethodIsValid = { readonly version: 1; readonly channelVersion: 1 } extends PairedWorkspaceBackendV1 ? true : false;
+    type RequestOnlyIsValid = { readonly version: 1; readonly requestVersion: 1; request: PairedRequest } extends PairedWorkspaceBackendV1 ? true : false;
+    type ChannelOnlyIsValid = { readonly version: 1; readonly channelVersion: 1; openChannel: PairedChannel } extends PairedWorkspaceBackendV1 ? true : false;
     expectTypeOf<ExistingV2WorkspaceBackend>().toExtend<WorkspaceBackend>();
     expectTypeOf<keyof WorkspaceBackend>().toEqualTypeOf<"request">();
     expectTypeOf<PairedWorkspaceBackendV1["version"]>().toEqualTypeOf<1>();
@@ -117,6 +125,12 @@ describe("public browser plugin API", () => {
     expectTypeOf<PairedBackendIsOptional>().toEqualTypeOf<true>();
     expectTypeOf<PairedRequestIsOptional>().toEqualTypeOf<true>();
     expectTypeOf<PairedChannelIsOptional>().toEqualTypeOf<true>();
+    expectTypeOf<EmptyBackendIsValid>().toEqualTypeOf<false>();
+    expectTypeOf<RequestMarkerWithoutMethodIsValid>().toEqualTypeOf<false>();
+    expectTypeOf<RequestMethodWithoutMarkerIsValid>().toEqualTypeOf<false>();
+    expectTypeOf<ChannelMarkerWithoutMethodIsValid>().toEqualTypeOf<false>();
+    expectTypeOf<RequestOnlyIsValid>().toEqualTypeOf<true>();
+    expectTypeOf<ChannelOnlyIsValid>().toEqualTypeOf<true>();
     expectTypeOf<ReadonlyKeys<PairedWorkspaceBackendV1>>().toEqualTypeOf<"version" | "requestVersion" | "channelVersion">();
     expectTypeOf<ReadonlyKeys<PairedWorkspaceBackendRequestOptions>>().toEqualTypeOf<"signal">();
     expectTypeOf<ReadonlyKeys<PairedWorkspaceBackendChannelOptions>>().toEqualTypeOf<keyof PairedWorkspaceBackendChannelOptions>();

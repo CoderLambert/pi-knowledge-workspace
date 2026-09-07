@@ -56,13 +56,13 @@ function requestOwnerBackend(backend: WorkspaceBackend): Promise<JsonValue> {
 
 async function requestPairedBackend(context: WorkspacePanelContext): Promise<JsonValue | undefined> {
   const backend: PairedWorkspaceBackendV1 | undefined = context.pairedBackend;
-  if (backend?.requestVersion !== 1 || backend.request === undefined) return undefined;
+  if (backend?.requestVersion !== 1) return undefined;
   return await backend.request("fixture.summary", null);
 }
 
 function openPairedBackendChannel(context: WorkspacePanelContext): void {
   const backend = context.pairedBackend;
-  if (backend?.channelVersion !== 1 || backend.openChannel === undefined) return;
+  if (backend?.channelVersion !== 1) return;
   void backend.openChannel("fixture.watch", null, { onData: echoJson });
 }
 

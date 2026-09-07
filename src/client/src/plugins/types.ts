@@ -141,13 +141,35 @@ export interface PairedWorkspaceBackendChannel {
   close(reason?: string): void;
 }
 
-export interface PairedWorkspaceBackendV1 {
+interface PairedWorkspaceBackendBaseV1 {
   readonly version: 1;
-  readonly requestVersion?: 1;
-  readonly channelVersion?: 1;
-  request?(operation: string, input: JsonValue, options?: PairedWorkspaceBackendRequestOptions): Promise<JsonValue>;
-  openChannel?(operation: string, input: JsonValue, options: PairedWorkspaceBackendChannelOptions): Promise<PairedWorkspaceBackendChannel>;
 }
+
+interface PairedWorkspaceBackendRequestCapabilityV1 {
+  readonly requestVersion: 1;
+  request(operation: string, input: JsonValue, options?: PairedWorkspaceBackendRequestOptions): Promise<JsonValue>;
+}
+
+interface PairedWorkspaceBackendWithoutRequest {
+  readonly requestVersion?: undefined;
+  request?: undefined;
+}
+
+interface PairedWorkspaceBackendChannelCapabilityV1 {
+  readonly channelVersion: 1;
+  openChannel(operation: string, input: JsonValue, options: PairedWorkspaceBackendChannelOptions): Promise<PairedWorkspaceBackendChannel>;
+}
+
+interface PairedWorkspaceBackendWithoutChannel {
+  readonly channelVersion?: undefined;
+  openChannel?: undefined;
+}
+
+export type PairedWorkspaceBackendV1 = PairedWorkspaceBackendBaseV1 & (
+  | (PairedWorkspaceBackendRequestCapabilityV1 & PairedWorkspaceBackendWithoutChannel)
+  | (PairedWorkspaceBackendWithoutRequest & PairedWorkspaceBackendChannelCapabilityV1)
+  | (PairedWorkspaceBackendRequestCapabilityV1 & PairedWorkspaceBackendChannelCapabilityV1)
+);
 
 export interface WorkspaceHost {
   requestRender(): void;

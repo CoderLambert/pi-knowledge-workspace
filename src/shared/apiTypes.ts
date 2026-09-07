@@ -1,4 +1,5 @@
 import type { MachineStatusUiEvent } from "./machineStatus.js";
+import type { TerminalPluginMode } from "./requiredTerminalPlugin.js";
 import type {
   DeleteWorkspaceFileResponse,
   FileContentMediaType,
@@ -62,15 +63,6 @@ export type {
   WriteWorkspaceFileOptions,
   WriteWorkspaceFileResponse,
 };
-
-/** Internal query shape for PI WEB's terminal-command-runs host protocol. */
-export interface TerminalCommandRunFilter {
-  projectId?: string;
-  workspaceId?: string;
-  terminalId?: string;
-  statuses?: TerminalCommandRunStatus[];
-  metadata?: Record<string, string>;
-}
 
 export type MachineStatus = "unknown" | "online" | "offline" | "error";
 
@@ -211,7 +203,7 @@ export interface PiWebConfigValues {
 
 export type PiWebPluginScope = "bundled" | "local" | "user" | "project";
 
-export const PI_WEB_PLUGIN_LIFECYCLE_VERSION = 1;
+export const PI_WEB_PLUGIN_LIFECYCLE_VERSION = 2;
 
 export type PiWebPluginServerState = "active" | "failed" | "incompatible" | "disabled" | "missing" | "unknown";
 export type PiWebPluginLifecyclePhase = "import" | "activate" | "validate" | "start" | "health" | "stop";
@@ -237,6 +229,8 @@ export interface PiWebPluginServerInfo {
 
 export interface PiWebPluginInfo {
   id: string;
+  /** The bundled Terminal package is required outside explicit recovery mode. */
+  required?: true;
   /** Browser module URL for the currently discovered package, if any. */
   module?: string;
   source: string;
@@ -268,6 +262,7 @@ export interface PiWebPluginRecoveryCommands {
 
 export interface PiWebPluginRuntimeInfo {
   status: PiWebPluginRuntimeStatus;
+  terminalMode: TerminalPluginMode;
   /** Safe-start level active in sessiond; absence means sessiond started normally. */
   safeStart?: PiWebPluginSafeStart;
   /** Current offline recovery config, including explicit `off` when known. */
@@ -441,13 +436,22 @@ export interface SessionRef {
 
 export type ServerNoticeSeverity = "info" | "warning" | "error";
 
-/** One independent server-created application event retained until dismissal. */
+/** Browser-visibility selectors for one server notice. */
+export type ServerNoticeScope =
+  | { projectId: string; workspaceId?: string; sessionId?: string }
+  | { projectId?: string; workspaceId: string; sessionId?: string }
+  | { projectId?: string; workspaceId?: string; sessionId: string };
+
+/** One independent server-created event retained until dismissal, eligible plugin eviction, or daemon end. */
 export interface ServerNotice {
   id: string;
   severity: ServerNoticeSeverity;
   message: string;
   createdAt: string;
   source?: string;
+  /** Omitted for global visibility. */
+  scope?: ServerNoticeScope;
+  /** Detached diagnostic metadata that never controls visibility. */
   context?: JsonObject;
 }
 
@@ -1165,24 +1169,6 @@ export interface FileSuggestion {
   kind: "tracked" | "untracked" | "other";
 }
 
-export interface TerminalInfo {
-  id: string;
-  cwd: string;
-  name: string;
-  createdAt: string;
-  exited: boolean;
-  exitCode?: number;
-  commandRunId?: string;
-}
-
-export interface RunTerminalCommandInput {
-  workspace: Workspace;
-  title: string;
-  command: string;
-  metadata?: Record<string, string>;
-  open?: boolean;
-}
-
 /** Secret-free identity of the pi agent state directory fixed for one sessiond lifetime. */
 export interface ActiveAgentProfileDescriptor {
   readonly schemaVersion: 2;
@@ -1213,11 +1199,6 @@ export interface PiWebRuntimeResponse {
   };
   capabilities: PiWebCapability[];
 }
-
-export type TerminalUiEvent =
-  | { type: "terminal.created"; terminal: TerminalInfo }
-  | { type: "terminal.exited"; terminal: TerminalInfo }
-  | { type: "terminal.closed"; terminalId: string; cwd: string };
 
 export interface CommandOption {
   value: string;
@@ -1364,4 +1345,4 @@ export type GlobalSessionEvent =
   | SessionStartupProgressEvent
   | ModelScopeChangedEvent
   | ServerNoticeEvent;
-export type RealtimeEvent = GlobalSessionEvent | TerminalUiEvent | MachineStatusUiEvent;
+export type RealtimeEvent = GlobalSessionEvent | MachineStatusUiEvent;

@@ -136,6 +136,27 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
 - **Dependent tasks:** P1-T02 database bootstrap/migrations, P1-T12 FTS5 baseline, P1-T20/P1-T21 backup/restore; P2-T07 extension work depends specifically on extension feasibility.
 - **Resolution:** pending target-runtime verification; P1-T02 may proceed against ADR-028 under the autonomous-development policy.
 
+### P1-T04 — Blob-store executable/filesystem acceptance
+
+- **Task status:** PARTIAL
+- **Branch:** `feat/p1-content-addressed-blob-store`
+- **PR:** #14
+- **Debt status:** OPEN
+- **Why deferred:** the GitHub-only automation environment cannot execute the repository dependency tree or filesystem acceptance harness, and the PR head currently has no GitHub Actions workflow run.
+- **Required verification:**
+  1. Run `npm test -- src/knowledge/storage/blobStore.test.ts` and confirm 6/6 tests pass.
+  2. Run `npm run typecheck`, `npm run lint`, `npm run knip`, `npm run build`, `npm run pack:dry`, and full `npm test`.
+  3. Run `git diff --check origin/feat/p1-knowledge-workspace-identity...HEAD` and confirm the direct-base diff is P1-T04-only.
+  4. Exercise a real temporary filesystem root and confirm exact raw-byte roundtrip at `blobs/sha256/<hash>`.
+  5. Confirm repeated and concurrent identical writes converge on one final object without overwrite/truncation.
+  6. Tamper with a published object and confirm `read`, `verify`, and an identical `put` fail closed with `BlobIntegrityError`.
+  7. Confirm traversal-shaped/uppercase/wrong-length/non-hex hashes are rejected before path access.
+  8. Confirm stale store-owned temp files are cleaned while recent and unrelated files remain untouched.
+- **Expected PASS evidence:** focused/static/build/package/full-suite gates show no new P1-T04-attributable failure; direct-base diff is task-only; filesystem evidence demonstrates atomic immutable publication, dedupe, tamper detection and bounded cleanup behavior.
+- **Assumptions used for continued development:** P1-T05 may use `put(rawBytes)`, `read(hash)` and SHA-256 blob identity; the store root remains a local filesystem where hard links within `blobs/sha256` are supported; if target packaging/filesystem constraints invalidate hard-link publication, P1-T04 must be revised without changing SourceVersion identity semantics.
+- **Dependent tasks:** P1-T05, P1-T07, P1-T20, P1-T21 and all historical-content durability work
+- **Resolution:** pending executable/filesystem verification; later tasks may proceed against the narrow content-addressed contract.
+
 P0-T03 is already fully accepted and remains PASS.
 
 ## Entry template

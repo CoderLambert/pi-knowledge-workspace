@@ -7,7 +7,7 @@
 - **Date:** 2026-09-08
 - **Branch:** `feat/p0-knowledge-plugin-skeleton`
 - **PR:** #3 — `feat: add P0 Knowledge paired-plugin skeleton`
-- **Status:** **PARTIAL**
+- **Status:** **PASS**
 - **PI WEB core runtime files changed:** 0
 - **Human verification guide:** `docs/development/verification/P0-T02-knowledge-plugin-skeleton.md`
 
@@ -210,7 +210,7 @@ Important scope evidence:
 - P0-T02 does not modify session/auth production code or its test support;
 - P0-T02 does not change the root dependency lock.
 
-The failing path currently returns early when the refreshed `ModelRuntime` can no longer resolve the active model before publishing an auth-loss warning. That behavior is an inherited PI WEB/Pi SDK baseline compatibility candidate and is not being silently patched inside the Knowledge feature task.
+At this stage the failure was treated as an inherited PI WEB/Pi SDK baseline compatibility candidate and was not patched inside the Knowledge feature task. The later P0-T01 baseline comparison reproduced the same failure and confirmed the classification below.
 
 ## Verification evidence state
 
@@ -303,8 +303,7 @@ The failure is therefore classified as an **inherited PI WEB / current Pi SDK ba
 - real remote Fleet E2E is not yet proven;
 - no persistence, Source, Evidence, retrieval, Ask or Notes behavior exists in P0-T02;
 - the inherited `piSessionService.promptQueue` auth-warning baseline failure remains open as separate maintenance scope;
-- a transient plugin-manifest request can race sessiond startup in the local development stack; refresh after sessiond becomes ready recovered normally during this verification.
-- no GitHub Actions workflow evidence was produced for this branch; P0-T02 acceptance is based on the recorded local automated and manual verification.
+- a transient plugin-manifest request can race sessiond startup in the local development stack; refresh after sessiond becomes ready recovered normally during this verification;
 - no GitHub Actions workflow evidence was produced for this branch; P0-T02 acceptance is based on the recorded local automated and manual verification.
 
 ## Result

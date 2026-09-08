@@ -100,11 +100,9 @@ The paired server plugin:
 - inconsistent host scope rejection;
 - unsupported operation rejection.
 
-## Local user verification attempt — 2026-09-08
+## Local verification history — 2026-09-08
 
-A real local verification run exposed two issues before P0-T02 could be accepted.
-
-### Issue A — TypeScript TS7006
+### Attempt 1 — strict TypeScript defect
 
 Observed:
 
@@ -113,61 +111,83 @@ pi-web-plugins/knowledge/pi-web-plugin.test.ts:47:29
 error TS7006: Parameter 'id' implicitly has an 'any' type.
 ```
 
-Root cause:
+The callback was initially passed through an `as never` fixture, preventing useful contextual typing. The immediate callback typing defect was corrected.
 
-The test fixture passed a callback through an `as never` host-context cast, so contextual typing did not infer the callback parameter under strict TypeScript settings.
+### Attempt 1 — plugin lifecycle UI failure
 
-Fix:
-
-```ts
-selectWorkspaceTool: (id: string) => { selected = id; }
-```
-
-Commit containing the fix starts from:
-
-```text
-600585f fix: type Knowledge workspace tool test callback
-```
-
-This removes the known TS7006 source-level defect. A fresh local `npm run verify` is still required to record PASS evidence.
-
-### Issue B — `Unsupported plugin manifest lifecycle version`
-
-Observed in the Vite UI:
+The browser also previously displayed:
 
 ```text
 Failed to load PI WEB plugins: Unsupported plugin manifest lifecycle version
 ```
 
-The same UI showed existing PI WEB Projects/Workspaces/Sessions while the feature checkout was opened on the Vite development port, indicating a mixed development/runtime environment was possible.
+A mixed frontend/backend checkout was identified as a plausible cause because Vite uses a separate API backend. The verification guide therefore includes an isolated-port/data-directory procedure. The Knowledge package manifest itself must not invent host lifecycle metadata as a workaround.
 
-Diagnosis:
+### Attempt 2 — runtime starts and Knowledge activates
 
-The Vite client normally runs on `8505` while PI WEB API defaults to `8504`. If an installed/older PI WEB backend is already listening on `8504`, a feature-branch Vite client can proxy plugin-manifest requests to that older backend. The current client and older server then disagree on the manifest lifecycle protocol.
+A later same-branch local run showed the normal startup sequence:
 
-This is **not** fixed by adding a lifecycle field to `pi-web-plugins/knowledge/package.json`; lifecycle belongs to the PI WEB host manifest protocol, not the Knowledge package declaration.
-
-Mitigation/fix for verification:
-
-Run the feature checkout with an isolated API port and data directory:
-
-```bash
-mkdir -p .tmp/p0-t02-data
-
-PI_WEB_PORT=8604 \
-PI_WEB_DATA_DIR="$PWD/.tmp/p0-t02-data" \
-npm run dev
+```text
+Vite client starts
+→ early proxy requests may receive ECONNREFUSED while the API is still booting
+→ PI WEB API listens on 127.0.0.1:8504
+→ Terminal server plugin activates
+→ Git server plugin activates
+→ Knowledge server plugin activates
+→ sessiond socket listens
 ```
 
-The Vite config inherits the API-port environment and proxies the development client to the same-checkout backend rather than a separately installed service.
+The early `ECONNREFUSED` messages are startup-order transients in this run, not persistent Knowledge failures, because the backend subsequently starts and serves requests successfully.
 
-The verification guide now requires checking:
+The earlier lifecycle-version failure was not reproduced in this later run.
+
+### Attempt 2 — focused tests PASS
+
+Executed locally:
 
 ```bash
-curl -fsS http://127.0.0.1:8604/pi-web-plugins/manifest.json
+npm test -- \
+  pi-web-plugins/knowledge/pi-web-plugin.test.ts \
+  pi-web-plugins/knowledge/server-plugin.test.ts
 ```
 
-before manual UI acceptance.
+Observed:
+
+```text
+Test Files  2 passed (2)
+Tests       8 passed (8)
+```
+
+### Attempt 2 — production build PASS
+
+Executed locally:
+
+```bash
+npm run build
+```
+
+The TypeScript/plugin/Vite production build completed successfully. The large-chunk message was a Vite warning, not a build failure.
+
+### Attempt 2 — repository verify stopped at ESLint
+
+`npm run verify` passed TypeScript typecheck and then failed lint with four Knowledge-specific violations:
+
+```text
+browser/pi-web-plugin.ts
+- no-unnecessary-condition
+- consistent-type-assertions
+
+pi-web-plugin.test.ts
+- no-floating-promises
+- consistent-type-assertions
+```
+
+These were corrected without disabling lint rules:
+
+1. removed the redundant `backend.request === undefined` check once `requestVersion === 1` narrows the paired-backend capability;
+2. replaced `as Record<string, unknown>` with a real `isRecord` type guard;
+3. removed the test's `as never` runtime-context escape and replaced it with a complete typed `PluginRuntimeContext` fixture;
+4. made the action test async and awaited `action.run(...)`.
 
 ## Verification evidence state
 
@@ -176,14 +196,14 @@ before manual UI acceptance.
 - public browser plugin API reviewed;
 - public server plugin API reviewed;
 - no PI WEB core navigation/server-route patch required;
-- automated browser/server regression tests are present;
-- real user verification attempt executed and produced actionable failure evidence;
-- TS7006 source defect corrected;
-- isolated-development procedure documented to prevent frontend/backend lifecycle mismatch.
+- Knowledge server plugin activates in a real local development run;
+- focused Knowledge tests passed 8/8 before the latest lint-only cleanup;
+- production build passed before the latest lint-only cleanup;
+- the four reported ESLint violations have been corrected in source without rule suppression.
 
 ### Still pending
 
-After pulling the latest branch, the following must be executed successfully on the user's machine:
+Because the lint cleanup changed source/test files after the successful focused-test/build run, the final gate must be rerun from the current branch head:
 
 ```bash
 npm test -- \
@@ -194,9 +214,9 @@ npm run verify
 npm run build
 ```
 
-Then run the isolated dev stack and complete the manual Workspace checks in the verification guide.
+Then complete the Knowledge panel manual Workspace checks from the verification guide.
 
-Repository GitHub Actions also has not produced the expected PR workflow evidence for this branch, so this report does not claim CI PASS.
+Repository GitHub Actions has not produced PR workflow evidence for the current branch head, so this report does not claim CI PASS.
 
 ## Known limitations
 
@@ -207,24 +227,23 @@ Repository GitHub Actions also has not produced the expected PR workflow evidenc
 
 ## Result
 
-**PARTIAL — defects found during real verification have been addressed, rerun required.**
+**PARTIAL — focused tests/build have succeeded once; final verify/build/manual rerun is required after lint cleanup.**
 
 P0-T02 must not be promoted to PASS until:
 
-1. focused tests pass;
-2. `npm run verify` passes;
-3. `npm run build` passes;
-4. same-checkout isolated dev manifest loads without lifecycle mismatch;
-5. Knowledge panel/manual Workspace switching checks pass.
+1. focused tests pass on the current head;
+2. `npm run verify` passes on the current head;
+3. `npm run build` passes on the current head;
+4. Knowledge panel opens without plugin lifecycle failure;
+5. Knowledge integration check returns the selected Workspace scope correctly;
+6. Workspace switching does not retain stale scope.
 
 ## Impact on the plan
 
-The architectural integration path remains valid. The local verification attempt added an important operational rule:
-
-> Feature-branch PI WEB frontend/backend must be started as a matched checkout and isolated from an already-installed PI WEB backend during acceptance testing.
+The architectural integration path remains valid. The latest local run is positive evidence that the bundled Knowledge server plugin can activate in the normal PI WEB development stack.
 
 No redesign of the Knowledge plugin boundary is required.
 
 ## Next action
 
-Re-run the updated P0-T02 verification guide. If it passes, update this report and `CHANGELOG.md` from `PARTIAL` to `PASS`; otherwise record the next concrete failure before starting P0-T03.
+Pull the current branch head and rerun the final P0-T02 gates. If they pass, record the manual UI result and promote P0-T02 from `PARTIAL` to `PASS`; otherwise record the next concrete failure before starting P0-T03.

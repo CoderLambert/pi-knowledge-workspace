@@ -22,6 +22,13 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P0-T06 — PARTIAL
+
+- Added deterministic selected-Machine Knowledge federation coverage over PI WEB's existing generic paired-backend Machine route; no Knowledge-specific production routing was added.
+- Written cases cover explicit local routing, selected target routing, target unavailable, target `pi-knowledge` unavailable, A→B switching, cancellation propagation, and zero gateway-local fallback.
+- Focused/static/build/package execution plus physical two-instance and real Fleet/multi-host acceptance remain OPEN verification debt.
+- Under the autonomous-development policy, P0-T07 may proceed on a separate stacked branch while P0-T06 remains PARTIAL.
+
 ### P0-T05 — PARTIAL
 
 - Added repository-owned local Knowledge cross-layer E2E coverage: browser panel → real sessiond paired-backend HTTP route → `PluginBackendRegistry` host scope → Knowledge adapter → real loopback `pi-knowledge` → UI.

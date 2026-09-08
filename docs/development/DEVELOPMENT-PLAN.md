@@ -658,7 +658,7 @@ Current implementation exists on PR #16. The reader validates relative input, ca
 
 ## P1-T07 — MD/TXT import job
 
-**Status:** TODO
+**Status:** PARTIAL
 
 Build first durable import path:
 
@@ -676,9 +676,13 @@ Requirements:
 - cancellation;
 - restart-safe job state.
 
+Current implementation exists on PR #17. Schema v2 adds only the minimum import-job durability fields; `MdTextImportJobs` provides Workspace-scoped idempotent submit, transactional Source/job binding, MD/TXT allowlisting, safe captured-byte execution, SourceVersion identity cross-checking, durable attempts, explicit retry, queued/in-flight cancellation before persistence, and restart recovery of inherited `running` jobs back to `queued`. Six import-job contract scenarios and schema-v1→v2 migration/rollback coverage are written. Executable/native-SQLite/process-restart acceptance remains OPEN debt.
+
 ---
 
 ## P1-T08 — ParsedArtifact canonicalization
+
+**Status:** TODO
 
 Implement Markdown/TXT parsing.
 
@@ -1829,12 +1833,13 @@ As of 2026-09-09:
 | P1-T04 | PARTIAL | Content-addressed raw-byte blob store implemented on PR #14; executable/filesystem acceptance remains OPEN debt. |
 | P1-T05 | PARTIAL | Source/SourceVersion domain implemented on PR #15; executable/real-SQLite acceptance remains OPEN debt. |
 | P1-T06 | PARTIAL | Safe Workspace file reader implemented on PR #16; executable/target-filesystem acceptance remains OPEN debt. |
-| P1-T07 | TODO | Next task: MD/TXT durable import job. |
+| P1-T07 | PARTIAL | Durable MD/TXT import job implemented on PR #17; executable/native-SQLite/restart acceptance remains OPEN debt. |
+| P1-T08 | TODO | Next task: ParsedArtifact canonicalization. |
 
 Execution mode: **deferred human verification is allowed for development progression**. Tasks with environment-only acceptance still outstanding remain PARTIAL with explicit verification debt, while later tasks may proceed when dependency-safe. Phase/release PASS still requires all mandatory debt for that gate to be cleared.
 
 Current next task:
 
-# **P1-T07 — MD/TXT import job**
+# **P1-T08 — ParsedArtifact canonicalization**
 
-P1-T07 may proceed as a separate stacked branch against the documented P1-T06 captured-byte contract. It must consume the captured bytes directly rather than reopen the Workspace path, then persist through the P1-T04/P1-T05 blob/SourceVersion path with idempotency, retry, cancellation and restart-safe job state.
+P1-T08 may proceed as a separate stacked branch against the immutable P1-T07 SourceVersion result contract. It must parse bytes from immutable SourceVersion/blob content rather than reopen mutable Workspace files, and must make canonical UTF-8 text, source mapping, parser/normalization fingerprints and artifact hash deterministic across supported MD/TXT cases.

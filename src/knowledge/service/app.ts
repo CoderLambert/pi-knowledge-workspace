@@ -31,7 +31,7 @@ export async function buildKnowledgeApp(options: KnowledgeAppOptions): Promise<F
     throw new Error("maxRequestBytes must be a positive integer");
   }
   if (!Number.isInteger(maxResponseBytes) || maxResponseBytes < MIN_RESPONSE_LIMIT) {
-    throw new Error(`maxResponseBytes must be an integer of at least ${MIN_RESPONSE_LIMIT}`);
+    throw new Error(`maxResponseBytes must be an integer of at least ${String(MIN_RESPONSE_LIMIT)}`);
   }
 
   const app = Fastify({
@@ -50,7 +50,7 @@ export async function buildKnowledgeApp(options: KnowledgeAppOptions): Promise<F
   });
 
   app.setErrorHandler((error, request, reply) => {
-    if (error.code === "FST_ERR_CTP_INVALID_JSON_BODY") {
+    if (hasErrorCode(error, "FST_ERR_CTP_INVALID_JSON_BODY")) {
       return sendKnowledgeError(
         reply,
         request.id,
@@ -58,13 +58,13 @@ export async function buildKnowledgeApp(options: KnowledgeAppOptions): Promise<F
         maxResponseBytes,
       );
     }
-    if (error.code === "FST_ERR_CTP_BODY_TOO_LARGE" || error.statusCode === 413) {
+    if (hasErrorCode(error, "FST_ERR_CTP_BODY_TOO_LARGE") || hasStatusCode(error, 413)) {
       return sendKnowledgeError(
         reply,
         request.id,
         new KnowledgeServiceError(
           KNOWLEDGE_ERROR_CODES.requestTooLarge,
-          `Request body exceeds the ${maxRequestBytes} byte limit`,
+          `Request body exceeds the ${String(maxRequestBytes)} byte limit`,
           413,
         ),
         maxResponseBytes,
@@ -107,7 +107,7 @@ export async function buildKnowledgeApp(options: KnowledgeAppOptions): Promise<F
       if (dispatchRequest.protocolVersion !== PI_KNOWLEDGE_PROTOCOL_VERSION) {
         throw new KnowledgeServiceError(
           KNOWLEDGE_ERROR_CODES.incompatibleProtocol,
-          `Unsupported protocol version: ${dispatchRequest.protocolVersion}`,
+          `Unsupported protocol version: ${String(dispatchRequest.protocolVersion)}`,
           409,
           { expectedProtocolVersion: PI_KNOWLEDGE_PROTOCOL_VERSION },
         );
@@ -160,6 +160,17 @@ function authenticate(authorization: string | undefined, expectedToken: string):
   return undefined;
 }
 
+function hasErrorCode(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
+}
+
+function hasStatusCode(error: unknown, statusCode: number): boolean {
+  return typeof error === "object"
+    && error !== null
+    && "statusCode" in error
+    && error.statusCode === statusCode;
+}
+
 function normalizeServiceError(error: unknown): KnowledgeServiceError {
   if (error instanceof KnowledgeServiceError) return error;
   return new KnowledgeServiceError(KNOWLEDGE_ERROR_CODES.internal, "Internal pi-knowledge error", 500);
@@ -179,7 +190,7 @@ function sendBoundedSuccess(
       requestId,
       new KnowledgeServiceError(
         KNOWLEDGE_ERROR_CODES.responseTooLarge,
-        `Response exceeds the ${maxResponseBytes} byte limit`,
+        `Response exceeds the ${String(maxResponseBytes)} byte limit`,
         500,
       ),
       maxResponseBytes,

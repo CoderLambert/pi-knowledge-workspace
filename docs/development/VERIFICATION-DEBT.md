@@ -57,6 +57,29 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
 - **Dependent tasks:** P0-T06, P0-T08
 - **Resolution:** pending user verification; compatible real E2E evidence may also close P0-T04 real-adapter rows, but not P0-T04's separate focused/static/build rows.
 
+### P0-T06 — Selected Machine / Fleet Knowledge routing acceptance
+
+- **Task status:** PARTIAL
+- **Branch:** `test/p0-selected-machine-federation-routing`
+- **PR:** #8
+- **Debt status:** OPEN
+- **Why deferred:** deterministic repository coverage is implemented, but the autonomous execution environment has no runnable checkout/dependency tree and no physical two-instance or real Fleet/multi-host topology. Those capabilities are required to produce executable and environmental acceptance evidence.
+- **Required verification:**
+  1. Run `npm test -- src/server/knowledgeSelectedMachineFederation.integration.test.ts` and record the exact result (expected 6 tests).
+  2. Run `npm run typecheck`, `npm run lint`, `npm run knip`, `npm run build`, `npm run pack:dry`, then the full `npm test` suite; do not patch the known inherited promptQueue baseline merely to obtain green.
+  3. Run `git diff --check origin/test/p0-local-knowledge-integration-e2e...HEAD` and `git diff --name-status origin/test/p0-local-knowledge-integration-e2e...HEAD`; confirm only P0-T06 test/report/verification/plan/changelog/debt records are present.
+  4. With the explicit Local Machine selected, confirm Knowledge `ready` follows the normal local paired-backend → local sessiond → local adapter/service chain.
+  5. With two isolated PI WEB instances, select target B from gateway A and confirm Knowledge returns B's distinct Workspace identity, B sessiond/B `pi-knowledge` receive the request, and A sessiond/A `pi-knowledge` receive no fallback request. This proves routing semantics only and must not be labeled real Fleet E2E.
+  6. Stop target PI WEB/API while gateway-local Knowledge remains healthy; confirm an explicit remote-machine failure and zero local fallback.
+  7. Keep target PI WEB/sessiond healthy but stop target `pi-knowledge`; confirm the target's explicit service-unavailable failure and zero gateway-local fallback.
+  8. Switch target A → B → A and confirm each new request follows the currently selected Machine with no stale result.
+  9. Cancel an in-flight selected-target Knowledge request and confirm cancellation propagates through the gateway Machine request to the target-side chain without a late local fallback.
+  10. When actual Fleet/multi-host machines are available, repeat success, target-unavailable, service-unavailable, switching and cancellation cases across hosts. Only this evidence may be described as real remote Fleet E2E.
+- **Expected PASS evidence:** focused/static/build/package gates pass; full suite has no new P0-T06-attributable failure; direct-base diff is task-only; local and selected-target physical logs prove the target owns Knowledge execution; failure/cancellation cases fail closed; gateway-local Knowledge is never used as fallback; real Fleet evidence is recorded when required by the P0 gate.
+- **Assumptions used for continued development:** `PAIRED_PLUGIN_BACKEND_REQUEST_ROUTE_PATH` remains in PI WEB's generic federation allowlist with bounded cancellation; selected Machine identity remains request authority; P0-T04/P0-T05 target-side Knowledge contracts remain valid while their own debts are open; later tasks must reuse pairedBackend instead of adding Knowledge-specific Machine routing.
+- **Dependent tasks:** P0-T07, P0-T08
+- **Resolution:** pending executable/local/Fleet verification; P0-T07 may proceed against the locked routing contract under the autonomous-development policy.
+
 P0-T03 is already fully accepted and remains PASS.
 
 ## Entry template

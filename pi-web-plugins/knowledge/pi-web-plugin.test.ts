@@ -4,6 +4,7 @@ import { html, render, svg } from "lit";
 import { describe, expect, it, vi } from "vitest";
 import type {
   JsonValue,
+  PluginRuntimeContext,
   Workspace,
   WorkspacePanelContext,
 } from "@jmfederico/pi-web/plugin-api";
@@ -37,15 +38,13 @@ describe("Knowledge browser plugin", () => {
     expect(panel?.routeAliases).toEqual(["knowledge"]);
   });
 
-  it("uses runtime plugin identity when opening the workspace tool", () => {
+  it("uses runtime plugin identity when opening the workspace tool", async () => {
     const runtimePluginId = "machine.72656d6f74652d31.knowledge";
     const action = activate(runtimePluginId).actions?.[0];
+    if (action === undefined) throw new Error("Expected Knowledge action");
     let selected: string | undefined;
 
-    action?.run({
-      state: { selectedWorkspace: workspace },
-      selectWorkspaceTool: (id: string) => { selected = id; },
-    } as never);
+    await action.run(runtimeContext((id) => { selected = id; }));
 
     expect(selected).toBe(`${runtimePluginId}:workspace.knowledge`);
   });
@@ -107,6 +106,31 @@ function clickIntegrationCheck(container: ParentNode): void {
   const button = container.querySelector("button");
   if (button === null) throw new Error("Expected Knowledge integration check button");
   button.click();
+}
+
+function runtimeContext(selectWorkspaceTool: PluginRuntimeContext["selectWorkspaceTool"]): PluginRuntimeContext {
+  const noop = () => undefined;
+  return {
+    state: { selectedWorkspace: workspace },
+    prompt: { insertText: noop, getText: () => "", getSelection: () => null },
+    openActionPalette: noop,
+    focusPrompt: noop,
+    addProject: noop,
+    configureAuth: noop,
+    logoutAuth: noop,
+    openThemePicker: noop,
+    selectMainView: noop,
+    selectWorkspaceTool,
+    openTerminal: noop,
+    refreshFiles: noop,
+    refreshWorkspacePanels: noop,
+    refreshAppData: noop,
+    checkForPiWebUpdates: noop,
+    reloadPage: noop,
+    startSession: noop,
+    archiveSession: noop,
+    stopActiveWork: noop,
+  };
 }
 
 function panelContext(

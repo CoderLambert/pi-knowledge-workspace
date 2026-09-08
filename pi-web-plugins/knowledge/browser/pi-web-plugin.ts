@@ -109,7 +109,7 @@ export default plugin;
 async function refreshKnowledgeStatus(context: WorkspacePanelContext): Promise<void> {
   const key = workspaceKey(context);
   const backend = context.pairedBackend;
-  if (backend?.requestVersion !== 1 || backend.request === undefined) {
+  if (backend?.requestVersion !== 1) {
     states.set(key, { loading: false, error: "Paired backend request capability is unavailable" });
     context.host.requestRender();
     return;
@@ -145,11 +145,15 @@ function parseKnowledgeStatus(value: unknown): KnowledgeStatus {
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new Error(`${label} must be an object`);
   }
-  return value as Record<string, unknown>;
+  return value;
 }
 
 function requireString(record: Record<string, unknown>, key: string): string {

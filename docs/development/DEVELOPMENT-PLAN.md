@@ -327,7 +327,7 @@ Under the autonomous-development policy P0-T05 implementation may proceed on a s
 
 ## P0-T05 — Local integration E2E
 
-**Status:** TODO
+**Status:** PARTIAL
 
 ### Objective
 
@@ -357,6 +357,19 @@ Select Workspace
 ### Exit
 
 A user can follow the verification guide and reproduce success/failure behavior without code inspection.
+
+### Current state
+
+Repository-owned cross-layer E2E coverage is present on `test/p0-local-knowledge-integration-e2e` / PR #7. The test drives the real Knowledge browser panel through the real sessiond paired-plugin HTTP route, `PluginBackendRegistry` host workspace resolution, the real P0-T04 Knowledge adapter, authenticated loopback HTTP and a real P0-T03 `pi-knowledge` Fastify listener. Written scenarios cover local success, service unavailable followed by restart recovery, wrong token fail-closed behavior, and incompatible protocol rejection.
+
+The test deliberately does not modify PI WEB core routes or create a Knowledge-specific browser transport. Actual execution evidence and a physical Browser → web/API process → sessiond process → service run, Workspace A→B→A switching, real request-timeout observation and regression smoke remain OPEN verification debt.
+
+Required records:
+
+- report: `docs/development/reports/P0-T05-local-integration-e2e.md`
+- verification: `docs/development/verification/P0-T05-local-integration-e2e.md`
+
+Under the autonomous-development policy P0-T06 may proceed on a separate stacked branch while P0-T05 remains PARTIAL. P0-T05 cannot become PASS until its recorded verification debt is resolved.
 
 ---
 
@@ -1768,11 +1781,12 @@ As of 2026-09-09:
 | P0-T02 | PASS | Knowledge paired-plugin skeleton accepted locally; authoritative scope, Workspace switching and worktree path verified. |
 | P0-T03 | PASS | Standalone authenticated loopback service accepted: focused 14/14; strict static/build/package gates PASS; full suite 3752 passed / 1 inherited failed / 2 skipped; real process lifecycle/HTTP/limits PASS. |
 | P0-T04 | PARTIAL | Thin server-plugin adapter and focused tests are implemented on PR #6; executable/static/build and real local adapter acceptance remain OPEN verification debt. |
+| P0-T05 | PARTIAL | Cross-layer local E2E is implemented on PR #7 through the real sessiond paired route and real service; execution plus physical browser/process/failure-switching acceptance remain OPEN verification debt. |
 
 Execution mode: **deferred human verification is allowed for development progression**. Tasks with environment-only acceptance still outstanding remain PARTIAL with explicit verification debt, while later tasks may proceed when dependency-safe. Phase/release PASS still requires all mandatory debt for that gate to be cleared.
 
 Current next task:
 
-# **P0-T05 — Local integration E2E**
+# **P0-T06 — Selected Machine / Fleet routing verification**
 
-P0-T05 may proceed as a separate stacked branch against the documented P0-T04 contract while P0-T04 remains PARTIAL. Do not begin P1 until the P0 Gate is satisfied.
+P0-T06 may proceed as a separate stacked branch against the documented P0-T04/P0-T05 contracts while both remain PARTIAL. Do not begin P1 until the P0 Gate is satisfied.

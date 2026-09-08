@@ -2,7 +2,7 @@
 
 ## What this verifies
 
-This guide verifies the first runnable Knowledge integration slice introduced by P0-T02:
+This guide verifies the first runnable Knowledge integration slice:
 
 ```text
 Knowledge Workspace Panel
@@ -13,52 +13,34 @@ Knowledge Workspace Panel
 → browser rendering
 ```
 
-It also verifies that the implementation remains a thin integration layer and does not require PI WEB core navigation changes.
-
-This guide does **not** verify the standalone `pi-knowledge` service, SQLite, retrieval, Ask, Notes, or Course. Those are later tasks.
+It does not verify the standalone `pi-knowledge` process, persistence, retrieval, Ask, Notes, or Course.
 
 ## Prerequisites
 
-- Linux/macOS/Windows development environment supported by PI WEB.
-- Node.js `>=22.19.0`.
-- npm.
-- Pi Coding Agent configured for the current user if your PI WEB development setup requires it.
-- A local folder or Git repository that can be added as a PI WEB Project.
+- Node.js `>=22.19.0`
+- npm
+- git
+- a local folder or Git repository that can be opened as a PI WEB Project
 
-Confirm Node:
+Check runtime:
 
 ```bash
 node --version
+npm --version
 ```
 
-Expected:
-
-```text
-v22.19.0 or newer
-```
-
-## Checkout and setup
-
-From an existing checkout:
+## Checkout and install
 
 ```bash
 git fetch origin
 git switch feat/p0-knowledge-plugin-skeleton
-npm install
-```
-
-Or clone fresh:
-
-```bash
-git clone https://github.com/CoderLambert/pi-knowledge-workspace.git
-cd pi-knowledge-workspace
-git switch feat/p0-knowledge-plugin-skeleton
+git pull
 npm install
 ```
 
 ## Automated verification
 
-### 1. Run focused Knowledge tests
+Run the focused Knowledge tests:
 
 ```bash
 npm test -- \
@@ -66,177 +48,135 @@ npm test -- \
   pi-web-plugins/knowledge/server-plugin.test.ts
 ```
 
-Expected:
-
-- both Knowledge test files execute;
-- all Knowledge tests pass;
-- no unhandled error is printed.
-
-These tests cover:
-
-- Knowledge Workspace Panel contribution;
-- runtime-qualified workspace-tool navigation;
-- browser call to `pairedBackend.request("knowledge.status", null)`;
-- rendering returned Project/Workspace scope;
-- missing paired-backend diagnostic behavior;
-- host-authoritative scope returned by the server plugin;
-- spoofed browser scope rejection;
-- inconsistent Project/Workspace scope rejection;
-- unsupported operation rejection.
-
-### 2. Run repository verification
+Then run the repository gates:
 
 ```bash
 npm run verify
-```
-
-Expected:
-
-```text
-typecheck PASS
-lint PASS
-knip PASS
-vitest PASS
-```
-
-Any non-zero exit code means this gate failed.
-
-### 3. Build the application and bundled plugins
-
-```bash
 npm run build
 ```
 
 Expected:
 
-- TypeScript build succeeds;
-- bundled plugin build succeeds;
-- Vite build succeeds;
-- no missing `knowledge` plugin module error appears.
+- focused Knowledge tests pass;
+- typecheck, lint, knip and Vitest pass;
+- the application and bundled plugins build successfully.
 
-## Start the feature
+## Important: use an isolated development backend
 
-Run the full development stack:
+Do **not** run the feature checkout against an already-installed PI WEB backend on the default API port.
+
+The Vite development client normally runs on port `8505` and proxies PI WEB API/plugin requests to the API port configured by `PI_WEB_PORT`. If an older installed PI WEB service is already listening on the default API port `8504`, a new development client can accidentally talk to that older backend. A typical symptom is:
+
+```text
+Failed to load PI WEB plugins: Unsupported plugin manifest lifecycle version
+```
+
+That is a mixed-version frontend/backend environment, not a Knowledge plugin manifest field that should be edited.
+
+For this task, start an isolated development instance:
 
 ```bash
+mkdir -p .tmp/p0-t02-data
+
+PI_WEB_PORT=8604 \
+PI_WEB_DATA_DIR="$PWD/.tmp/p0-t02-data" \
 npm run dev
 ```
 
-This starts the session daemon, web/API process, bundled-plugin watcher/build, and Vite client.
+Keep this terminal running.
 
-Open the Vite development URL, normally:
+The Vite URL is normally:
 
 ```text
 http://localhost:8505
 ```
 
-If another port is shown in the Vite output, use that exact URL instead.
+If Vite prints another port, use the printed URL.
+
+### Confirm the development backend is the one serving the browser
+
+In another terminal:
+
+```bash
+curl -fsS http://127.0.0.1:8604/pi-web-plugins/manifest.json
+```
+
+Expected:
+
+- HTTP request succeeds;
+- JSON contains the current development plugin manifest;
+- the response is from port `8604`, not the installed/default `8504` service.
+
+If `jq` is installed, inspect the lifecycle value directly:
+
+```bash
+curl -fsS http://127.0.0.1:8604/pi-web-plugins/manifest.json | jq '.lifecycleVersion'
+```
+
+Do not change the Knowledge package to make it match an older backend. The frontend and backend from the same checkout must be run together.
 
 ## Manual verification
 
-### Case 1 — Knowledge panel is available for a Workspace
+### Case 1 — Knowledge panel appears
 
-1. Open the PI WEB development UI.
+1. Open the Vite development URL.
 2. Add or select a Project.
-3. Select one Workspace under that Project.
-4. Find the `Knowledge` workspace tool/tab next to the existing workspace tools.
-5. Open `Knowledge`.
+3. Select a Workspace.
+4. Find and open `Knowledge`.
 
 Expected:
 
-- the Knowledge panel renders;
-- the page does not crash;
-- existing Files/Terminal/Git/Chat behavior remains usable;
-- no separate duplicated Machine/Project/Workspace selector appears inside Knowledge.
+- no `Unsupported plugin manifest lifecycle version` banner;
+- Knowledge is available as a Workspace tool;
+- no duplicated Machine/Project/Workspace selector exists inside Knowledge;
+- existing Files/Terminal/Git/Chat surfaces remain usable.
 
-If the Knowledge panel does not appear:
+If `Knowledge` is not visible, open **Settings → PI WEB plugins** and confirm the bundled `knowledge` plugin is discovered/enabled for the selected machine. Because it has a server entry, restart the dev stack after changing enablement, then reload the browser.
 
-1. Open **Settings → PI WEB plugins**.
-2. Confirm the bundled `knowledge` plugin is discovered/enabled for the selected machine.
-3. Because Knowledge has a server entry, restart the development stack/session daemon if enablement changed.
-4. Reload the browser page.
+### Case 2 — Integration request works
 
-### Case 2 — Browser → paired backend → server plugin path works
-
-1. Open the Knowledge panel for a selected Workspace.
+1. Open `Knowledge`.
 2. Click **Check integration**.
-3. Wait for the request to complete.
 
-Expected UI values:
+Expected:
 
 ```text
 Status: ready
-Machine: <current selected machine>
+Machine: <selected machine>
 Project: <current project id>
-Workspace: <current workspace label/id>
-Path: <current workspace filesystem path>
+Workspace: <current workspace>
+Path: <host-resolved workspace path>
 ```
 
-Expected behavior:
-
-- `Status` becomes `ready`;
-- no browser-authored path entry is required;
-- the displayed Workspace corresponds to the Workspace selected in PI WEB;
-- the displayed filesystem path corresponds to the host-resolved Workspace path.
+The browser must not ask the user for an authoritative filesystem path.
 
 ### Case 3 — Workspace switching updates scope
 
-Use two Workspaces if possible. For example:
-
-```text
-main checkout
-feature worktree
-```
-
-Steps:
-
 1. Open Workspace A.
-2. Open Knowledge.
-3. Click **Check integration**.
-4. Record Project / Workspace / Path.
-5. Switch to Workspace B.
-6. Open Knowledge again.
-7. Click **Check integration**.
+2. `Knowledge → Check integration`.
+3. Record Workspace and Path.
+4. Switch to Workspace B or another worktree.
+5. Run the integration check again.
 
 Expected:
 
-- Workspace B returns its own Workspace id/label/path;
-- Workspace A's path is not reused;
-- no `knowledgeSelectedWorkspace`-style duplicated state is visible or required;
-- switching back to A returns A's scope again.
+- Workspace and Path change to Workspace B;
+- Workspace A scope is not reused;
+- switching back returns Workspace A scope again.
 
 ### Case 4 — Git worktree scope
 
-If the Project is a Git repository with a worktree:
-
-1. Select a non-main worktree Workspace.
-2. Open Knowledge.
-3. Click **Check integration**.
-
-Expected:
-
-- the returned `Path` is the selected worktree path;
-- it is not automatically replaced with the repository main checkout path;
-- Project and Workspace ids remain internally consistent.
-
-## Negative / failure verification
-
-### Case 5 — Automated spoofed-scope rejection
-
-The current UI deliberately sends `null` for `knowledge.status`, so the browser does not provide a manual field for forging a filesystem scope.
-
-Verify this security invariant through the server test:
+If the project has a worktree:
 
 ```bash
-npm test -- pi-web-plugins/knowledge/server-plugin.test.ts
+git worktree list
 ```
 
-Expected:
+Select a non-main worktree in PI WEB and run `Knowledge → Check integration`.
 
-- the test that supplies browser-authored scope fields passes only because the server rejects that input;
-- the server derives returned scope exclusively from host `PairedPluginRequestContext.project/workspace`.
+Expected: `Path` is the selected worktree path, not the main checkout path.
 
-### Case 6 — Unsupported operation rejection
+## Negative/security checks
 
 Run:
 
@@ -244,12 +184,11 @@ Run:
 npm test -- pi-web-plugins/knowledge/server-plugin.test.ts
 ```
 
-Expected:
+This must verify that:
 
-- unsupported Knowledge operations are rejected explicitly;
-- there is no generic `proxy(anyOperation)` behavior.
-
-### Case 7 — Paired-backend unavailable diagnostic
+- browser-authored Project/Workspace scope is rejected;
+- inconsistent host Project/Workspace scope is rejected;
+- unsupported Knowledge operations are rejected.
 
 Run:
 
@@ -257,97 +196,70 @@ Run:
 npm test -- pi-web-plugins/knowledge/pi-web-plugin.test.ts
 ```
 
-Expected:
-
-- the test constructing a Workspace context without the paired request capability renders an explicit backend-unavailable error state;
-- the browser code does not fall back to a handcrafted localhost URL or legacy owner backend.
-
-Note: depending on the host plugin lifecycle, a real server-backed browser module may not be published when its paired backend is unhealthy. For that reason, this specific missing-capability state is currently a deterministic automated verification case rather than a guaranteed reproducible manual host scenario.
+This must verify that the browser uses `pairedBackend.request("knowledge.status", null)` and reports an unavailable paired backend explicitly rather than constructing its own localhost/service URL.
 
 ## PASS checklist
 
-P0-T02 can be manually accepted when all applicable items below pass:
-
-- [ ] `node --version` is `>=22.19.0`.
+- [ ] Node.js is `>=22.19.0`.
 - [ ] Focused Knowledge tests pass.
 - [ ] `npm run verify` passes.
 - [ ] `npm run build` passes.
-- [ ] `npm run dev` starts successfully.
-- [ ] Knowledge is visible for a selected Workspace.
+- [ ] isolated dev stack starts with API port `8604`.
+- [ ] `curl http://127.0.0.1:8604/pi-web-plugins/manifest.json` succeeds.
+- [ ] no plugin lifecycle-version mismatch banner appears in the Vite UI.
+- [ ] Knowledge is visible for the selected Workspace.
 - [ ] **Check integration** returns `Status: ready`.
 - [ ] Project / Workspace / Path match the selected Workspace.
-- [ ] Switching Workspace changes the returned scope correctly.
-- [ ] Git worktree scope resolves to the selected worktree path when tested.
-- [ ] Existing workspace tools still work.
-- [ ] Spoofed-scope server test passes.
-- [ ] Unsupported-operation server test passes.
+- [ ] switching Workspace updates scope correctly.
+- [ ] worktree path is correct when tested.
+- [ ] existing Workspace tools still work.
 
 ## FAIL criteria
 
-Treat P0-T02 as failed if any of these occur:
+Treat the task as failed if:
 
-- Knowledge requires editing PI WEB core navigation to become usable;
-- Knowledge opens against a different Workspace than the one selected;
-- the browser must send or control the authoritative filesystem path;
-- switching Workspaces leaves stale scope from the previous Workspace;
-- `knowledge.status` accepts arbitrary browser-authored scope data;
-- the Knowledge server entry accepts arbitrary/unbounded operations;
-- focused tests fail;
-- `npm run verify` fails because of P0-T02 changes;
-- `npm run build` cannot build the Knowledge bundled plugin;
-- existing Files/Terminal/Git workspace behavior regresses.
+- typecheck/tests/build fail after pulling the latest branch;
+- the Vite client still talks to a backend from another PI WEB version;
+- Knowledge is unavailable on the isolated same-checkout dev stack;
+- Knowledge resolves a different Workspace than the selected one;
+- browser input can control authoritative filesystem scope;
+- Workspace switching leaves stale scope;
+- existing Files/Terminal/Git behavior regresses.
 
 ## Troubleshooting
 
-### Knowledge tab does not appear
+### `Unsupported plugin manifest lifecycle version`
 
-Check that the plugin source exists:
+First confirm which backend is being queried:
 
 ```bash
-ls -la pi-web-plugins/knowledge
+curl -i http://127.0.0.1:8604/pi-web-plugins/manifest.json
+curl -i http://127.0.0.1:8504/pi-web-plugins/manifest.json
 ```
 
-Rebuild plugins:
+For this verification, the browser must use the development backend on `8604`.
+
+Stop the current dev process with `Ctrl-C`, then restart exactly with:
+
+```bash
+PI_WEB_PORT=8604 \
+PI_WEB_DATA_DIR="$PWD/.tmp/p0-t02-data" \
+npm run dev
+```
+
+Do not try to fix this error by adding/changing a `lifecycleVersion` field in `pi-web-plugins/knowledge/package.json`.
+
+### Knowledge does not appear
 
 ```bash
 npm run build:plugins
 ```
 
-Then restart the development stack:
-
-```bash
-# stop the current npm run dev with Ctrl-C
-npm run dev
-```
-
-Also inspect **Settings → PI WEB plugins** and confirm `knowledge` is discovered/enabled for the selected machine.
-
-### Knowledge panel shows a backend error
-
-Check terminal output from:
-
-```bash
-npm run dev
-```
-
-Then run the focused server test:
-
-```bash
-npm test -- pi-web-plugins/knowledge/server-plugin.test.ts
-```
-
-If the focused test passes but the browser does not, capture:
-
-- selected Machine;
-- selected Project;
-- selected Workspace;
-- browser console error;
-- sessiond/server logs;
-- exact UI error message.
+Restart the isolated dev stack and inspect **Settings → PI WEB plugins**.
 
 ### Repository verification fails
 
-Run gates individually:
+Run gates independently:
 
 ```bash
 npm run typecheck
@@ -356,60 +268,28 @@ npm run knip
 npm test
 ```
 
-Record the first failing command and its complete error output in the development report before changing code.
+Record the first failing output.
 
-## Cleanup / reset
+## Cleanup
 
-Stop the development stack with:
+Stop development with `Ctrl-C`.
 
-```text
-Ctrl-C
-```
-
-No Knowledge database, persistent Source data, embeddings, or generated artifacts are created by P0-T02, so there is no task-specific data cleanup.
-
-To return to your previous branch:
+P0-T02 creates no Knowledge database or source data. The isolated PI WEB development state can be removed if no longer needed:
 
 ```bash
-git switch -
+rm -rf .tmp/p0-t02-data
 ```
 
 ## Verification limits
 
-Passing this guide proves only the P0-T02 integration skeleton.
+Passing this guide proves only the P0-T02 paired-plugin integration skeleton. It does not prove standalone `pi-knowledge`, real remote Fleet E2E, Source import, persistence, retrieval, Evidence durability, Restricted Ask, Notes, or Course.
 
-It does **not** prove:
+## Record the result
 
-- standalone `pi-knowledge` process behavior;
-- service authentication/IPC;
-- service restart/recovery;
-- real remote Fleet E2E;
-- Source import;
-- SQLite persistence;
-- retrieval quality;
-- Evidence stability;
-- Restricted Ask;
-- Notes;
-- Course generation.
-
-Those require their own later task verification guides.
-
-## Recording the result
-
-After a human runs this guide, update:
+After executing the guide, update:
 
 ```text
 docs/development/reports/P0-T02-knowledge-plugin-skeleton.md
 ```
 
-Record at minimum:
-
-- OS/environment;
-- Node/npm versions;
-- commands executed;
-- focused test result;
-- `npm run verify` result;
-- `npm run build` result;
-- manual Cases 1–4 result;
-- any failure/log evidence;
-- final PASS / PARTIAL / BLOCKED status.
+Record the environment, commands run, automated results, manual cases, failure evidence, and final PASS / PARTIAL / BLOCKED status.

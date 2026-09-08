@@ -1,8 +1,8 @@
 # Development Reporting Standard
 
-This repository treats task reporting and user verification documentation as part of the implementation Definition of Done.
+This repository treats task reporting, human verification documentation, and the concise development changelog as part of the Definition of Done.
 
-A development task is not considered complete until its repository report has been written or updated. A user-visible or behavior-changing task must also include a reproducible verification guide.
+A development task is not considered complete until its repository report has been written or updated. A user-visible or behavior-changing task must also include a reproducible verification guide. Every task status change must be reflected in `CHANGELOG.md`.
 
 ## Required workflow
 
@@ -12,6 +12,7 @@ For analysis/documentation-only tasks:
 Task deliverable
 → verification/review
 → repository report
+→ CHANGELOG entry
 → report index / phase status update
 → task may be marked complete
 ```
@@ -23,27 +24,34 @@ Task implementation
 → automated verification
 → repository report
 → human verification guide
+→ CHANGELOG entry
 → report/verification indexes + phase status update
 → task may be marked complete
 ```
 
-## Report location
+## Documentation locations
 
-Completed-task reports live under:
+Detailed task reports:
 
 ```text
 docs/development/reports/
 ```
 
-Human-executable feature verification guides live under:
+Human-executable feature verification guides:
 
 ```text
 docs/development/verification/
 ```
 
+Concise project progress log:
+
+```text
+docs/development/CHANGELOG.md
+```
+
 See [`VERIFICATION.md`](./VERIFICATION.md) for the required verification-guide format.
 
-## Required report sections
+## Report requirements
 
 Every task report must contain, at minimum:
 
@@ -60,6 +68,20 @@ Every task report must contain, at minimum:
 11. Result: PASS / PARTIAL / BLOCKED.
 12. Impact on the plan.
 13. Next task.
+
+## Changelog requirements
+
+`CHANGELOG.md` is intentionally short. It is for quick progress review, not implementation evidence.
+
+For each task status change, add:
+
+```text
+YYYY-MM-DD  TASK-ID  STATUS
+- one-line outcome
+- optional one-line important consequence / blocker
+```
+
+Do not duplicate file-by-file details, test logs, or architecture rationale there. Link to reports when detail is needed.
 
 ## Evidence rules
 
@@ -80,7 +102,7 @@ When a task produces a PR, the PR should link to both its repository report and 
 Use:
 
 - `docs/architecture/` for durable architecture decisions and baselines;
-- `docs/development/` for plans and implementation constraints;
+- `docs/development/` for plans, standards, and the concise changelog;
 - `docs/development/reports/` for chronological task execution evidence;
 - `docs/development/verification/` for copyable human acceptance procedures.
 
@@ -91,9 +113,10 @@ If a task changes a durable architectural decision, update or add the correspond
 From P0 onward:
 
 ```text
-Analysis task + report missing = NOT COMPLETE
+Analysis task + report/changelog missing = NOT COMPLETE
 Behavior implementation + report missing = NOT COMPLETE
 Behavior implementation + verification guide missing = NOT COMPLETE
+Behavior implementation + changelog missing = NOT COMPLETE
 Behavior implementation + required runtime/CI verification pending = PARTIAL
-Behavior implementation + required verification + report + verification guide = PASS
+Implementation + required verification + report + verification guide + changelog = PASS
 ```

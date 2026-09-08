@@ -20,7 +20,7 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ---
 
-## 2026-09-08
+## 2026-09-09
 
 ### P0-T02 — PASS
 
@@ -28,6 +28,8 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 - Host-authoritative Project / Workspace / Path and Workspace switching were verified.
 - Git worktree scope and existing Files / Terminal / Git / Chat behavior were verified without regression.
 - The sole remaining full-suite auth/session failure was reproduced on the P0-T01 baseline and classified as inherited.
+
+## 2026-09-08
 
 ### P0-T01 — PASS
 

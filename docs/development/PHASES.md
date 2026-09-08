@@ -4,6 +4,8 @@
 
 Each phase has an explicit exit condition. Dependencies may be explored in parallel, but a later product gate cannot be declared complete before the previous gate's evidence exists.
 
+Task reporting is part of the Definition of Done. Every completed task must add or update a report under `docs/development/reports/` following [`REPORTING.md`](./REPORTING.md). Implementation without its repository report is not considered complete.
+
 ## P0a — Thin Fork integration spike
 
 Goal: prove the fork can expose a first-class Knowledge surface without destabilizing existing PI WEB workspace behavior.

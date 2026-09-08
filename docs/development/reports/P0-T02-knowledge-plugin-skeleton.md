@@ -111,7 +111,7 @@ pi-web-plugins/knowledge/pi-web-plugin.test.ts:47:29
 error TS7006: Parameter 'id' implicitly has an 'any' type.
 ```
 
-The callback was initially passed through an `as never` fixture, preventing useful contextual typing. The immediate callback typing defect was corrected.
+The callback was initially passed through an `as never` fixture, preventing useful contextual typing. The callback and fixture were replaced with a fully typed `PluginRuntimeContext` test helper.
 
 ### Attempt 1 — plugin lifecycle UI failure
 
@@ -121,7 +121,7 @@ The browser also previously displayed:
 Failed to load PI WEB plugins: Unsupported plugin manifest lifecycle version
 ```
 
-A mixed frontend/backend checkout was identified as a plausible cause because Vite uses a separate API backend. The verification guide therefore includes an isolated-port/data-directory procedure. The Knowledge package manifest itself must not invent host lifecycle metadata as a workaround.
+A mixed frontend/backend checkout was identified as a plausible cause because Vite uses a separate API backend. The verification guide includes an isolated-port/data-directory procedure for that failure mode. The Knowledge package manifest itself must not invent host lifecycle metadata as a workaround.
 
 ### Attempt 2 — runtime starts and Knowledge activates
 
@@ -137,57 +137,80 @@ Vite client starts
 → sessiond socket listens
 ```
 
-The early `ECONNREFUSED` messages are startup-order transients in this run, not persistent Knowledge failures, because the backend subsequently starts and serves requests successfully.
+The early `ECONNREFUSED` messages were startup-order transients in that run because the backend subsequently started and served requests successfully.
 
-The earlier lifecycle-version failure was not reproduced in this later run.
+### Attempt 2 — focused tests/build PASS, lint defects fixed
 
-### Attempt 2 — focused tests PASS
+Focused Knowledge tests passed 8/8 and `npm run build` completed successfully. `npm run verify` then exposed four P0-T02 ESLint violations. They were corrected without rule suppression:
 
-Executed locally:
+1. removed a redundant paired-backend condition;
+2. replaced an unsafe record assertion with a real type guard;
+3. removed the `as never` test escape;
+4. awaited the async action invocation.
 
-```bash
-npm test -- \
-  pi-web-plugins/knowledge/pi-web-plugin.test.ts \
-  pi-web-plugins/knowledge/server-plugin.test.ts
-```
+### Attempt 3 — Node Web Storage test-environment incompatibility identified
 
-Observed:
-
-```text
-Test Files  2 passed (2)
-Tests       8 passed (8)
-```
-
-### Attempt 2 — production build PASS
-
-Executed locally:
-
-```bash
-npm run build
-```
-
-The TypeScript/plugin/Vite production build completed successfully. The large-chunk message was a Vite warning, not a build failure.
-
-### Attempt 2 — repository verify stopped at ESLint
-
-`npm run verify` passed TypeScript typecheck and then failed lint with four Knowledge-specific violations:
+A full verification run initially reported:
 
 ```text
-browser/pi-web-plugin.ts
-- no-unnecessary-condition
-- consistent-type-assertions
-
-pi-web-plugin.test.ts
-- no-floating-promises
-- consistent-type-assertions
+Test Files  25 failed | 347 passed
+Tests       297 failed | 3442 passed | 2 skipped
 ```
 
-These were corrected without disabling lint rules:
+The failures clustered around unrelated browser tests and repeatedly failed at:
 
-1. removed the redundant `backend.request === undefined` check once `requestVersion === 1` narrows the paired-backend capability;
-2. replaced `as Record<string, unknown>` with a real `isRecord` type guard;
-3. removed the test's `as never` runtime-context escape and replaced it with a complete typed `PluginRuntimeContext` fixture;
-4. made the action test async and awaited `action.run(...)`.
+```text
+localStorage.clear()
+```
+
+Node also emitted:
+
+```text
+ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+```
+
+Running a representative failing test with Node experimental Web Storage disabled changed it from 4 failures to 4/4 PASS:
+
+```bash
+NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--no-experimental-webstorage" \
+npm test -- src/client/src/components/SettingsDialog.test.ts
+```
+
+To make this deterministic for every developer, `vitest.config.ts` now supplies:
+
+```ts
+execArgv: ["--no-experimental-webstorage"]
+```
+
+so normal `npm test` / `npm run verify` no longer require a manual environment override.
+
+### Attempt 3 — full suite reduced to one inherited auth/session failure
+
+With the Web Storage issue removed, the full suite became:
+
+```text
+Test Files  1 failed | 371 passed
+Tests       1 failed | 3738 passed | 2 skipped
+```
+
+The only remaining failure is:
+
+```text
+src/server/sessions/piSessionService.promptQueue.test.ts
+PiSessionService prompt, queue, and auth warnings
+→ refreshes auth state and dedupes warnings when logout removes the current model's credentials
+```
+
+The same test also fails when run alone (14/15 pass, one failure), so this is not a full-suite ordering/flakiness artifact.
+
+Important scope evidence:
+
+- `src/server/sessions/piSessionService.promptQueue.test.ts` is byte-identical between P0-T02 and its P0-T01 base;
+- `src/server/sessions/piSessionService.ts` is byte-identical between P0-T02 and its P0-T01 base;
+- P0-T02 does not modify session/auth production code or its test support;
+- P0-T02 does not change the root dependency lock.
+
+The failing path currently returns early when the refreshed `ModelRuntime` can no longer resolve the active model before publishing an auth-loss warning. That behavior is an inherited PI WEB/Pi SDK baseline compatibility candidate and is not being silently patched inside the Knowledge feature task.
 
 ## Verification evidence state
 
@@ -197,26 +220,20 @@ These were corrected without disabling lint rules:
 - public server plugin API reviewed;
 - no PI WEB core navigation/server-route patch required;
 - Knowledge server plugin activates in a real local development run;
-- focused Knowledge tests passed 8/8 before the latest lint-only cleanup;
-- production build passed before the latest lint-only cleanup;
-- the four reported ESLint violations have been corrected in source without rule suppression.
+- focused Knowledge tests: **8/8 PASS**;
+- TypeScript typecheck: **PASS** in the latest full verify path;
+- ESLint: **PASS** in the latest full verify path;
+- knip: **PASS** in the latest full verify path;
+- production build: **PASS**;
+- Node Web Storage / happy-dom incompatibility reproduced and fixed in Vitest worker configuration;
+- full test suite: **3738 PASS, 1 inherited auth/session baseline candidate FAIL, 2 skipped**;
+- the remaining failing test is outside the P0-T02 modified code path and its test/service files are identical to the P0-T01 base.
 
 ### Still pending
 
-Because the lint cleanup changed source/test files after the successful focused-test/build run, the final gate must be rerun from the current branch head:
-
-```bash
-npm test -- \
-  pi-web-plugins/knowledge/pi-web-plugin.test.ts \
-  pi-web-plugins/knowledge/server-plugin.test.ts
-
-npm run verify
-npm run build
-```
-
-Then complete the Knowledge panel manual Workspace checks from the verification guide.
-
-Repository GitHub Actions has not produced PR workflow evidence for the current branch head, so this report does not claim CI PASS.
+1. manual Knowledge panel acceptance on the current branch head;
+2. final classification or separate maintenance fix for the inherited `piSessionService.promptQueue` auth-warning test;
+3. GitHub Actions evidence (no PR workflow run has been produced for this branch).
 
 ## Known limitations
 
@@ -227,23 +244,24 @@ Repository GitHub Actions has not produced PR workflow evidence for the current 
 
 ## Result
 
-**PARTIAL — focused tests/build have succeeded once; final verify/build/manual rerun is required after lint cleanup.**
+**PARTIAL — P0-T02-specific automated gates are green; one inherited baseline auth/session test and final manual UI acceptance remain.**
 
-P0-T02 must not be promoted to PASS until:
+P0-T02 may move to PASS only after:
 
-1. focused tests pass on the current head;
-2. `npm run verify` passes on the current head;
-3. `npm run build` passes on the current head;
-4. Knowledge panel opens without plugin lifecycle failure;
-5. Knowledge integration check returns the selected Workspace scope correctly;
-6. Workspace switching does not retain stale scope.
+1. the manual Knowledge panel checks succeed on the current head;
+2. the remaining auth/session test is either reproduced/classified as a baseline failure or fixed in a separate maintenance scope;
+3. the final report records the decision explicitly.
 
 ## Impact on the plan
 
-The architectural integration path remains valid. The latest local run is positive evidence that the bundled Knowledge server plugin can activate in the normal PI WEB development stack.
+The architectural integration path remains valid. Real local verification now provides positive evidence that:
+
+- the Knowledge server plugin activates in the normal PI WEB development stack;
+- the focused Knowledge contract passes;
+- the fork can keep its test environment deterministic on current supported Node versions.
 
 No redesign of the Knowledge plugin boundary is required.
 
 ## Next action
 
-Pull the current branch head and rerun the final P0-T02 gates. If they pass, record the manual UI result and promote P0-T02 from `PARTIAL` to `PASS`; otherwise record the next concrete failure before starting P0-T03.
+Run the manual Knowledge Workspace verification on the current branch head. In parallel, classify the single inherited auth/session test as a separate baseline maintenance item rather than expanding P0-T02 into unrelated session/auth work.

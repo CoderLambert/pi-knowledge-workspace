@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P1-T04 — PARTIAL
+
+- Added immutable SHA-256 raw-byte storage at `blobs/sha256/<hash>` with store-owned hashing, strict hash/path validation, atomic no-overwrite hard-link publication, deduplication, verified reads, tamper detection and stale partial-temp cleanup.
+- Added six contract tests covering exact byte roundtrip, repeated/concurrent dedupe, corruption fail-closed behavior, traversal-shaped invalid hashes, cleanup isolation and cleanup-age validation.
+- Focused/static/build/package execution remains OPEN verification debt; P1-T05 may proceed against the narrow blob-store contract without treating P1-T04 as accepted.
+
 ### P1-T01 — PARTIAL
 
 - Selected `better-sqlite3` 13.x as the proposed V1 Knowledge database driver and recorded the decision in ADR-028.

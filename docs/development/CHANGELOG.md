@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P1-T06 — PARTIAL
+
+- Added a safe Workspace file reader that accepts only explicit relative paths, canonicalizes root/target paths, rejects lexical and symlink escapes, blocks sensitive dotenv/SSH/private-key patterns, enforces a byte limit, and returns exact captured bytes plus SHA-256.
+- Capture is bound to an opened file descriptor and revalidates descriptor/path identity and metadata after the read, so truncation, rewrite, removal, symlink retarget or path replacement fails closed instead of producing ambiguous bytes.
+- Added eight filesystem-security contract scenarios; executable/static/build/target-filesystem evidence remains OPEN verification debt. P1-T07 may consume only successful captured bytes and must not reopen the path.
+
 ### P1-T05 — PARTIAL
 
 - Added the Source/SourceVersion domain layer: create/list/rename/archive Source, capture/list immutable SourceVersions, and manual update through the same raw-byte capture path.

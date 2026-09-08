@@ -8,7 +8,7 @@ import type {
   ServerPluginActivationContext,
 } from "@jmfederico/pi-web/server-plugin-api";
 
-export const KNOWLEDGE_PLUGIN_ID = "knowledge";
+const KNOWLEDGE_PLUGIN_ID = "knowledge";
 export const KNOWLEDGE_STATUS_OPERATION = "knowledge.status";
 
 const plugin: PiWebServerPlugin = {
@@ -21,7 +21,7 @@ const plugin: PiWebServerPlugin = {
 
 export default plugin;
 
-export function activateKnowledgePlugin(context: ServerPluginActivationContext): ServerPluginActivation {
+function activateKnowledgePlugin(context: ServerPluginActivationContext): ServerPluginActivation {
   if (context.pluginId !== KNOWLEDGE_PLUGIN_ID) {
     throw new Error(
       `Knowledge server entry must activate as plugin id ${KNOWLEDGE_PLUGIN_ID}, received ${context.pluginId}`,

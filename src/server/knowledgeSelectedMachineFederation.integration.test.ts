@@ -165,7 +165,7 @@ describe("Knowledge selected-machine federation contract", () => {
     expect(response.statusCode).toBe(200);
     expect(appTestContext.sessionDaemonRequests).toEqual([{
       method: "POST",
-      path: `/api${knowledgePath}`,
+      path: knowledgePath,
       body: knowledgePayload,
     }]);
   });

@@ -66,14 +66,11 @@ describe("Knowledge browser plugin", () => {
       });
     });
     const context = panelContext(request);
-    const panel = activate().workspacePanels?.[0];
-    if (panel === undefined) throw new Error("Expected Knowledge workspace panel");
+    const panel = requiredPanel();
     const container = document.createElement("div");
 
     render(panel.render(context), container);
-    const button = container.querySelector("button");
-    if (button === null) throw new Error("Expected Knowledge integration check button");
-    button.click();
+    clickIntegrationCheck(container);
     await settleBackend();
     render(panel.render(context), container);
 
@@ -84,10 +81,36 @@ describe("Knowledge browser plugin", () => {
     expect(container.textContent).toContain("workspace-1");
     expect(container.textContent).toContain("/work/project-one/worktree");
   });
+
+  it("keeps the panel visible and reports a missing paired backend capability", async () => {
+    const context = panelContext();
+    const panel = requiredPanel();
+    const container = document.createElement("div");
+
+    expect(panel.visible).toBeUndefined();
+    render(panel.render(context), container);
+    clickIntegrationCheck(container);
+    await settleBackend();
+    render(panel.render(context), container);
+
+    expect(container.textContent).toContain("Paired backend request capability is unavailable");
+  });
 });
 
+function requiredPanel() {
+  const panel = activate().workspacePanels?.[0];
+  if (panel === undefined) throw new Error("Expected Knowledge workspace panel");
+  return panel;
+}
+
+function clickIntegrationCheck(container: ParentNode): void {
+  const button = container.querySelector("button");
+  if (button === null) throw new Error("Expected Knowledge integration check button");
+  button.click();
+}
+
 function panelContext(
-  request: (operation: string, input: JsonValue) => Promise<JsonValue>,
+  request?: (operation: string, input: JsonValue) => Promise<JsonValue>,
 ): WorkspacePanelContext {
   const noop = () => undefined;
   return {
@@ -105,11 +128,15 @@ function panelContext(
       deleteFile: () => Promise.reject(new Error("not implemented")),
       moveFile: () => Promise.reject(new Error("not implemented")),
     },
-    pairedBackend: {
-      version: 1,
-      requestVersion: 1,
-      request,
-    },
+    ...(request === undefined
+      ? {}
+      : {
+          pairedBackend: {
+            version: 1 as const,
+            requestVersion: 1 as const,
+            request,
+          },
+        }),
     host: { requestRender: noop },
     prompt: { insertText: noop, getText: () => "", getSelection: () => null },
     terminal: {

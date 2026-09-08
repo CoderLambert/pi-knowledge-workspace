@@ -136,6 +136,49 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
 - **Dependent tasks:** P1-T02 database bootstrap/migrations, P1-T12 FTS5 baseline, P1-T20/P1-T21 backup/restore; P2-T07 extension work depends specifically on extension feasibility.
 - **Resolution:** pending target-runtime verification; P1-T02 may proceed against ADR-028 under the autonomous-development policy.
 
+### P1-T04 — Blob-store executable/filesystem acceptance
+
+- **Task status:** PARTIAL
+- **Branch:** `feat/p1-content-addressed-blob-store`
+- **PR:** #14
+- **Debt status:** OPEN
+- **Why deferred:** the GitHub-only automation environment cannot execute the repository dependency tree or filesystem acceptance harness, and the PR head currently has no GitHub Actions workflow run.
+- **Required verification:**
+  1. Run `npm test -- src/knowledge/storage/blobStore.test.ts` and confirm 6/6 tests pass.
+  2. Run `npm run typecheck`, `npm run lint`, `npm run knip`, `npm run build`, `npm run pack:dry`, and full `npm test`.
+  3. Run `git diff --check origin/feat/p1-knowledge-workspace-identity...HEAD` and confirm the direct-base diff is P1-T04-only.
+  4. Exercise a real temporary filesystem root and confirm exact raw-byte roundtrip at `blobs/sha256/<hash>`.
+  5. Confirm repeated and concurrent identical writes converge on one final object without overwrite/truncation.
+  6. Tamper with a published object and confirm `read`, `verify`, and an identical `put` fail closed with `BlobIntegrityError`.
+  7. Confirm traversal-shaped/uppercase/wrong-length/non-hex hashes are rejected before path access.
+  8. Confirm stale store-owned temp files are cleaned while recent and unrelated files remain untouched.
+- **Expected PASS evidence:** focused/static/build/package/full-suite gates show no new P1-T04-attributable failure; direct-base diff is task-only; filesystem evidence demonstrates atomic immutable publication, dedupe, tamper detection and bounded cleanup behavior.
+- **Assumptions used for continued development:** P1-T05 may use `put(rawBytes)`, `read(hash)` and SHA-256 blob identity; the store root remains a local filesystem where hard links within `blobs/sha256` are supported; if target packaging/filesystem constraints invalidate hard-link publication, P1-T04 must be revised without changing SourceVersion identity semantics.
+- **Dependent tasks:** P1-T05, P1-T07, P1-T20, P1-T21 and all historical-content durability work
+- **Resolution:** pending executable/filesystem verification; later tasks may proceed against the narrow content-addressed contract.
+
+### P1-T05 — Source/SourceVersion domain acceptance
+
+- **Task status:** PARTIAL
+- **Branch:** `feat/p1-source-version-domain`
+- **PR:** #15
+- **Debt status:** OPEN
+- **Why deferred:** the GitHub-only automation environment cannot execute the repository dependency tree or real `better-sqlite3` database; P1-T05 also inherits unresolved P1-T02 native SQLite and P1-T04 blob-store acceptance risk.
+- **Required verification:**
+  1. Run `npm test -- src/knowledge/storage/sourceDomain.test.ts` and confirm 5/5 tests pass.
+  2. Run `npm run typecheck`, `npm run lint`, `npm run knip`, `npm run build`, `npm run pack:dry`, and full `npm test`.
+  3. Run `git diff --check origin/feat/p1-content-addressed-blob-store...HEAD` and confirm the direct-base diff is P1-T05-only.
+  4. With a real file-backed Knowledge DB, create/list/rename/archive a Source and confirm metadata changes create no SourceVersion.
+  5. Capture byte sequence A twice and confirm the same SourceVersion id/row is reused.
+  6. Capture changed bytes B and confirm exactly one new SourceVersion with a different content hash.
+  7. Run concurrent identical captures and confirm `UNIQUE(source_id, content_sha256)` converges on one version.
+  8. Confirm archived Source history remains readable and Workspace A list results never expose Workspace B Sources.
+  9. Confirm every stored `blob_key` is the content address rather than an absolute mutable path and resolves through P1-T04 verified read.
+- **Expected PASS evidence:** focused/static/build/package/full-suite gates show no new P1-T05-attributable failure; real SQLite demonstrates byte-change-only version creation, metadata-only stability, concurrency dedupe, archive preservation and Workspace isolation; blob integrity remains valid.
+- **Assumptions used for continued development:** P1-T02 schema constraints behave as written under the selected SQLite driver; P1-T04 content-addressed publication remains immutable; P1-T06 may feed captured bytes only after performing its own containment, sensitivity, size and race checks.
+- **Dependent tasks:** P1-T06, P1-T07, P1-T08 and all historical SourceVersion consumers
+- **Resolution:** pending executable/SQLite/blob dependency verification; later tasks may proceed against the explicit Source capture contract.
+
 P0-T03 is already fully accepted and remains PASS.
 
 ## Entry template

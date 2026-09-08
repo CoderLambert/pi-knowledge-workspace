@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildKnowledgeApp } from "../../src/knowledge/service/app.js";
 import {
   PI_KNOWLEDGE_DEFAULT_MAX_REQUEST_BYTES,
   PI_KNOWLEDGE_DEFAULT_MAX_RESPONSE_BYTES,
   PI_KNOWLEDGE_DEFAULT_PORT,
   PI_KNOWLEDGE_PROTOCOL_VERSION,
 } from "../../src/knowledge/contracts/protocol.js";
+import { buildKnowledgeApp } from "../../src/knowledge/service/app.js";
 import {
   createKnowledgeServiceClient,
   createKnowledgeServiceClientFromEnvironment,
@@ -21,7 +21,7 @@ const SERVICE_TOKEN = "p0-t04-service-client-test-token";
 const apps: Array<Awaited<ReturnType<typeof buildKnowledgeApp>>> = [];
 
 afterEach(async () => {
-  await Promise.all(apps.splice(0).map(async (app) => app.close()));
+  await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
 async function startService(token: string = SERVICE_TOKEN): Promise<number> {
@@ -108,9 +108,9 @@ describe("Knowledge service client", () => {
 
   it("rejects a generated request that exceeds the adapter request bound before fetch", async () => {
     let fetchCalls = 0;
-    const fetchImpl: typeof fetch = async () => {
+    const fetchImpl: typeof fetch = () => {
       fetchCalls += 1;
-      return new Response("{}");
+      return Promise.resolve(new Response("{}"));
     };
     const client = createKnowledgeServiceClient({
       host: "127.0.0.1",
@@ -129,10 +129,10 @@ describe("Knowledge service client", () => {
   });
 
   it("rejects an oversized response from content-length before buffering its body", async () => {
-    const fetchImpl: typeof fetch = async () => new Response("{}", {
+    const fetchImpl: typeof fetch = () => Promise.resolve(new Response("{}", {
       status: 200,
       headers: { "content-length": "4096" },
-    });
+    }));
     const client = createKnowledgeServiceClient({
       host: "127.0.0.1",
       port: 8515,
@@ -148,9 +148,12 @@ describe("Knowledge service client", () => {
   it("propagates caller cancellation through the fetch signal", async () => {
     const fetchImpl: typeof fetch = async (_input, init) => {
       const signal = init?.signal;
-      if (!(signal instanceof AbortSignal)) throw new Error("expected fetch AbortSignal");
+      if (signal === undefined || signal === null) throw new Error("expected fetch AbortSignal");
       return await new Promise<Response>((_resolve, reject) => {
-        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+        signal.addEventListener("abort", () => {
+          const reason: unknown = signal.reason;
+          reject(reason);
+        }, { once: true });
       });
     };
     const client = createKnowledgeServiceClient({
@@ -166,12 +169,15 @@ describe("Knowledge service client", () => {
     await expect(pending).rejects.toThrow("host deadline reached");
   });
 
-  it("maps the adapter deadline when the service call does not settle in time", async () => {
+  it("maps the adapter deadline when the complete service call does not settle in time", async () => {
     const fetchImpl: typeof fetch = async (_input, init) => {
       const signal = init?.signal;
-      if (!(signal instanceof AbortSignal)) throw new Error("expected fetch AbortSignal");
+      if (signal === undefined || signal === null) throw new Error("expected fetch AbortSignal");
       return await new Promise<Response>((_resolve, reject) => {
-        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+        signal.addEventListener("abort", () => {
+          const reason: unknown = signal.reason;
+          reject(reason);
+        }, { once: true });
       });
     };
     const client = createKnowledgeServiceClient({

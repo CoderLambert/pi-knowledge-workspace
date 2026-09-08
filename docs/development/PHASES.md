@@ -4,6 +4,8 @@
 
 Each phase has an explicit exit condition. Dependencies may be explored in parallel, but a later product gate cannot be declared complete before the previous gate's evidence exists.
 
+This file defines phase-level goals and exit gates. The authoritative task-level breakdown is [`DEVELOPMENT-PLAN.md`](./DEVELOPMENT-PLAN.md), which lists the complete P0–P5 task set, dependencies, deliverables, verification expectations and current task status.
+
 Task reporting is part of the Definition of Done. Every completed task must add or update a report under `docs/development/reports/` following [`REPORTING.md`](./REPORTING.md). Implementation without its repository report is not considered complete.
 
 Every user-visible or behavior-changing task must also add or update a reproducible human verification guide under `docs/development/verification/` following [`VERIFICATION.md`](./VERIFICATION.md). The guide must tell a user exactly how to start, exercise, observe, pass/fail and clean up the feature. Implementation without this guide is not considered complete.

@@ -103,7 +103,7 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
 
 - **Task status:** PARTIAL
 - **Branch:** `chore/p0-gate-review`
-- **PR:** pending at time of branch preparation
+- **PR:** #10
 - **Debt status:** OPEN
 - **Why deferred:** P0-T08 is a strict phase gate. P0-T04 through P0-T07 still have mandatory executable/local/Fleet/runtime acceptance debt, so the gate cannot become PASS in the autonomous environment.
 - **Required verification:**
@@ -115,6 +115,26 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
 - **Assumptions used for continued development:** autonomous P1 implementation may proceed against documented P0 contracts, but P0 remains explicitly PARTIAL and later tasks may not cite this gate as accepted evidence until closure.
 - **Dependent tasks:** P1 implementation may proceed under policy; release/phase acceptance depends on eventual closure.
 - **Resolution:** pending P0 verification-debt closure and gate rerun.
+
+### P1-T01 — SQLite driver target-runtime acceptance
+
+- **Task status:** PARTIAL
+- **Branch:** `experiment/p1-sqlite-driver-decision`
+- **PR:** #11
+- **Debt status:** OPEN
+- **Why deferred:** the autonomous environment can review repository/upstream sources but cannot install or execute the selected native SQLite binding on the user's target Omarchy/Linux x64 environment.
+- **Required verification:**
+  1. After P1-T02 integrates `better-sqlite3` 13.x, run `npm install` on the target supported Node runtime and confirm the native binding resolves.
+  2. Create/query an FTS5 virtual table and confirm no `no such module: fts5` failure.
+  3. Verify explicit commit and rollback semantics used by the migration layer.
+  4. Create a file-backed database, run the driver's online backup, open the backup independently and confirm snapshot contents.
+  5. Verify safe local extension loading feasibility when a trusted test extension is available; do not use untrusted binaries merely to satisfy this check.
+  6. After dependency integration, run `npm run typecheck`, `npm run lint`, `npm run knip`, `npm run build`, `npm run pack:dry`, and `npm test`.
+  7. Verify packaged `pi-knowledge` resolves the native binding on target Linux x64.
+- **Expected PASS evidence:** selected dependency installs/resolves; FTS5, transactions and backup work; package/build gates show no driver-attributable failures; packaged service starts with the native binding. Extension loading either passes or is explicitly deferred only for extension-dependent later work.
+- **Assumptions used for continued development:** `better-sqlite3` 13.x remains the selected direct driver; P1-T02 may implement against it without a dual-driver abstraction; if target packaging or mandatory FTS5 fails materially, ADR-028 must be reopened rather than silently adding a second backend.
+- **Dependent tasks:** P1-T02 database bootstrap/migrations, P1-T12 FTS5 baseline, P1-T20/P1-T21 backup/restore; P2-T07 extension work depends specifically on extension feasibility.
+- **Resolution:** pending target-runtime verification; P1-T02 may proceed against ADR-028 under the autonomous-development policy.
 
 P0-T03 is already fully accepted and remains PASS.
 

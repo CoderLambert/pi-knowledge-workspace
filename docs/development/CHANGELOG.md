@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P1-T01 — PARTIAL
+
+- Selected `better-sqlite3` 13.x as the proposed V1 Knowledge database driver and recorded the decision in ADR-028.
+- Decision reason is feature determinism rather than benchmark speed: P1 requires FTS5, while `node:sqlite` FTS5 availability varies across official Node builds; current `better-sqlite3` explicitly compiles FTS5 and supports Node >=22.
+- Target Omarchy/Linux native-package, FTS5, transaction, backup and extension-loading checks remain OPEN verification debt; P1-T02 may proceed without adding a dual-driver abstraction.
+
 ### P0-T08 — PARTIAL
 
 - Completed the P0 gate review without adding production code; the thin-fork integration boundary remains viable and no invasive Machine/Workspace/Session rewrite or Knowledge-specific federation stack is required.

@@ -22,11 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
-### P0-T03 — PARTIAL
+### P0-T03 — PASS
 
-- Standalone authenticated loopback `pi-knowledge` process/contract skeleton implemented with protocol v1, `capabilities.get`, `workspace.echo`, stable errors, auth, and request/response bounds.
-- Focused contract/config tests and build/package entry were added; P0-T04 was not started.
-- Automated/static/build execution and real-process acceptance remain outstanding because no GitHub Actions run was produced and the assistant execution container cannot reach GitHub/npm.
+- Standalone authenticated loopback `pi-knowledge` process/contract accepted with protocol v1, `capabilities.get`, `workspace.echo`, stable errors, auth, request/response bounds, and independent process lifecycle.
+- Focused tests passed 14/14; TypeScript, ESLint, knip, build, package dry-run, dist entry, and diff check passed.
+- Full suite recorded 3752 passed / 1 inherited failed / 2 skipped; the sole `piSessionService.promptQueue` failure matches the P0-T01/P0-T02 inherited baseline and is not a P0-T03 regression.
+- Real built-process acceptance passed loopback bind, non-loopback rejection, health/dispatch, negative cases, request/response limits, and clean SIGINT/SIGTERM shutdown. P0-T04 was not started.
 
 ### P0-T02 — PASS
 

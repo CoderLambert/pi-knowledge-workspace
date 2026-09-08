@@ -8,346 +8,223 @@
 - **Branch:** `feat/p0-knowledge-plugin-skeleton`
 - **PR:** #3 — `feat: add P0 Knowledge paired-plugin skeleton`
 - **Status:** **PARTIAL**
-- **Reason for PARTIAL:** implementation and test coverage are present, but repository CI has not yet executed for the PR head.
-- **PI WEB core files changed:** 0
+- **PI WEB core runtime files changed:** 0
+- **Human verification guide:** `docs/development/verification/P0-T02-knowledge-plugin-skeleton.md`
 
 ## Objective
 
-Implement the first runnable Knowledge product surface using only the public integration seams proven in P0-T01.
-
-The task had to prove the following path without introducing the standalone Knowledge service yet:
+Implement the first runnable Knowledge product surface using only PI WEB public extension seams:
 
 ```text
 Knowledge Workspace Panel
 → context.pairedBackend.request()
-→ PI WEB machine/federation transport
+→ PI WEB selected-machine transport
 → host-authoritative PairedPluginRequestContext
 → Knowledge paired server plugin
 ```
 
-The task also had to preserve the architectural rule that heavy Knowledge work does not move into sessiond.
+Heavy Knowledge processing remains outside sessiond and is deferred to P0-T03.
 
-## Scope
+## Delivered behavior
 
-### Included
+### Bundled Knowledge plugin
 
-- bundled `knowledge` PI WEB plugin package;
-- first-party Knowledge Workspace panel;
-- action for opening the Knowledge workspace tool;
-- paired browser/server plugin wiring;
-- `knowledge.status` integration-check operation;
-- host-authoritative Project/Workspace scope projection;
-- explicit capability-unavailable diagnostics;
-- browser bridge tests;
-- server scope/trust-boundary tests;
-- public PI WEB plugin API compatibility review.
-
-### Excluded
-
-- standalone `pi-knowledge` process;
-- IPC/HTTP contract to that service;
-- SQLite;
-- source ingestion/parsing;
-- FTS/vector retrieval;
-- embeddings;
-- reranking;
-- Pi restricted Ask runtime;
-- citations/course generation;
-- production service lifecycle/restart behavior.
-
-These items remain intentionally deferred to later P0/P1 tasks.
-
-## Changes
-
-### 1. Added bundled Knowledge plugin manifest
-
-Path:
-
-- `pi-web-plugins/knowledge/package.json`
-
-The package declares a bundled plugin with:
+Added:
 
 ```text
-id: knowledge
-browser module: browser/pi-web-plugin.js
-server module: server-plugin.js
-machineSpecific: true
+pi-web-plugins/knowledge/
+├── package.json
+├── browser/pi-web-plugin.ts
+├── server-plugin.ts
+├── pi-web-plugin.test.ts
+└── server-plugin.test.ts
 ```
 
-This keeps the Knowledge browser and server revision paired on the selected machine and avoids creating an unrelated host routing mechanism.
+The browser contribution provides:
 
-### 2. Added Knowledge Workspace panel
-
-Path:
-
-- `pi-web-plugins/knowledge/browser/pi-web-plugin.ts`
-
-The plugin contributes:
-
-- Workspace panel id: `workspace.knowledge`;
-- title: `Knowledge`;
-- order: `35`;
-- route alias: `knowledge`;
+- `Knowledge` Workspace panel;
+- panel id `workspace.knowledge`;
+- route alias `knowledge`;
 - `view.knowledge` action;
-- runtime-qualified navigation using `runtimePluginId`.
+- runtime-qualified plugin identity for selected-machine compatibility;
+- integration check through `pairedBackend.request("knowledge.status", null)`;
+- explicit paired-backend-unavailable diagnostics.
 
-No AppShell/navigation core code is patched.
-
-### 3. Added paired backend integration check
-
-The browser invokes:
-
-```ts
-context.pairedBackend.request("knowledge.status", null)
-```
-
-The browser never supplies authoritative Project/Workspace identity to the operation.
-
-The response is validated before rendering and displays:
-
-- status;
-- selected Machine;
-- host Project id;
-- host Workspace id/label;
-- host Workspace path.
-
-### 4. Added explicit backend-unavailable state
-
-The Knowledge panel remains visible even if the paired request capability is unavailable.
-
-This was an intentional diagnostic decision: hiding the entire panel would make plugin/service/fleet failures harder to distinguish from missing product registration.
-
-When the request capability is missing, the panel records and renders an explicit error rather than silently disappearing.
-
-### 5. Added paired Knowledge server plugin
-
-Path:
-
-- `pi-web-plugins/knowledge/server-plugin.ts`
-
-The server entry:
+The paired server plugin:
 
 - implements public Server Plugin API v1;
-- activates only under plugin id `knowledge`;
-- exposes paired request capability v1;
-- implements `knowledge.status`;
-- reports healthy plugin lifecycle status;
+- handles bounded `knowledge.status` only;
+- reads Project/Workspace scope from host `PairedPluginRequestContext`;
+- rejects browser-authored scope input;
+- rejects inconsistent host scope;
 - rejects unsupported operations;
-- rejects non-empty browser-authored input for `knowledge.status`;
-- validates that host Workspace project scope matches the host Project id;
-- returns scope only from `PairedPluginRequestContext.project/workspace`.
-
-The server plugin performs no parsing/indexing/model/database work.
-
-## Files changed
-
-Primary task files:
-
-| Path | Responsibility |
-|---|---|
-| `pi-web-plugins/knowledge/package.json` | Bundled browser/server plugin declaration. |
-| `pi-web-plugins/knowledge/browser/pi-web-plugin.ts` | Knowledge Workspace UI and paired request initiation. |
-| `pi-web-plugins/knowledge/server-plugin.ts` | Thin paired backend and authoritative scope projection. |
-| `pi-web-plugins/knowledge/pi-web-plugin.test.ts` | Browser contribution/navigation/bridge tests. |
-| `pi-web-plugins/knowledge/server-plugin.test.ts` | Server trust-boundary and operation tests. |
-
-Documentation added after implementation:
-
-| Path | Responsibility |
-|---|---|
-| `docs/development/REPORTING.md` | Mandatory task reporting standard. |
-| `docs/development/reports/README.md` | Chronological report index. |
-| `docs/development/reports/P0-T01-integration-seams.md` | Historical P0-T01 execution report. |
-| `docs/development/reports/P0-T02-knowledge-plugin-skeleton.md` | This report. |
+- performs no DB, parsing, retrieval, embedding or LLM work.
 
 ## Architecture decisions
 
-### 1. No PI WEB core navigation patch
+1. **No AppShell/core navigation patch.** Knowledge uses `WorkspacePanelContribution`.
+2. **Use paired backend.** Knowledge is not the Workspace owner/provider.
+3. **Host scope is authoritative.** Browser JSON cannot choose the filesystem Workspace.
+4. **Use runtime-qualified plugin identity.** Required for machine-scoped/federated plugin correctness.
+5. **Keep the server plugin thin.** P0-T03 introduces the standalone `pi-knowledge` process.
+6. **Keep failure states visible.** Capability failures are diagnosable rather than silently hiding the product surface.
 
-**Decision:** continue using the existing Workspace plugin contribution model.
+## Security / correctness invariants
 
-**Result:** P0-T02 modifies no PI WEB core file.
+- Browser input cannot select authoritative Project/Workspace/path.
+- `knowledge.status` accepts only `null`/empty input.
+- returned scope comes from host-owned Project/Workspace context.
+- Workspace `projectId` must match host Project id.
+- unsupported operations fail explicitly.
+- browser code does not construct a Knowledge service URL.
+- heavy Knowledge processing is absent from sessiond.
 
-This confirms the P0-T01 prediction that Knowledge can be introduced without a second navigation system.
-
-### 2. Use paired backend, not workspace-owner backend
-
-**Decision:** use `WorkspacePanelContext.pairedBackend`.
-
-**Reason:** Knowledge is a paired product feature, not the provider that owns the Workspace.
-
-### 3. Runtime-qualified plugin identity
-
-**Decision:** navigation uses `runtimePluginId` when constructing the qualified Workspace tool id.
-
-**Reason:** federated/remote machines may expose machine-qualified runtime identities; hard-coding `knowledge:workspace.knowledge` would be incorrect for those cases.
-
-### 4. Host scope is authoritative
-
-**Decision:** the server derives Project/Workspace scope only from `PairedPluginRequestContext`.
-
-Browser-authored scope fields are deliberately rejected for the status operation.
-
-### 5. Keep server plugin thin
-
-**Decision:** the paired server plugin currently returns only bounded integration metadata.
-
-**Reason:** PI WEB server plugin code executes inside sessiond. Heavy parsing, embeddings, retrieval and course/model work belong in a standalone service introduced in P0-T03.
-
-### 6. Keep failure surface observable
-
-**Decision:** Knowledge remains visible when its paired backend capability is missing.
-
-**Reason:** a visible diagnostic state is operationally safer than silently removing the product surface.
-
-## Security and correctness invariants
-
-The implementation enforces or preserves these rules:
-
-1. Browser JSON cannot choose authoritative Project/Workspace scope.
-2. `knowledge.status` accepts only `null` or an empty object as request input.
-3. Scope returned to the browser is derived from host-owned `project` and `workspace` context.
-4. Workspace `projectId` must match host Project `id`.
-5. Unsupported Knowledge operations fail explicitly.
-6. Browser code does not construct Knowledge service URLs, machine proxy URLs, or filesystem authority.
-7. Browser navigation uses runtime plugin identity, preserving machine/federation correctness.
-8. Heavy Knowledge processing is still absent from sessiond.
-
-## Test coverage added
+## Automated coverage added
 
 ### Browser tests
 
 `pi-web-plugins/knowledge/pi-web-plugin.test.ts` covers:
 
-- Knowledge Workspace panel contribution;
-- panel id/title/order/route alias;
-- runtime plugin identity when opening the Workspace tool;
-- actual `pairedBackend.request("knowledge.status", null)` invocation;
-- rendering host-scope values returned through the bridge;
-- paired backend unavailable diagnostic behavior.
+- Workspace panel metadata;
+- runtime-qualified tool selection;
+- `pairedBackend.request("knowledge.status", null)`;
+- rendering host scope;
+- paired-backend-unavailable diagnostics.
 
 ### Server tests
 
-`pi-web-plugins/knowledge/server-plugin.test.ts` covers the paired backend contract, including:
+`pi-web-plugins/knowledge/server-plugin.test.ts` covers:
 
-- returning host-resolved Project/Workspace scope;
-- rejecting browser-authored/spoofed scope input;
-- rejecting inconsistent host Project/Workspace scope;
-- rejecting unsupported operations.
+- host-resolved scope;
+- spoofed browser scope rejection;
+- inconsistent host scope rejection;
+- unsupported operation rejection.
 
-## Verification and evidence
+## Local user verification attempt — 2026-09-08
 
-### Performed successfully
+A real local verification run exposed two issues before P0-T02 could be accepted.
 
-- Source-level review of the public PI WEB Browser Plugin API used by the implementation.
-- Source-level review of the public PI WEB Server Plugin API used by the implementation.
-- Confirmed `WorkspacePanelContext.pairedBackend`, `host.requestRender()`, runtime plugin identity and paired server request context are public seams.
-- Reviewed the PR diff to confirm the task changes only the new Knowledge plugin and its tests before reporting documents were added.
-- Confirmed no PI WEB core navigation/server-route patch was required.
-- Added browser and server automated regression tests.
-- PR #3 created and remains the implementation review surface.
+### Issue A — TypeScript TS7006
 
-### Not executed / not yet proven
-
-The repository CI has not produced a workflow/check run for the current PR head.
-
-The configured CI normally executes:
+Observed:
 
 ```text
-npm ci
-→ npm run verify
-→ npm run build
-→ package smoke/dry-pack checks
+pi-web-plugins/knowledge/pi-web-plugin.test.ts:47:29
+error TS7006: Parameter 'id' implicitly has an 'any' type.
 ```
 
-However, no PR workflow run was available for the P0-T02 head during this task.
+Root cause:
 
-A separate local-container verification attempt could not install dependencies because that execution environment could not resolve/access GitHub. This is an environment limitation, not evidence that the code passes or fails.
+The test fixture passed a callback through an `as never` host-context cast, so contextual typing did not infer the callback parameter under strict TypeScript settings.
 
-Therefore this report deliberately does **not** claim:
+Fix:
 
-- TypeScript build PASS;
-- Vitest PASS;
-- lint PASS;
-- knip PASS;
-- package smoke PASS;
-- Linux/Windows CI PASS.
+```ts
+selectWorkspaceTool: (id: string) => { selected = id; }
+```
 
-Those gates remain outstanding.
+Commit containing the fix starts from:
 
-## Known limitations / unresolved items
+```text
+600585f fix: type Knowledge workspace tool test callback
+```
 
-### 1. CI execution pending
+This removes the known TS7006 source-level defect. A fresh local `npm run verify` is still required to record PASS evidence.
 
-This is the only reason P0-T02 is currently `PARTIAL` instead of `PASS`.
+### Issue B — `Unsupported plugin manifest lifecycle version`
 
-### 2. No standalone service yet
+Observed in the Vite UI:
 
-`knowledge.status` currently terminates in the paired server plugin. P0-T03 must introduce the independent process/service boundary.
+```text
+Failed to load PI WEB plugins: Unsupported plugin manifest lifecycle version
+```
 
-### 3. No service-down semantics yet
+The same UI showed existing PI WEB Projects/Workspaces/Sessions while the feature checkout was opened on the Vite development port, indicating a mixed development/runtime environment was possible.
 
-Because there is no external service, P0-T02 cannot yet verify:
+Diagnosis:
 
-- service unavailable;
-- service restart;
-- IPC timeout;
-- process version mismatch.
+The Vite client normally runs on `8505` while PI WEB API defaults to `8504`. If an installed/older PI WEB backend is already listening on `8504`, a feature-branch Vite client can proxy plugin-manifest requests to that older backend. The current client and older server then disagree on the manifest lifecycle protocol.
 
-### 4. No real target-offline/fleet failure proof yet
+This is **not** fixed by adding a lifecycle field to `pi-web-plugins/knowledge/package.json`; lifecycle belongs to the PI WEB host manifest protocol, not the Knowledge package declaration.
 
-The implementation is designed to reuse PI WEB federation, but P0c still owns explicit failure/routing validation.
+Mitigation/fix for verification:
 
-### 5. No persistence or knowledge behavior
+Run the feature checkout with an isolated API port and data directory:
 
-The panel is an integration skeleton only. It does not represent Source, Evidence, retrieval or Ask functionality.
+```bash
+mkdir -p .tmp/p0-t02-data
+
+PI_WEB_PORT=8604 \
+PI_WEB_DATA_DIR="$PWD/.tmp/p0-t02-data" \
+npm run dev
+```
+
+The Vite config inherits the API-port environment and proxies the development client to the same-checkout backend rather than a separately installed service.
+
+The verification guide now requires checking:
+
+```bash
+curl -fsS http://127.0.0.1:8604/pi-web-plugins/manifest.json
+```
+
+before manual UI acceptance.
+
+## Verification evidence state
+
+### Confirmed / performed
+
+- public browser plugin API reviewed;
+- public server plugin API reviewed;
+- no PI WEB core navigation/server-route patch required;
+- automated browser/server regression tests are present;
+- real user verification attempt executed and produced actionable failure evidence;
+- TS7006 source defect corrected;
+- isolated-development procedure documented to prevent frontend/backend lifecycle mismatch.
+
+### Still pending
+
+After pulling the latest branch, the following must be executed successfully on the user's machine:
+
+```bash
+npm test -- \
+  pi-web-plugins/knowledge/pi-web-plugin.test.ts \
+  pi-web-plugins/knowledge/server-plugin.test.ts
+
+npm run verify
+npm run build
+```
+
+Then run the isolated dev stack and complete the manual Workspace checks in the verification guide.
+
+Repository GitHub Actions also has not produced the expected PR workflow evidence for this branch, so this report does not claim CI PASS.
+
+## Known limitations
+
+- standalone `pi-knowledge` process is not implemented yet;
+- service-down/restart/version behavior belongs to P0-T03/P0-T05;
+- real remote Fleet E2E is not yet proven;
+- no persistence, Source, Evidence, retrieval, Ask or Notes behavior exists in P0-T02.
 
 ## Result
 
-**PARTIAL — implementation complete, CI pending**
+**PARTIAL — defects found during real verification have been addressed, rerun required.**
 
-The architecture objective of P0-T02 has been achieved:
+P0-T02 must not be promoted to PASS until:
 
-```text
-Knowledge Workspace surface
-+ public paired browser/server seam
-+ authoritative host scope
-+ zero PI WEB core modifications
-```
-
-The task must not be promoted to `PASS` until the repository's required verification commands/CI are successfully executed.
+1. focused tests pass;
+2. `npm run verify` passes;
+3. `npm run build` passes;
+4. same-checkout isolated dev manifest loads without lifecycle mismatch;
+5. Knowledge panel/manual Workspace switching checks pass.
 
 ## Impact on the plan
 
-P0-T02 confirms the thin-fork direction and removes the need for:
+The architectural integration path remains valid. The local verification attempt added an important operational rule:
 
-- custom Knowledge browser/server gateway routes;
-- a second Fleet protocol;
-- duplicated Project/Workspace selection state;
-- AppShell Knowledge patches.
+> Feature-branch PI WEB frontend/backend must be started as a matched checkout and isolated from an already-installed PI WEB backend during acceptance testing.
 
-The next architectural boundary is now concrete:
+No redesign of the Knowledge plugin boundary is required.
 
-```text
-PI WEB Browser Plugin
-→ PI WEB paired transport
-→ Knowledge Server Plugin (thin adapter)
-→ standalone pi-knowledge service
-```
+## Next action
 
-## Next task
-
-**P0-T03 — Standalone `pi-knowledge` service contract + process skeleton**
-
-P0-T03 should introduce only the minimum external-process boundary required to prove:
-
-```text
-Knowledge server plugin
-→ bounded local IPC/HTTP contract
-→ standalone pi-knowledge process
-→ health/version/scope request
-```
-
-It should still avoid database, RAG, embeddings or production ingestion logic unless required to prove the service boundary.
-
-P0-T03 must also produce its own repository report before being marked complete.
+Re-run the updated P0-T02 verification guide. If it passes, update this report and `CHANGELOG.md` from `PARTIAL` to `PASS`; otherwise record the next concrete failure before starting P0-T03.

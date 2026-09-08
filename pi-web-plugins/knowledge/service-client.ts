@@ -99,7 +99,7 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
   const baseUrl = `http://${formatHost(host)}:${String(port)}`;
 
   return Object.freeze({
-    async dispatch(
+    dispatch(
       operation: KnowledgeServiceOperation,
       input: unknown,
       signal: AbortSignal,
@@ -119,7 +119,7 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
         );
       }
 
-      return await withRequestDeadline(signal, timeoutMs, async (deadlineSignal) => {
+      return withRequestDeadline(signal, timeoutMs, async (deadlineSignal) => {
         const response = await performFetch(
           fetchImpl,
           `${baseUrl}/v1/dispatch`,
@@ -165,9 +165,9 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
       });
     },
 
-    async health(signal: AbortSignal): Promise<Record<string, unknown>> {
+    health(signal: AbortSignal): Promise<Record<string, unknown>> {
       throwIfAborted(signal);
-      return await withRequestDeadline(signal, timeoutMs, async (deadlineSignal) => {
+      return withRequestDeadline(signal, timeoutMs, async (deadlineSignal) => {
         const response = await performFetch(
           fetchImpl,
           `${baseUrl}/v1/health`,

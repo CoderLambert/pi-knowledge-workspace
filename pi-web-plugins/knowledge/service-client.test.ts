@@ -88,7 +88,7 @@ describe("Knowledge service client", () => {
       code: "SERVICE_REJECTED",
       remoteCode: "AUTH_INVALID",
     });
-    expect(String(caught)).not.toContain(wrongToken);
+    expect(caught instanceof Error ? caught.message : "").not.toContain(wrongToken);
   });
 
   it("rejects non-loopback environment configuration before creating a client", () => {
@@ -146,10 +146,10 @@ describe("Knowledge service client", () => {
   });
 
   it("propagates caller cancellation through the fetch signal", async () => {
-    const fetchImpl: typeof fetch = async (_input, init) => {
+    const fetchImpl: typeof fetch = (_input, init) => {
       const signal = init?.signal;
       if (signal === undefined || signal === null) throw new Error("expected fetch AbortSignal");
-      return await new Promise<Response>((_resolve, reject) => {
+      return new Promise<Response>((_resolve, reject) => {
         signal.addEventListener("abort", () => {
           const reason: unknown = signal.reason;
           reject(reason);
@@ -170,10 +170,10 @@ describe("Knowledge service client", () => {
   });
 
   it("maps the adapter deadline when the complete service call does not settle in time", async () => {
-    const fetchImpl: typeof fetch = async (_input, init) => {
+    const fetchImpl: typeof fetch = (_input, init) => {
       const signal = init?.signal;
       if (signal === undefined || signal === null) throw new Error("expected fetch AbortSignal");
-      return await new Promise<Response>((_resolve, reject) => {
+      return new Promise<Response>((_resolve, reject) => {
         signal.addEventListener("abort", () => {
           const reason: unknown = signal.reason;
           reject(reason);

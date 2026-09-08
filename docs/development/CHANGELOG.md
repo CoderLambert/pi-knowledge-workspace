@@ -25,8 +25,9 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 ### P0-T02 — PARTIAL
 
 - Added the first runnable Knowledge Workspace paired-plugin skeleton with host-authoritative Project/Workspace scope and zero PI WEB core navigation changes.
-- Local verification found and fixed the strict-TypeScript callback typing defect; the verification flow now isolates the feature checkout from an older installed PI WEB backend to prevent plugin lifecycle-version mismatches.
-- Fresh `npm run verify`, build, and manual same-checkout verification are still required before P0-T02 can move to PASS.
+- Local focused tests pass (8/8) and the production build succeeds.
+- `npm run verify` exposed four ESLint violations in the Knowledge browser plugin/test; the redundant capability check, unsafe assertion, floating promise, and `as never` test fixture have been corrected on the branch.
+- A fresh local `npm run verify` rerun is still required before P0-T02 can be promoted to PASS.
 
 ### P0-T01 — PASS
 

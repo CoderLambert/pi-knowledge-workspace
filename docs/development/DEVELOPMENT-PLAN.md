@@ -30,7 +30,10 @@ Plan task
 → build / static verification
 → development report
 → human verification guide
-→ record actual verification evidence
+→ run all verification available to the current execution environment
+→ if external-only verification remains: PARTIAL + explicit verification debt
+→ continue later implementation where dependency-safe
+→ record deferred verification evidence when available
 → update plan/index/ADR if required
 → PASS / PARTIAL / BLOCKED
 ```
@@ -42,7 +45,22 @@ Plan task
 - **BLOCKED** — task cannot satisfy its objective without changing an architectural assumption or dependency.
 - **TODO** — not started.
 
-## 1.3 Development discipline
+## 1.3 Deferred verification policy
+
+PASS standards do not change, but local/manual verification may be deferred so it does not unnecessarily block implementation progress.
+
+When the only remaining gates require capabilities unavailable to the current automation/execution environment — for example the user's local machine, browser/UI interaction, Fleet/multi-instance setup, system services, hardware, or environment-specific integration — use the following rules:
+
+1. Keep the task **PARTIAL**; do not label it PASS.
+2. Record an explicit **verification debt** in the task report and verification guide, including the exact checks/evidence still required.
+3. Continue to the next planned task when the implemented interfaces, automated/static checks, and dependency contracts are sufficiently stable for later work.
+4. Do not use deferred verification as permission to ignore a genuine dependency. If a later task depends on an unverified invariant and proceeding could invalidate the implementation, stop at that specific dependency and record it as the blocker.
+5. When the user later has time, deferred verification may be completed in batches; successful evidence upgrades the corresponding PARTIAL task to PASS.
+6. Phase gates and release gates remain strict. A phase/release cannot be declared PASS while required verification debt for that gate remains unresolved.
+
+This policy separates **development progression** from **final acceptance**: implementation may advance ahead of human/environment-specific acceptance, but acceptance evidence is never fabricated or silently waived.
+
+## 1.4 Development discipline
 
 1. Read existing PI WEB patterns before modifying code.
 2. Prefer public, upstream-supported seams over core patches.
@@ -1736,6 +1754,8 @@ As of 2026-09-09:
 | P0-T01 | PASS | Integration seams documented and validated by source review. |
 | P0-T02 | PASS | Knowledge paired-plugin skeleton accepted locally; authoritative scope, Workspace switching and worktree path verified. |
 | P0-T03 | PASS | Standalone authenticated loopback service accepted: focused 14/14; strict static/build/package gates PASS; full suite 3752 passed / 1 inherited failed / 2 skipped; real process lifecycle/HTTP/limits PASS. |
+
+Execution mode: **deferred human verification is allowed for development progression**. Tasks with environment-only acceptance still outstanding remain PARTIAL with explicit verification debt, while later tasks may proceed when dependency-safe. Phase/release PASS still requires all mandatory debt for that gate to be cleared.
 
 Current next task:
 

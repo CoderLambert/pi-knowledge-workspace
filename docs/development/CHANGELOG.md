@@ -22,6 +22,13 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P0-T04 — PARTIAL
+
+- Thin Knowledge server-plugin adapter implemented: host-authoritative `PairedPluginRequestContext` scope is sent to standalone `pi-knowledge` through authenticated loopback HTTP using fixed `workspace.echo` dispatch.
+- Browser input cannot choose service host/port/token/operation or override Project/Workspace scope; service echo mismatches, non-loopback targets, oversized traffic, protocol/request-id mismatches, cancellation and deadlines fail closed.
+- Focused adapter tests were added, including direct client → real P0-T03 Fastify service coverage; executable test/static/build and real local sessiond→service evidence is recorded as deferred verification debt.
+- Under the autonomous-development policy, P0-T05 may proceed on a separate stacked branch while P0-T04 remains PARTIAL.
+
 ### P0-T03 — PASS
 
 - Standalone authenticated loopback `pi-knowledge` process/contract accepted with protocol v1, `capabilities.get`, `workspace.echo`, stable errors, auth, request/response bounds, and independent process lifecycle.

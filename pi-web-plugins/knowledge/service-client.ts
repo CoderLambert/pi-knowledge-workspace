@@ -119,89 +119,99 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
         );
       }
 
-      const response = await fetchBounded(
-        fetchImpl,
-        `${baseUrl}/v1/dispatch`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${token}`,
-            "content-type": "application/json",
+      return await withRequestDeadline(signal, timeoutMs, async (deadlineSignal) => {
+        const response = await performFetch(
+          fetchImpl,
+          `${baseUrl}/v1/dispatch`,
+          {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${token}`,
+              "content-type": "application/json",
+            },
+            body,
           },
-          body,
-        },
-        signal,
-        timeoutMs,
-      );
-      const responseBody = await readBoundedJsonBody(response, maxResponseBytes);
-      requireCorrelatedRequestId(response, requestId);
-      const envelope = requireRecord(responseBody, "pi-knowledge dispatch response");
-      requireProtocolVersion(envelope);
-      if (envelope["requestId"] !== requestId) {
-        throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge response requestId does not match the request");
-      }
-
-      if (envelope["ok"] === false) throwRemoteError(envelope);
-      if (!response.ok) {
-        throw new KnowledgeServiceClientError(
-          "PROTOCOL_INVALID",
-          `pi-knowledge returned HTTP ${String(response.status)} without a structured error`,
+          deadlineSignal,
         );
-      }
-      if (envelope["ok"] !== true) {
-        throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge response is missing ok=true");
-      }
-      if (envelope["operation"] !== operation) {
-        throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge response operation does not match the request");
-      }
+        const responseBody = await readBoundedJsonBody(response, maxResponseBytes);
+        requireCorrelatedRequestId(response, requestId);
+        const envelope = requireRecord(responseBody, "pi-knowledge dispatch response");
+        requireProtocolVersion(envelope);
+        if (envelope["requestId"] !== requestId) {
+          throw new KnowledgeServiceClientError(
+            "PROTOCOL_INVALID",
+            "pi-knowledge response requestId does not match the request",
+          );
+        }
 
-      return requireRecord(envelope["result"], "pi-knowledge dispatch result");
+        if (envelope["ok"] === false) throwRemoteError(envelope);
+        if (!response.ok) {
+          throw new KnowledgeServiceClientError(
+            "PROTOCOL_INVALID",
+            `pi-knowledge returned HTTP ${String(response.status)} without a structured error`,
+          );
+        }
+        if (envelope["ok"] !== true) {
+          throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge response is missing ok=true");
+        }
+        if (envelope["operation"] !== operation) {
+          throw new KnowledgeServiceClientError(
+            "PROTOCOL_INVALID",
+            "pi-knowledge response operation does not match the request",
+          );
+        }
+
+        return requireRecord(envelope["result"], "pi-knowledge dispatch result");
+      });
     },
 
     async health(signal: AbortSignal): Promise<Record<string, unknown>> {
       throwIfAborted(signal);
-      const response = await fetchBounded(
-        fetchImpl,
-        `${baseUrl}/v1/health`,
-        {
-          method: "GET",
-          headers: { authorization: `Bearer ${token}` },
-        },
-        signal,
-        timeoutMs,
-      );
-      const responseBody = await readBoundedJsonBody(response, maxResponseBytes);
-      const envelope = requireRecord(responseBody, "pi-knowledge health response");
-      requireProtocolVersion(envelope);
-      const requestId = requireBoundedRequestId(envelope["requestId"]);
-      requireCorrelatedRequestId(response, requestId);
-
-      if (envelope["ok"] === false) throwRemoteError(envelope);
-      if (!response.ok) {
-        throw new KnowledgeServiceClientError(
-          "PROTOCOL_INVALID",
-          `pi-knowledge health returned HTTP ${String(response.status)} without a structured error`,
+      return await withRequestDeadline(signal, timeoutMs, async (deadlineSignal) => {
+        const response = await performFetch(
+          fetchImpl,
+          `${baseUrl}/v1/health`,
+          {
+            method: "GET",
+            headers: { authorization: `Bearer ${token}` },
+          },
+          deadlineSignal,
         );
-      }
-      if (envelope["ok"] !== true) {
-        throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge health response is missing ok=true");
-      }
-      if (envelope["service"] !== "pi-knowledge" || envelope["status"] !== "healthy") {
-        throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge health payload is invalid");
-      }
+        const responseBody = await readBoundedJsonBody(response, maxResponseBytes);
+        const envelope = requireRecord(responseBody, "pi-knowledge health response");
+        requireProtocolVersion(envelope);
+        const requestId = requireBoundedRequestId(envelope["requestId"]);
+        requireCorrelatedRequestId(response, requestId);
 
-      return envelope;
+        if (envelope["ok"] === false) throwRemoteError(envelope);
+        if (!response.ok) {
+          throw new KnowledgeServiceClientError(
+            "PROTOCOL_INVALID",
+            `pi-knowledge health returned HTTP ${String(response.status)} without a structured error`,
+          );
+        }
+        if (envelope["ok"] !== true) {
+          throw new KnowledgeServiceClientError(
+            "PROTOCOL_INVALID",
+            "pi-knowledge health response is missing ok=true",
+          );
+        }
+        if (envelope["service"] !== "pi-knowledge" || envelope["status"] !== "healthy") {
+          throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge health payload is invalid");
+        }
+
+        return envelope;
+      });
     },
   });
 }
 
-async function fetchBounded(
-  fetchImpl: FetchLike,
-  url: string,
-  init: RequestInit,
+async function withRequestDeadline<T>(
   callerSignal: AbortSignal,
   timeoutMs: number,
-): Promise<Response> {
+  operation: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  throwIfAborted(callerSignal);
   const timeoutController = new AbortController();
   const timeout = setTimeout(() => {
     timeoutController.abort(new Error("pi-knowledge request timed out"));
@@ -209,7 +219,7 @@ async function fetchBounded(
   const signal = AbortSignal.any([callerSignal, timeoutController.signal]);
 
   try {
-    return await fetchImpl(url, { ...init, signal });
+    return await operation(signal);
   } catch (error) {
     if (callerSignal.aborted) throw abortReason(callerSignal);
     if (timeoutController.signal.aborted) {
@@ -219,13 +229,26 @@ async function fetchBounded(
         { cause: error },
       );
     }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function performFetch(
+  fetchImpl: FetchLike,
+  url: string,
+  init: RequestInit,
+  signal: AbortSignal,
+): Promise<Response> {
+  try {
+    return await fetchImpl(url, { ...init, signal });
+  } catch (error) {
     throw new KnowledgeServiceClientError(
       "SERVICE_UNAVAILABLE",
       "pi-knowledge service is unavailable",
       { cause: error },
     );
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -264,6 +287,13 @@ async function readBoundedJsonBody(response: Response, maxBytes: number): Promis
       }
       chunks.push(Buffer.from(chunk.value));
     }
+  } catch (error) {
+    if (error instanceof KnowledgeServiceClientError) throw error;
+    throw new KnowledgeServiceClientError(
+      "SERVICE_UNAVAILABLE",
+      "pi-knowledge response stream failed",
+      { cause: error },
+    );
   } finally {
     reader.releaseLock();
   }

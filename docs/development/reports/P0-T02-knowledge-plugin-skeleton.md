@@ -5,6 +5,7 @@
 - **Task:** P0-T02
 - **Phase:** P0a — Thin Fork integration spike
 - **Date:** 2026-09-08
+- **Accepted:** 2026-09-09
 - **Branch:** `feat/p0-knowledge-plugin-skeleton`
 - **PR:** #3 — `feat: add P0 Knowledge paired-plugin skeleton`
 - **Status:** **PASS**
@@ -337,6 +338,4 @@ No redesign of the Knowledge plugin boundary is required.
 
 ## Next action
 
-Close P0-T02 documentation and task status consistently across the Human Verification Guide, concise changelog, and development plan / phase tracking.
-
-Do not begin P0-T03 until those repository records are updated.
+P0-T02 is closed. P0-T03 — Standalone `pi-knowledge` contract + process skeleton is the next planned task and remains **TODO**. It is not started by this report.

@@ -66,14 +66,14 @@ Expected for P0-T02-owned code:
 - focused Knowledge tests pass;
 - production build succeeds.
 
-The current inherited baseline has one known auth/session test candidate under investigation:
+The current inherited baseline has one confirmed inherited auth/session failure:
 
 ```text
 src/server/sessions/piSessionService.promptQueue.test.ts
 → refreshes auth state and dedupes warnings when logout removes the current model's credentials
 ```
 
-This test and its `PiSessionService` implementation are byte-identical to the P0-T01 base and are outside the Knowledge change set. If it is the only failing test, record it separately rather than modifying Knowledge code to make it pass.
+The same test was reproduced on `origin/chore/p0-integration-seam-analysis` with the same result: 14 passed, 1 failed, with `expected 1` / `received 0`. The failing test and its `PiSessionService` implementation are unchanged from the P0-T01 baseline and are outside the Knowledge change set. It is classified as an inherited PI WEB / current Pi SDK baseline compatibility failure; do not modify unrelated session/auth behavior to make P0-T02 green.
 
 ## Start the feature
 
@@ -180,6 +180,23 @@ Expected:
 
 - returned path is the selected worktree path;
 - it is not silently replaced by the main checkout path.
+
+### Case 5 — Existing Workspace Tools regression
+
+Verify the existing Workspace Tools still work for the selected Workspace:
+
+1. Open **Files** and read a repository file such as `package.json`.
+2. Open **Terminal** and run `pwd`.
+3. Open **Git** and confirm the current branch/status renders.
+4. Use **Chat** and confirm a normal session request succeeds.
+
+Expected:
+
+- Files renders the selected Workspace file tree and file contents;
+- Terminal `pwd` matches the selected Workspace path;
+- Git renders the selected Workspace branch/status;
+- Chat remains usable without session/runtime errors;
+- Knowledge does not break or replace the existing Workspace Tools.
 
 ## Negative / security verification
 
@@ -289,6 +306,45 @@ Ctrl-C
 ```
 
 P0-T02 creates no Knowledge database, source snapshots, embeddings, or indexes.
+
+## Recorded local acceptance — 2026-09-09
+
+Manual acceptance was performed on:
+
+- branch: `feat/p0-knowledge-plugin-skeleton`
+- commit: `1037003`
+
+Results:
+
+- Knowledge panel available: **PASS**
+- `Check integration` returns `Status: ready`: **PASS**
+- Project / Workspace / Path correct: **PASS**
+- Workspace switching A → B → A without stale scope: **PASS**
+- Git worktree path resolution: **PASS**
+- Files regression: **PASS**
+- Terminal regression: **PASS**
+- Git regression: **PASS**
+- Chat regression: **PASS**
+- focused Knowledge tests: **8/8 PASS**
+- typecheck: **PASS**
+- ESLint: **PASS**
+- knip: **PASS**
+- production build: **PASS**
+- spoofed browser Workspace scope rejection: **PASS**
+- unsupported operation rejection: **PASS**
+
+A temporary verification worktree was used:
+
+- Workspace: `verify/p0-t02-worktree`
+- Path: `/home/lambert/githubRepos/lambert/pi-knowledge-workspace-p0-t02-wt`
+
+The worktree was removed after verification.
+
+The full suite recorded **3738 passed, 1 failed, 2 skipped**. The sole failure was independently reproduced on `origin/chore/p0-integration-seam-analysis` with the same **14 passed, 1 failed** result and the same `expected 1` / `received 0` assertion. It is classified as an inherited baseline failure, not a P0-T02 regression.
+
+The first browser load also observed a transient plugin manifest `503` while `sessiond` was still starting. After Terminal, Git and Knowledge server plugins activated and the session daemon socket became available, a hard refresh loaded all Workspace Tools normally. No persistent plugin lifecycle failure remained.
+
+**Recorded result: PASS.**
 
 ## Verification limits
 

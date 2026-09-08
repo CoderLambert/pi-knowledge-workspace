@@ -221,47 +221,123 @@ The failing path currently returns early when the refreshed `ModelRuntime` can n
 - no PI WEB core navigation/server-route patch required;
 - Knowledge server plugin activates in a real local development run;
 - focused Knowledge tests: **8/8 PASS**;
-- TypeScript typecheck: **PASS** in the latest full verify path;
-- ESLint: **PASS** in the latest full verify path;
-- knip: **PASS** in the latest full verify path;
+- TypeScript typecheck: **PASS**;
+- ESLint: **PASS**;
+- knip: **PASS**;
 - production build: **PASS**;
 - Node Web Storage / happy-dom incompatibility reproduced and fixed in Vitest worker configuration;
-- full test suite: **3738 PASS, 1 inherited auth/session baseline candidate FAIL, 2 skipped**;
-- the remaining failing test is outside the P0-T02 modified code path and its test/service files are identical to the P0-T01 base.
+- full test suite: **3738 PASS, 1 inherited baseline auth/session failure, 2 skipped**;
+- the remaining `piSessionService.promptQueue` failure was reproduced unchanged on `origin/chore/p0-integration-seam-analysis`: **14 PASS, 1 FAIL**, with the same `expected 1 / received 0` assertion;
+- P0-T02 does not modify the failing session/auth production code or test;
+- Knowledge Workspace panel opens successfully in the normal local development stack;
+- `knowledge.status` returns **Status: ready**;
+- returned Project, Workspace and filesystem Path match the currently selected PI WEB server-authoritative scope;
+- Workspace switching was verified **A → B → A** with no stale Workspace scope;
+- a temporary Git worktree was discovered as a second PI WEB Workspace and Knowledge returned its real worktree path;
+- Files, Terminal, Git and Chat Workspace functionality was manually regression-checked successfully;
+- browser spoofed Workspace scope rejection tests pass;
+- unsupported Knowledge operation rejection tests pass.
 
-### Still pending
+### Manual verification — 2026-09-09
 
-1. manual Knowledge panel acceptance on the current branch head;
-2. final classification or separate maintenance fix for the inherited `piSessionService.promptQueue` auth-warning test;
-3. GitHub Actions evidence (no PR workflow run has been produced for this branch).
+Manual acceptance was performed on branch `feat/p0-knowledge-plugin-skeleton` at commit `1037003`.
+
+Verified primary Workspace:
+
+- Workspace: `feat/p0-knowledge-plugin-skeleton`
+- Path: `/home/lambert/githubRepos/lambert/pi-knowledge-workspace`
+
+Verified temporary worktree Workspace:
+
+- Workspace: `verify/p0-t02-worktree`
+- Path: `/home/lambert/githubRepos/lambert/pi-knowledge-workspace-p0-t02-wt`
+
+Observed switching sequence:
+
+1. primary Workspace → Knowledge → `Check integration`;
+2. temporary worktree Workspace → Knowledge → `Check integration`;
+3. primary Workspace → Knowledge → `Check integration`.
+
+Each request returned the currently selected Workspace and its real filesystem path. No stale scope from the previously selected Workspace was observed.
+
+Regression checks:
+
+- Files: **PASS**
+- Terminal: **PASS**
+- Git: **PASS**
+- Chat: **PASS**
+
+During the first development-page load, the browser observed a transient plugin manifest `503` while `sessiond` was still starting. The same process subsequently logged Terminal, Git and Knowledge server plugin activation and began listening on `/home/lambert/.pi-web/sessiond.sock`; after a hard refresh the plugin manifest and Workspace Tools loaded normally. This is recorded as a development startup timing observation, not a persistent Knowledge failure.
+
+### Baseline failure classification
+
+The remaining full-suite failure is:
+
+`src/server/sessions/piSessionService.promptQueue.test.ts`
+
+`refreshes auth state and dedupes warnings when logout removes the current model's credentials`
+
+P0-T02 result:
+
+- **14 PASS, 1 FAIL**
+- assertion: `expected 1`, `received 0`
+
+The same test was run independently from a temporary worktree at:
+
+`origin/chore/p0-integration-seam-analysis`
+
+using the same installed dependency tree and with Node experimental Web Storage disabled for the baseline configuration.
+
+Baseline result:
+
+- **14 PASS, 1 FAIL**
+- same test;
+- same assertion: `expected 1`, `received 0`.
+
+The failure is therefore classified as an **inherited PI WEB / current Pi SDK baseline compatibility failure**, not a P0-T02 Knowledge regression. P0-T02 does not patch unrelated session/auth behavior to make this test green.
 
 ## Known limitations
 
 - standalone `pi-knowledge` process is not implemented yet;
 - service-down/restart/version behavior belongs to P0-T03/P0-T05;
 - real remote Fleet E2E is not yet proven;
-- no persistence, Source, Evidence, retrieval, Ask or Notes behavior exists in P0-T02.
+- no persistence, Source, Evidence, retrieval, Ask or Notes behavior exists in P0-T02;
+- the inherited `piSessionService.promptQueue` auth-warning baseline failure remains open as separate maintenance scope;
+- a transient plugin-manifest request can race sessiond startup in the local development stack; refresh after sessiond becomes ready recovered normally during this verification.
+- no GitHub Actions workflow evidence was produced for this branch; P0-T02 acceptance is based on the recorded local automated and manual verification.
+- no GitHub Actions workflow evidence was produced for this branch; P0-T02 acceptance is based on the recorded local automated and manual verification.
 
 ## Result
 
-**PARTIAL — P0-T02-specific automated gates are green; one inherited baseline auth/session test and final manual UI acceptance remain.**
+**PASS — P0-T02 Knowledge paired-plugin skeleton accepted locally.**
 
-P0-T02 may move to PASS only after:
+Acceptance evidence includes:
 
-1. the manual Knowledge panel checks succeed on the current head;
-2. the remaining auth/session test is either reproduced/classified as a baseline failure or fixed in a separate maintenance scope;
-3. the final report records the decision explicitly.
+- P0-T02-specific automated gates PASS;
+- Knowledge panel loads successfully;
+- paired backend integration reports `ready`;
+- Project / Workspace / Path are host-authoritative and correct;
+- Workspace switching does not retain stale scope;
+- Git worktree path resolution is correct;
+- Files / Terminal / Git / Chat regressions were not observed;
+- spoofed browser scope and unsupported-operation negative tests PASS;
+- the sole remaining full-suite failure is reproduced on the P0-T01 baseline and is explicitly classified as inherited.
 
 ## Impact on the plan
 
-The architectural integration path remains valid. Real local verification now provides positive evidence that:
+P0-T02 is complete and the architectural integration path remains valid:
 
-- the Knowledge server plugin activates in the normal PI WEB development stack;
-- the focused Knowledge contract passes;
-- the fork can keep its test environment deterministic on current supported Node versions.
+- Knowledge uses the public Workspace Panel contribution seam;
+- Browser → Server communication uses the existing paired backend transport;
+- selected Machine / Fleet routing remains owned by PI WEB;
+- Project / Workspace authority remains server-side;
+- no Knowledge-specific Machine / Project / Workspace state system was introduced;
+- PI WEB core runtime modifications remain zero for this task.
 
 No redesign of the Knowledge plugin boundary is required.
 
 ## Next action
 
-Run the manual Knowledge Workspace verification on the current branch head. In parallel, classify the single inherited auth/session test as a separate baseline maintenance item rather than expanding P0-T02 into unrelated session/auth work.
+Close P0-T02 documentation and task status consistently across the Human Verification Guide, concise changelog, and development plan / phase tracking.
+
+Do not begin P0-T03 until those repository records are updated.

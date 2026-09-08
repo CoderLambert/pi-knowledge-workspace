@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P1-T05 — PARTIAL
+
+- Added the Source/SourceVersion domain layer: create/list/rename/archive Source, capture/list immutable SourceVersions, and manual update through the same raw-byte capture path.
+- Enforced the key invariant that metadata edits do not create versions and byte-identical recaptures reuse the existing `(source_id, content_sha256)` version; only changed raw bytes create a new SourceVersion.
+- Added five contract tests using a database seam fake plus the real P1-T04 blob store; real SQLite/native-driver and executable repository gates remain OPEN verification debt.
+
 ### P1-T04 — PARTIAL
 
 - Added immutable SHA-256 raw-byte storage at `blobs/sha256/<hash>` with store-owned hashing, strict hash/path validation, atomic no-overwrite hard-link publication, deduplication, verified reads, tamper detection and stale partial-temp cleanup.

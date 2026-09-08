@@ -11,6 +11,7 @@ import {
 
 const IMPORT_JOB_KIND = "workspace-file-import";
 const ALLOWED_EXTENSIONS = new Set([".md", ".markdown", ".txt"]);
+const DEFAULT_IMPORT_MAX_BYTES = 16 * 1024 * 1024;
 
 export type ImportJobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
@@ -61,7 +62,7 @@ export interface MdTextImportJobsOptions {
 export class MdTextImportJobs {
   private readonly now: () => Date;
   private readonly createId: () => string;
-  private readonly maxBytes: number | undefined;
+  private readonly maxBytes: number;
   private readonly captureFile: NonNullable<MdTextImportJobsOptions["captureFile"]>;
 
   constructor(
@@ -71,7 +72,7 @@ export class MdTextImportJobs {
   ) {
     this.now = options.now ?? (() => new Date());
     this.createId = options.createId ?? randomUUID;
-    this.maxBytes = options.maxBytes;
+    this.maxBytes = options.maxBytes ?? DEFAULT_IMPORT_MAX_BYTES;
     this.captureFile = options.captureFile ?? captureWorkspaceFile;
   }
 

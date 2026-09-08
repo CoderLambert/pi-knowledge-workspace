@@ -25,17 +25,17 @@ class RecordingKnowledgeServiceClient implements KnowledgeServiceClient {
     workspaceLabel: "feature/p0",
   };
 
-  async dispatch(
+  dispatch(
     operation: KnowledgeServiceOperation,
     input: unknown,
     signal: AbortSignal,
   ): Promise<Record<string, unknown>> {
     this.dispatchCalls.push({ operation, input, signal });
-    return this.dispatchResult;
+    return Promise.resolve(this.dispatchResult);
   }
 
-  async health(): Promise<Record<string, unknown>> {
-    return { status: "healthy" };
+  health(): Promise<Record<string, unknown>> {
+    return Promise.resolve({ status: "healthy" });
   }
 }
 

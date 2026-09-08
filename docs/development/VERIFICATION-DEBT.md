@@ -33,8 +33,8 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
   8. Confirm cancellation/deadline behavior and that browser code contains no `pi-knowledge` token/host/port authority.
 - **Expected PASS evidence:** focused/static/build/package gates pass; real server-plugin → service call authenticates and returns exact host scope; negative cases fail explicitly; no new task-attributable full-suite failures; no service credential or connection authority reaches browser code.
 - **Assumptions used for continued development:** P0-T03 protocol v1 and `workspace.echo` remain stable; `PairedPluginRequestContext` Project/Workspace/signal remain host-owned; sessiond and `pi-knowledge` can share `PI_KNOWLEDGE_TOKEN` through server-side environment configuration; the browser continues to call `knowledge.status` with null/empty input; existing PI WEB paired-backend/federation routing remains authoritative.
-- **Dependent tasks:** P0-T05, P0-T06
-- **Resolution:** pending user verification; P0-T05/P0-T06 may proceed against the documented contract under the autonomous-development policy.
+- **Dependent tasks:** P0-T05, P0-T06, P0-T08, P1 tasks that reuse the service boundary
+- **Resolution:** pending user verification; later implementation may proceed against the documented contract under the autonomous-development policy.
 
 ### P0-T05 — Real local Browser → PI WEB → sessiond → pi-knowledge E2E
 
@@ -54,7 +54,7 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
   8. Smoke Files/Terminal/Git/Chat while Knowledge integration is active.
 - **Expected PASS evidence:** P0-T05 focused/static/build/package gates pass; full suite has no new task-attributable failure; real browser local integration renders exact authoritative scope; A→B→A follows host state; all five failure/recovery cases behave explicitly; browser never receives service credentials or direct localhost service authority; existing Workspace tools remain functional.
 - **Assumptions used for continued development:** P0-T04 adapter semantics and the new cross-layer sessiond-route test correctly model the target-side local chain; PI WEB selected-Machine routing remains unchanged and will be proven separately in P0-T06; no gateway-local fallback is permitted when a selected target Machine owns the paired backend.
-- **Dependent tasks:** P0-T06, P0-T08
+- **Dependent tasks:** P0-T06, P0-T08, later Knowledge browser surfaces
 - **Resolution:** pending user verification; compatible real E2E evidence may also close P0-T04 real-adapter rows, but not P0-T04's separate focused/static/build rows.
 
 ### P0-T06 — Selected Machine / Fleet Knowledge routing acceptance
@@ -77,8 +77,44 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
   10. When actual Fleet/multi-host machines are available, repeat success, target-unavailable, service-unavailable, switching and cancellation cases across hosts. Only this evidence may be described as real remote Fleet E2E.
 - **Expected PASS evidence:** focused/static/build/package gates pass; full suite has no new P0-T06-attributable failure; direct-base diff is task-only; local and selected-target physical logs prove the target owns Knowledge execution; failure/cancellation cases fail closed; gateway-local Knowledge is never used as fallback; real Fleet evidence is recorded when required by the P0 gate.
 - **Assumptions used for continued development:** `PAIRED_PLUGIN_BACKEND_REQUEST_ROUTE_PATH` remains in PI WEB's generic federation allowlist with bounded cancellation; selected Machine identity remains request authority; P0-T04/P0-T05 target-side Knowledge contracts remain valid while their own debts are open; later tasks must reuse pairedBackend instead of adding Knowledge-specific Machine routing.
-- **Dependent tasks:** P0-T07, P0-T08
-- **Resolution:** pending executable/local/Fleet verification; P0-T07 may proceed against the locked routing contract under the autonomous-development policy.
+- **Dependent tasks:** P0-T07, P0-T08, later remote-capable Knowledge surfaces
+- **Resolution:** pending executable/local/Fleet verification; later tasks may proceed against the locked routing contract under the autonomous-development policy.
+
+### P0-T07 — Restricted Pi runtime acceptance
+
+- **Task status:** PARTIAL
+- **Branch:** `experiment/p0-restricted-pi-runtime-probe`
+- **PR:** #9
+- **Debt status:** OPEN
+- **Why deferred:** repository-owned runtime code/tests are present, but the autonomous environment cannot execute the repository dependency tree and GitHub has not supplied CI evidence for the branch.
+- **Required verification:**
+  1. Run `npm test -- src/knowledge/runtime/restrictedPiRuntime.test.ts` and record the exact test count/result.
+  2. Run `npm run typecheck`, `npm run lint`, `npm run knip`, `npm run build`, `npm run pack:dry`, and the full `npm test` suite.
+  3. Run `git diff --check origin/test/p0-selected-machine-federation-routing...HEAD` and confirm the P0-T07 direct-base diff is task-only.
+  4. Confirm active model-visible tools are exactly `knowledge_sources`, `knowledge_search`, `knowledge_read`, and `submit_answer`.
+  5. Confirm `bash`, `read`, `write`, `edit`, `grep`, `find`, `ls`, arbitrary project extensions, AGENTS/context, skills and prompt templates are not loaded by the restricted runtime fixture.
+  6. Confirm the runtime uses in-memory settings/session state, an in-memory credential store, `modelsPath: null`, no create-time model refresh, and no model-network refresh according to the current Pi SDK surface.
+- **Expected PASS evidence:** focused/static/build/package/full-suite gates show no P0-T07-attributable failure; the runtime exposes only the four Knowledge tools and discovers none of the seeded hostile project/global resources or persisted command credentials/configuration.
+- **Assumptions used for continued development:** the current Pi SDK configuration semantics used by the probe remain stable enough for P3 to later implement the production restricted runtime; no P1 task should depend on model execution; if SDK semantics change, P3 must revalidate rather than inherit an obsolete isolation assumption.
+- **Dependent tasks:** P0-T08, P3-T03, P3-T04 and grounded Ask runtime work
+- **Resolution:** pending executable repository verification.
+
+### P0-T08 — P0 gate closure evidence
+
+- **Task status:** PARTIAL
+- **Branch:** `chore/p0-gate-review`
+- **PR:** pending at time of branch preparation
+- **Debt status:** OPEN
+- **Why deferred:** P0-T08 is a strict phase gate. P0-T04 through P0-T07 still have mandatory executable/local/Fleet/runtime acceptance debt, so the gate cannot become PASS in the autonomous environment.
+- **Required verification:**
+  1. Resolve the mandatory P0-T04 through P0-T07 debt rows above with dated evidence.
+  2. Run `git diff --check origin/experiment/p0-restricted-pi-runtime-probe...HEAD` and confirm P0-T08 contains documentation/gate-review scope only.
+  3. Re-run the P0-T08 verification guide's repository, local integration, selected-Machine/Fleet, restricted-runtime and architecture stop-condition checks.
+  4. Update the originating reports, PR descriptions, `DEVELOPMENT-PLAN.md`, `CHANGELOG.md`, and this ledger with the final evidence.
+- **Expected PASS evidence:** every mandatory P0 gate condition is green; no P0-T04..T08 required debt remains OPEN; no invasive PI WEB infrastructure rewrite is required; P0-T08 and the P0 phase may then be marked PASS.
+- **Assumptions used for continued development:** autonomous P1 implementation may proceed against documented P0 contracts, but P0 remains explicitly PARTIAL and later tasks may not cite this gate as accepted evidence until closure.
+- **Dependent tasks:** P1 implementation may proceed under policy; release/phase acceptance depends on eventual closure.
+- **Resolution:** pending P0 verification-debt closure and gate rerun.
 
 P0-T03 is already fully accepted and remains PASS.
 

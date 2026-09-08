@@ -23,7 +23,7 @@ async function addMachine(name: string, baseUrl: string): Promise<string> {
     url: "/api/machines",
     payload: { name, baseUrl },
   });
-  expect(response.statusCode).toBe(201);
+  expect(response.statusCode).toBe(200);
   return response.json<{ id: string }>().id;
 }
 

@@ -22,7 +22,7 @@ export function loadKnowledgeServiceConfig(env: NodeJS.ProcessEnv = process.env)
   const host = parseLoopbackHost(env["PI_KNOWLEDGE_HOST"]);
   const token = env["PI_KNOWLEDGE_TOKEN"];
   if (token === undefined || token.length < MIN_TOKEN_LENGTH) {
-    throw new Error(`PI_KNOWLEDGE_TOKEN is required and must be at least ${MIN_TOKEN_LENGTH} characters`);
+    throw new Error(`PI_KNOWLEDGE_TOKEN is required and must be at least ${String(MIN_TOKEN_LENGTH)} characters`);
   }
 
   return {
@@ -62,7 +62,7 @@ function parseInteger(
   if (value === undefined || value === "") return defaultValue;
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
-    throw new Error(`${name} must be an integer between ${min} and ${max}`);
+    throw new Error(`${name} must be an integer between ${String(min)} and ${String(max)}`);
   }
   return parsed;
 }

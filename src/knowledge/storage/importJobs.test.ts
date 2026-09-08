@@ -91,7 +91,7 @@ class ImportDatabase implements KnowledgeDatabase {
       if (!job) return unchanged();
       job.status = "succeeded"; job.result_json = String(p[0]); job.updated_at = String(p[1]); return changed();
     }
-    if (sql.includes("job_attempts SET status = 'failed'")) {
+    if (sql.includes("job_attempts SET status = 'failed'") && sql.includes("WHERE id = ? AND job_id = ?")) {
       const row = this.attempts.find((a) => a.id === p[2] && a.job_id === p[3]);
       if (!row) return unchanged();
       row.status = "failed"; row.finished_at = String(p[0]); row.error_json = String(p[1]); return changed();

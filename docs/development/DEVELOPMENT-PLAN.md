@@ -176,7 +176,7 @@ Accepted locally on 2026-09-09. Knowledge UI, authoritative Project / Workspace 
 
 ## P0-T03 — Standalone pi-knowledge contract + process skeleton
 
-**Status:** TODO
+**Status:** PARTIAL
 
 ### Objective
 
@@ -237,6 +237,17 @@ POST /v1/dispatch
 ### Verification
 
 Must prove the standalone process starts/stops independently and rejects malformed/version-incompatible requests.
+
+### Current state
+
+Implementation is present on `feat/p0-standalone-pi-knowledge-service` with an authenticated loopback Fastify service, protocol v1, the two initial operations, stable error envelopes, request/response bounds, build/bin integration, and focused tests. P0-T04 has not started.
+
+Required records:
+
+- report: `docs/development/reports/P0-T03-standalone-pi-knowledge-service.md`
+- verification: `docs/development/verification/P0-T03-standalone-pi-knowledge-service.md`
+
+P0-T03 remains PARTIAL until focused tests, TypeScript, ESLint, knip, build/package checks, full-suite regression evidence, and real standalone process start/listen/stop verification have actually run successfully. GitHub Actions has not produced a run for the current stacked PR, so source review is not counted as automated PASS evidence.
 
 ---
 
@@ -1726,10 +1737,10 @@ As of 2026-09-09:
 |---|---|---|
 | P0-T01 | PASS | Integration seams documented and validated by source review. |
 | P0-T02 | PASS | Knowledge paired-plugin skeleton accepted locally; authoritative scope, Workspace switching and worktree path verified. |
-| P0-T03 | TODO | Next implementation task; not started. |
+| P0-T03 | PARTIAL | Standalone service/contract implementation, tests and docs are present; automated/static/build and real-process acceptance evidence are still pending. |
 
 Current next task:
 
-# **P0-T03 — Standalone `pi-knowledge` contract + process skeleton**
+# **Complete P0-T03 verification and acceptance**
 
-Do not begin P1 until the P0 Gate is satisfied.
+Do not begin P0-T04 until P0-T03 is PASS. Do not begin P1 until the P0 Gate is satisfied.

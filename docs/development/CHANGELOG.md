@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P0-T03 — PARTIAL
+
+- Standalone authenticated loopback `pi-knowledge` process/contract skeleton implemented with protocol v1, `capabilities.get`, `workspace.echo`, stable errors, auth, and request/response bounds.
+- Focused contract/config tests and build/package entry were added; P0-T04 was not started.
+- Automated/static/build execution and real-process acceptance remain outstanding because no GitHub Actions run was produced and the assistant execution container cannot reach GitHub/npm.
+
 ### P0-T02 — PASS
 
 - Knowledge Workspace paired-plugin skeleton accepted locally.

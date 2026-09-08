@@ -1,6 +1,6 @@
 # Autonomous Development Execution Policy
 
-This document supplements `DEVELOPMENT-PLAN.md` for unattended development periods.
+This document supplements `DEVELOPMENT-PLAN.md` for unattended development periods and **supersedes the stop-on-unverified-dependency sentence in `DEVELOPMENT-PLAN.md` §1.3(4) while unattended automation is active**.
 
 ## Objective
 

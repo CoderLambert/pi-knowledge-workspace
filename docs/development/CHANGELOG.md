@@ -22,6 +22,13 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P0-T07 — PARTIAL
+
+- Added a repository-owned restricted Pi SDK runtime probe with exactly four model-visible tools: `knowledge_sources`, `knowledge_search`, `knowledge_read`, and `submit_answer`.
+- The probe disables project/global extensions, skills, prompt templates, themes, AGENTS/context files, persisted settings/sessions, models.json loading, credential-file loading, and model-network refresh.
+- Tests assert the four-tool allowlist, absence of built-in shell/filesystem tools, and zero discovery of seeded project resources.
+- Focused/static/build/package execution remains OPEN verification debt; P0-T07 stays PARTIAL until executable evidence is recorded.
+
 ### P0-T06 — PARTIAL
 
 - Added deterministic selected-Machine Knowledge federation coverage over PI WEB's existing generic paired-backend Machine route; no Knowledge-specific production routing was added.

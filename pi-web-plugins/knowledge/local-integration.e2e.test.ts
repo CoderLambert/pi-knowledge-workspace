@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 
+import { Buffer } from "node:buffer";
 import { createServer, type Server } from "node:http";
 import { resolve } from "node:path";
+import Fastify, { type FastifyInstance } from "fastify";
 import { html, render, svg } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -15,6 +17,7 @@ import type {
 import { buildKnowledgeApp } from "../../src/knowledge/service/app.js";
 import { PluginBackendRegistry } from "../../src/server/plugins/pluginBackendRegistry.js";
 import type { ServerPluginPairedBackendContribution } from "../../src/server/plugins/serverPluginRuntime.js";
+import { registerPairedPluginBackendRoutes } from "../../src/server/sessiond/pluginBackendRoutes.js";
 import type { Project } from "../../src/server/types.js";
 import { WorkspaceProviderRegistry } from "../../src/server/workspaces/workspaceProviderRegistry.js";
 import browserPlugin from "./browser/pi-web-plugin.js";
@@ -31,7 +34,7 @@ afterEach(async () => {
 });
 
 describe("P0-T05 local Knowledge integration", () => {
-  it("runs Browser panel → host workspace authority → Knowledge adapter → real pi-knowledge → UI", async () => {
+  it("runs Browser panel → sessiond route → host workspace authority → adapter → real pi-knowledge → UI", async () => {
     const service = await startKnowledgeService(SERVICE_TOKEN);
     const fixture = await createIntegrationFixture(service.port, SERVICE_TOKEN);
     const panel = requiredPanel();
@@ -116,7 +119,7 @@ async function createIntegrationFixture(port: number, token: string): Promise<{
   project: Project;
   workspace: Workspace;
   panelContext: WorkspacePanelContext;
-  bridge: ReturnType<typeof createPairedBridge>;
+  bridge: ReturnType<typeof createSessiondBridge>;
 }> {
   vi.stubEnv("PI_KNOWLEDGE_HOST", "127.0.0.1");
   vi.stubEnv("PI_KNOWLEDGE_PORT", String(port));
@@ -165,7 +168,16 @@ async function createIntegrationFixture(port: number, token: string): Promise<{
     backend,
   };
   const registry = new PluginBackendRegistry({ contributions: [contribution], workspaces });
-  const bridge = createPairedBridge(registry, project, resolvedWorkspace.id);
+  const sessiond = Fastify({ logger: false });
+  registerPairedPluginBackendRoutes(sessiond, {
+    projects: projectReader(project),
+    backends: registry,
+    onWorkspacesMutated: () => undefined,
+  });
+  await sessiond.ready();
+  closeables.push(() => sessiond.close());
+
+  const bridge = createSessiondBridge(sessiond, project, resolvedWorkspace.id);
   const workspace: Workspace = {
     id: resolvedWorkspace.id,
     projectId: resolvedWorkspace.projectId,
@@ -182,8 +194,8 @@ async function createIntegrationFixture(port: number, token: string): Promise<{
   };
 }
 
-function createPairedBridge(
-  registry: PluginBackendRegistry,
+function createSessiondBridge(
+  sessiond: FastifyInstance,
   project: Project,
   workspaceId: string,
 ): {
@@ -192,20 +204,45 @@ function createPairedBridge(
 } {
   let lastSettled = Promise.resolve();
   const request = vi.fn((operation: string, input: JsonValue): Promise<JsonValue> => {
-    const pending = registry.request({
-      pluginId: "knowledge",
-      moduleRevision: KNOWLEDGE_REVISION,
-      project,
-      workspaceId,
-      operation,
-      input,
-    });
+    const pending = dispatchSessiondRequest(sessiond, project, workspaceId, operation, input);
     lastSettled = pending.then(() => undefined, () => undefined);
     return pending;
   });
   return {
     request,
     waitForLastRequest: () => lastSettled,
+  };
+}
+
+async function dispatchSessiondRequest(
+  sessiond: FastifyInstance,
+  project: Project,
+  workspaceId: string,
+  operation: string,
+  input: JsonValue,
+): Promise<JsonValue> {
+  const response = await sessiond.inject({
+    method: "POST",
+    url: `/paired-plugin-backends/knowledge/projects/${encodeURIComponent(project.id)}/workspaces/${encodeURIComponent(workspaceId)}/${encodeURIComponent(operation)}`,
+    payload: { revision: KNOWLEDGE_REVISION, input },
+  });
+  const parsed: unknown = JSON.parse(response.body);
+  if (!isJsonValue(parsed)) throw new Error("sessiond returned non-JSON plugin data");
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    if (isRecord(parsed) && typeof parsed["error"] === "string") throw new Error(parsed["error"]);
+    throw new Error(`sessiond Knowledge request failed with HTTP ${String(response.statusCode)}`);
+  }
+  return parsed;
+}
+
+function projectReader(project: Project): {
+  requireProject: (projectId: string) => Promise<Project>;
+} {
+  return {
+    requireProject: (projectId: string) => projectId === project.id
+      ? Promise.resolve(project)
+      : Promise.reject(new Error("Project not found")),
   };
 }
 
@@ -336,4 +373,12 @@ async function listen(server: Server): Promise<number> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every((entry) => isJsonValue(entry));
+  if (isRecord(value)) return Object.values(value).every((entry) => isJsonValue(entry));
+  return false;
 }

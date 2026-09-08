@@ -103,7 +103,7 @@ export function invalidRequest(message: string): KnowledgeServiceError {
 
 function requireBoundedString(value: unknown, field: string, maxLength: number): string {
   if (typeof value !== "string" || value.length === 0 || value.length > maxLength) {
-    throw invalidRequest(`${field} must be a non-empty string of at most ${maxLength} characters`);
+    throw invalidRequest(`${field} must be a non-empty string of at most ${String(maxLength)} characters`);
   }
   return value;
 }

@@ -179,6 +179,28 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
 - **Dependent tasks:** P1-T06, P1-T07, P1-T08 and all historical SourceVersion consumers
 - **Resolution:** pending executable/SQLite/blob dependency verification; later tasks may proceed against the explicit Source capture contract.
 
+### P1-T06 — Safe Workspace file-reader acceptance
+
+- **Task status:** PARTIAL
+- **Branch:** `feat/p1-safe-workspace-file-reader`
+- **PR:** #16
+- **Debt status:** OPEN
+- **Why deferred:** the GitHub-only automation environment cannot execute the repository dependency tree or target Linux filesystem acceptance, and the PR head has no GitHub Actions workflow run.
+- **Required verification:**
+  1. Run `npm test -- src/knowledge/storage/workspaceFileReader.test.ts` and confirm 8/8 tests pass.
+  2. Run `npm run typecheck`, `npm run lint`, `npm run knip`, `npm run build`, `npm run pack:dry`, and full `npm test`.
+  3. Run `git diff --check origin/feat/p1-source-version-domain...HEAD` and confirm the direct-base diff is P1-T06-only.
+  4. On the target filesystem, capture a contained MD/TXT file and confirm exact returned bytes and SHA-256.
+  5. Confirm parent traversal, absolute paths and an escaping symlink fail before bytes are returned; confirm a symlink whose canonical target stays inside the Workspace remains usable.
+  6. Confirm `.env`, `.env.*`, `.ssh/**`, common `id_*` private keys, `*.pem` and `*.key` fail with `SENSITIVE_FILE`.
+  7. Confirm files above the configured limit fail with `FILE_TOO_LARGE` and non-regular paths fail closed.
+  8. Replace, rewrite, remove or retarget a selected path during capture and confirm `FILE_CHANGED_DURING_CAPTURE`; no ambiguous bytes may be returned.
+  9. Confirm P1-T06 itself creates no blob, SourceVersion, job or parser artifact.
+- **Expected PASS evidence:** focused/static/build/package/full-suite gates show no new P1-T06-attributable failure; direct-base diff is task-only; target filesystem evidence proves containment, symlink, sensitivity, size and replacement-race defenses plus exact-byte hashing.
+- **Assumptions used for continued development:** successful `CapturedWorkspaceFile.bytes` are the only bytes P1-T07 may ingest; P1-T07 must not reopen the path after P1-T06 validation; the target Node/Linux filesystem exposes stable `dev`/`ino` identity through `stat`/`fstat`; P1-T04/P1-T05 remain the only blob/SourceVersion persistence path.
+- **Dependent tasks:** P1-T07 and any later Workspace-file reimport/update flow
+- **Resolution:** pending executable/target-filesystem verification; later implementation may proceed against the captured-byte contract.
+
 P0-T03 is already fully accepted and remains PASS.
 
 ## Entry template

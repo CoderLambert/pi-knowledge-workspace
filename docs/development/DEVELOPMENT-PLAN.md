@@ -627,7 +627,7 @@ Current implementation exists on PR #15. Source metadata operations do not creat
 
 ## P1-T06 — Safe Workspace file reader
 
-**Status:** TODO
+**Status:** PARTIAL
 
 Support explicitly selected Workspace files.
 
@@ -652,9 +652,13 @@ oversized file
 file replaced during capture
 ```
 
+Current implementation exists on PR #16. The reader validates relative input, canonical root/target containment, symlink escapes, sensitive dotenv/SSH/private-key patterns and max size; captures exact bytes/hash through an opened descriptor; and revalidates descriptor/path identity plus metadata to fail closed on replacement/rewrite races. Eight focused filesystem-security tests are written. Executable/static/build and target-filesystem acceptance remains OPEN debt.
+
 ---
 
 ## P1-T07 — MD/TXT import job
+
+**Status:** TODO
 
 Build first durable import path:
 
@@ -1824,12 +1828,13 @@ As of 2026-09-09:
 | P1-T03 | PARTIAL | Durable installation/Workspace identity implemented on PR #13; real SQLite acceptance remains unverified. |
 | P1-T04 | PARTIAL | Content-addressed raw-byte blob store implemented on PR #14; executable/filesystem acceptance remains OPEN debt. |
 | P1-T05 | PARTIAL | Source/SourceVersion domain implemented on PR #15; executable/real-SQLite acceptance remains OPEN debt. |
-| P1-T06 | TODO | Next task: safe Workspace file reader. |
+| P1-T06 | PARTIAL | Safe Workspace file reader implemented on PR #16; executable/target-filesystem acceptance remains OPEN debt. |
+| P1-T07 | TODO | Next task: MD/TXT durable import job. |
 
 Execution mode: **deferred human verification is allowed for development progression**. Tasks with environment-only acceptance still outstanding remain PARTIAL with explicit verification debt, while later tasks may proceed when dependency-safe. Phase/release PASS still requires all mandatory debt for that gate to be cleared.
 
 Current next task:
 
-# **P1-T06 — Safe Workspace file reader**
+# **P1-T07 — MD/TXT import job**
 
-P1-T06 may proceed as a separate stacked branch against the documented P1-T05 Source capture contract. It must enforce relative-path, realpath-containment, symlink, sensitive-file, size and file-change-race checks before bytes are eligible for SourceVersion capture.
+P1-T07 may proceed as a separate stacked branch against the documented P1-T06 captured-byte contract. It must consume the captured bytes directly rather than reopen the Workspace path, then persist through the P1-T04/P1-T05 blob/SourceVersion path with idempotency, retry, cancellation and restart-safe job state.

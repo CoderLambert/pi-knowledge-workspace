@@ -44,7 +44,7 @@ describe("Knowledge browser plugin", () => {
 
     action?.run({
       state: { selectedWorkspace: workspace },
-      selectWorkspaceTool: (id) => { selected = id; },
+      selectWorkspaceTool: (id: string) => { selected = id; },
     } as never);
 
     expect(selected).toBe(`${runtimePluginId}:workspace.knowledge`);

@@ -22,6 +22,13 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P0-T05 — PARTIAL
+
+- Added repository-owned local Knowledge cross-layer E2E coverage: browser panel → real sessiond paired-backend HTTP route → `PluginBackendRegistry` host scope → Knowledge adapter → real loopback `pi-knowledge` → UI.
+- Automated scenarios are written for success, service-unavailable/restart recovery, wrong token, and incompatible protocol; no PI WEB core route/navigation/federation implementation was changed.
+- Focused/static/build execution and real browser/web/API/sessiond/Workspace-switching/timeout acceptance remain OPEN verification debt.
+- Under the autonomous-development policy, P0-T06 may proceed on a separate stacked branch while P0-T05 remains PARTIAL.
+
 ### P0-T04 — PARTIAL
 
 - Thin Knowledge server-plugin adapter implemented: host-authoritative `PairedPluginRequestContext` scope is sent to standalone `pi-knowledge` through authenticated loopback HTTP using fixed `workspace.echo` dispatch.

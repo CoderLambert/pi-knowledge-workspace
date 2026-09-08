@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
 import { Buffer } from "node:buffer";
+import { randomUUID } from "node:crypto";
 
 export const KNOWLEDGE_SERVICE_PROTOCOL_VERSION = 1;
 export const KNOWLEDGE_SERVICE_DEFAULT_HOST = "127.0.0.1";
@@ -136,6 +136,10 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
       const responseBody = await readBoundedJsonBody(response, maxResponseBytes);
       requireCorrelatedRequestId(response, requestId);
       const envelope = requireRecord(responseBody, "pi-knowledge dispatch response");
+      requireProtocolVersion(envelope);
+      if (envelope["requestId"] !== requestId) {
+        throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge response requestId does not match the request");
+      }
 
       if (envelope["ok"] === false) throwRemoteError(envelope);
       if (!response.ok) {
@@ -146,10 +150,6 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
       }
       if (envelope["ok"] !== true) {
         throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge response is missing ok=true");
-      }
-      requireProtocolVersion(envelope);
-      if (envelope["requestId"] !== requestId) {
-        throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge response requestId does not match the request");
       }
       if (envelope["operation"] !== operation) {
         throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge response operation does not match the request");
@@ -172,6 +172,9 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
       );
       const responseBody = await readBoundedJsonBody(response, maxResponseBytes);
       const envelope = requireRecord(responseBody, "pi-knowledge health response");
+      requireProtocolVersion(envelope);
+      const requestId = requireBoundedRequestId(envelope["requestId"]);
+      requireCorrelatedRequestId(response, requestId);
 
       if (envelope["ok"] === false) throwRemoteError(envelope);
       if (!response.ok) {
@@ -183,10 +186,6 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
       if (envelope["ok"] !== true) {
         throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge health response is missing ok=true");
       }
-      requireProtocolVersion(envelope);
-
-      const requestId = requireBoundedRequestId(envelope["requestId"]);
-      requireCorrelatedRequestId(response, requestId);
       if (envelope["service"] !== "pi-knowledge" || envelope["status"] !== "healthy") {
         throw new KnowledgeServiceClientError("PROTOCOL_INVALID", "pi-knowledge health payload is invalid");
       }
@@ -314,7 +313,6 @@ function requireBoundedRequestId(value: unknown): string {
 }
 
 function throwRemoteError(envelope: Record<string, unknown>): never {
-  requireProtocolVersion(envelope);
   const error = requireRecord(envelope["error"], "pi-knowledge error response");
   const code = error["code"];
   const message = error["message"];
@@ -329,10 +327,14 @@ function throwRemoteError(envelope: Record<string, unknown>): never {
 }
 
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new KnowledgeServiceClientError("PROTOCOL_INVALID", `${label} must be a JSON object`);
   }
-  return Object.fromEntries(Object.entries(value));
+  return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function validateHost(host: string): string {

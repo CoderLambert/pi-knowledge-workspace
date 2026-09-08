@@ -56,7 +56,6 @@ const plugin: PiWebPlugin = {
             `,
             order: 35,
             routeAliases: ["knowledge"],
-            visible: (context) => hasKnowledgeBackend(context),
             render: (context) => {
               const key = workspaceKey(context);
               const state = states.get(key) ?? { loading: false };
@@ -106,10 +105,6 @@ const plugin: PiWebPlugin = {
 };
 
 export default plugin;
-
-function hasKnowledgeBackend(context: WorkspacePanelContext): boolean {
-  return context.pairedBackend?.requestVersion === 1 && context.pairedBackend.request !== undefined;
-}
 
 async function refreshKnowledgeStatus(context: WorkspacePanelContext): Promise<void> {
   const key = workspaceKey(context);

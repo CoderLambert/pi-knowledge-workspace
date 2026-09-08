@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P0-T08 — PARTIAL
+
+- Completed the P0 gate review without adding production code; the thin-fork integration boundary remains viable and no invasive Machine/Workspace/Session rewrite or Knowledge-specific federation stack is required.
+- P0 cannot be declared PASS while mandatory P0-T04 through P0-T07 executable/local/Fleet/runtime verification debt remains OPEN.
+- Added the gate matrix, closure procedure and explicit P0 acceptance backlog; autonomous implementation may proceed to P1-T01 against documented contracts, but later work must not reinterpret P0 as accepted.
+
 ### P0-T07 — PARTIAL
 
 - Added a repository-owned restricted Pi SDK runtime probe with exactly four model-visible tools: `knowledge_sources`, `knowledge_search`, `knowledge_read`, and `submit_answer`.

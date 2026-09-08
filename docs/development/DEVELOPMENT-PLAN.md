@@ -176,7 +176,7 @@ Accepted locally on 2026-09-09. Knowledge UI, authoritative Project / Workspace 
 
 ## P0-T03 — Standalone pi-knowledge contract + process skeleton
 
-**Status:** TODO
+**Status:** PASS
 
 ### Objective
 
@@ -237,6 +237,15 @@ POST /v1/dispatch
 ### Verification
 
 Must prove the standalone process starts/stops independently and rejects malformed/version-incompatible requests.
+
+### Result
+
+Accepted locally on 2026-09-09. The standalone authenticated loopback Fastify service, protocol v1, `capabilities.get`, `workspace.echo`, stable error envelopes, request/response bounds, and build/bin integration all passed acceptance. Focused tests passed 14/14; TypeScript, ESLint, knip, build, package dry-run, dist entry, and diff check passed. The full suite recorded 3752 passed / 1 inherited failed / 2 skipped; the sole `piSessionService.promptQueue` failure matches the P0-T01/P0-T02 inherited baseline and is not a P0-T03 regression. Real built-process acceptance passed independent start, loopback-only bind, non-loopback rejection, health/dispatch, auth/schema/version/operation negative cases, request/response size limits, and clean SIGINT/SIGTERM shutdown. P0-T04 was not started.
+
+Required records:
+
+- report: `docs/development/reports/P0-T03-standalone-pi-knowledge-service.md`
+- verification: `docs/development/verification/P0-T03-standalone-pi-knowledge-service.md`
 
 ---
 
@@ -1726,10 +1735,10 @@ As of 2026-09-09:
 |---|---|---|
 | P0-T01 | PASS | Integration seams documented and validated by source review. |
 | P0-T02 | PASS | Knowledge paired-plugin skeleton accepted locally; authoritative scope, Workspace switching and worktree path verified. |
-| P0-T03 | TODO | Next implementation task; not started. |
+| P0-T03 | PASS | Standalone authenticated loopback service accepted: focused 14/14; strict static/build/package gates PASS; full suite 3752 passed / 1 inherited failed / 2 skipped; real process lifecycle/HTTP/limits PASS. |
 
 Current next task:
 
-# **P0-T03 — Standalone `pi-knowledge` contract + process skeleton**
+# **P0-T04 — Thin server-plugin → pi-knowledge adapter**
 
-Do not begin P1 until the P0 Gate is satisfied.
+P0-T04 remains TODO until started as its own task/branch. Do not begin P1 until the P0 Gate is satisfied.

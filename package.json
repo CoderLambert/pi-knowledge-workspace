@@ -26,7 +26,8 @@
   "bin": {
     "pi-web": "dist/cli.js",
     "pi-web-server": "dist/server/index.js",
-    "pi-web-sessiond": "dist/server/sessiond.js"
+    "pi-web-sessiond": "dist/server/sessiond.js",
+    "pi-knowledge": "dist/knowledge/service/main.js"
   },
   "files": [
     "dist",
@@ -62,6 +63,7 @@
     "verify:staged": "node scripts/verify-staged.mjs",
     "start": "tsx src/server/index.ts",
     "start:sessiond": "npm run build:plugins && tsx src/server/sessiond.ts",
+    "start:knowledge": "tsx src/knowledge/service/main.ts",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "prepack": "npm run build",
     "pack:dry": "npm pack --dry-run",

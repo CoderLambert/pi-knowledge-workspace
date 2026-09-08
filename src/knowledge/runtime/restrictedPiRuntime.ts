@@ -3,7 +3,6 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   defineTool,
-  InMemorySettingsStorage,
   ModelRuntime,
   SessionManager,
   SettingsManager,
@@ -34,6 +33,26 @@ function restrictedTool(name: (typeof RESTRICTED_KNOWLEDGE_TOOL_NAMES)[number]) 
   });
 }
 
+function createInMemorySettingsManager() {
+  let globalSettings: string | undefined;
+  let projectSettings: string | undefined;
+  return SettingsManager.fromStorage(
+    {
+      withLock(
+        scope: "global" | "project",
+        fn: (current: string | undefined) => string | undefined,
+      ) {
+        const current = scope === "global" ? globalSettings : projectSettings;
+        const next = fn(current);
+        if (next === undefined) return;
+        if (scope === "global") globalSettings = next;
+        else projectSettings = next;
+      },
+    },
+    { projectTrusted: false },
+  );
+}
+
 export interface RestrictedPiRuntimeProbe {
   activeToolNames: string[];
   discoveredResources: {
@@ -46,7 +65,7 @@ export interface RestrictedPiRuntimeProbe {
 }
 
 export async function createRestrictedPiRuntimeProbe(cwd = process.cwd()): Promise<RestrictedPiRuntimeProbe> {
-  const settingsManager = SettingsManager.fromStorage(new InMemorySettingsStorage(), { projectTrusted: false });
+  const settingsManager = createInMemorySettingsManager();
   const resourceLoader = new DefaultResourceLoader({
     cwd,
     agentDir: cwd,

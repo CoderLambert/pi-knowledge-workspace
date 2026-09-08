@@ -7,8 +7,9 @@
 - **Date:** 2026-09-09
 - **Branch:** `feat/p0-standalone-pi-knowledge-service`
 - **Stacked base:** `feat/p0-knowledge-plugin-skeleton` at `4a3536977aa379fd9dbd97d175c39b94536d74f8`
-- **PR:** #4 — `feat: add standalone pi-knowledge service skeleton` (draft)
-- **Status:** **PARTIAL**
+- **Implementation verification head:** `f98926530abe7dc2fd06edd3e684ca31a430beda`
+- **PR:** #4 — `feat: add standalone pi-knowledge service skeleton`
+- **Status:** **PASS**
 - **P0-T04 started:** no
 - **Human verification guide:** `docs/development/verification/P0-T03-standalone-pi-knowledge-service.md`
 
@@ -16,7 +17,7 @@
 
 Introduce a real standalone `pi-knowledge` process boundary with a small authenticated loopback HTTP/JSON contract, without implementing persistent Knowledge behavior or changing PI WEB's existing Machine / Project / Workspace / Session ownership.
 
-The task proves only the service process and protocol boundary:
+P0-T03 proves only:
 
 ```text
 local caller
@@ -25,11 +26,11 @@ local caller
 → bounded allowlisted dispatch
 ```
 
-It does **not** prove the Browser → sessiond → `pi-knowledge` chain. That remains P0-T04/P0-T05 scope.
+It does **not** implement or claim the Browser → sessiond → `pi-knowledge` chain. That remains P0-T04/P0-T05 scope.
 
-## Scope
+## Delivered scope
 
-Implemented in P0-T03:
+Implemented:
 
 - independent `pi-knowledge` process entry;
 - explicit loopback-only bind configuration;
@@ -40,74 +41,48 @@ Implemented in P0-T03:
 - operation allowlist:
   - `capabilities.get`;
   - `workspace.echo`;
-- caller request id on dispatch plus server request ids for pre-dispatch failures/health;
+- caller request id plus server request ids for pre-dispatch failures/health;
 - stable structured success/error envelopes;
-- bounded request body;
-- bounded serialized response;
-- malformed JSON rejection;
-- malformed schema rejection;
-- unsupported operation rejection;
-- incompatible protocol rejection;
-- rejection of extra target/proxy fields;
+- bounded request body and serialized response;
+- malformed JSON/schema rejection;
+- unsupported-operation rejection;
+- incompatible-protocol rejection;
+- arbitrary target/proxy-field rejection;
 - build/bin/package entry for `pi-knowledge`;
-- focused contract/config tests.
+- focused contract/config tests;
+- real standalone listen/HTTP/shutdown verification.
 
 Explicitly not implemented:
 
 - P0-T04 server-plugin adapter;
-- Browser access to `pi-knowledge`;
-- SQLite or any persistence;
+- Browser access to the service port/token;
+- SQLite or persistence;
 - ingestion/parsing;
 - retrieval/RAG;
 - embeddings;
 - Notes;
-- model/LLM calls;
-- Pi SDK restricted runtime;
+- model/LLM/Pi SDK runtime;
 - Redis/RabbitMQ/Kafka;
-- general RPC/framework abstraction.
+- generic RPC/proxy framework.
 
-## Changes
+## Contract and process boundary
 
-### Contract boundary
-
-Added `src/knowledge/contracts/` containing:
-
-- protocol/service constants and transport limits;
-- exact initial operation allowlist;
-- dispatch-envelope and operation-specific schema validation;
-- stable error codes and `KnowledgeServiceError`.
-
-The dispatch request shape is deliberately narrow:
-
-```json
-{
-  "protocolVersion": 1,
-  "requestId": "caller-generated-id",
-  "operation": "capabilities.get | workspace.echo",
-  "input": null
-}
-```
-
-Top-level fields outside this envelope are rejected. The generic envelope leaves `input` as `unknown`; each allowlisted operation validates its own exact input contract. `workspace.echo` accepts only:
+Source boundary:
 
 ```text
-projectId
-workspaceId
-workspacePath
-workspaceLabel?
+src/knowledge/contracts/
+  protocol.ts
+  operations.ts
+  schemas.ts
+  errors.ts
+
+src/knowledge/service/
+  main.ts
+  app.ts
+  config.ts
+  health.ts
+  dispatch.ts
 ```
-
-There is no URL, host, port, socket path, command, filesystem-read target, or arbitrary proxy destination in the contract.
-
-### Standalone service
-
-Added `src/knowledge/service/`:
-
-- `main.ts` — process entry, config load, listen, SIGINT/SIGTERM close;
-- `app.ts` — Fastify app, authentication, endpoints, error mapping, request/response bounds;
-- `config.ts` — loopback/token/port/limit configuration;
-- `health.ts` — health payload;
-- `dispatch.ts` — allowlisted operation dispatch.
 
 Default transport configuration:
 
@@ -118,180 +93,175 @@ max request: 64 KiB
 max response: 64 KiB
 ```
 
-`PI_KNOWLEDGE_HOST` is restricted to explicit `127.0.0.1` or `::1`; non-loopback binds such as `0.0.0.0` fail configuration.
+`PI_KNOWLEDGE_HOST` accepts only explicit `127.0.0.1` or `::1`; a non-loopback bind such as `0.0.0.0` fails configuration. `PI_KNOWLEDGE_TOKEN` is required by process configuration and must be at least 16 characters.
 
-`PI_KNOWLEDGE_TOKEN` is required by the process configuration and must contain at least 16 characters. The token is not logged.
+The initial dispatch envelope is intentionally narrow:
 
-### Build/package integration
+```json
+{
+  "protocolVersion": 1,
+  "requestId": "caller-generated-id",
+  "operation": "capabilities.get | workspace.echo",
+  "input": null
+}
+```
+
+Top-level unknown fields are rejected. `input` remains `unknown` at the envelope boundary and is validated only by the selected allowlisted operation. `workspace.echo` accepts only:
+
+```text
+projectId
+workspaceId
+workspacePath
+workspaceLabel?
+```
+
+There is no URL, host, port, socket path, command, filesystem-read target, or arbitrary proxy destination in the contract.
+
+`workspace.echo` is deliberately non-authoritative in P0-T03: it validates and echoes supplied test scope only. Host-authoritative scope injection is P0-T04 responsibility.
+
+## Build/package integration
 
 Updated:
 
 - `tsconfig.build.json` to emit `src/knowledge/**`;
 - `package.json` with `start:knowledge` and `pi-knowledge` bin entry;
-- `knip.json` with the standalone service entry point.
+- `knip.json` with the standalone process entry.
 
-No PI WEB sessiond/server route is modified by this task.
-
-## Files
-
-Added:
-
-```text
-src/knowledge/contracts/protocol.ts
-src/knowledge/contracts/operations.ts
-src/knowledge/contracts/schemas.ts
-src/knowledge/contracts/errors.ts
-src/knowledge/service/main.ts
-src/knowledge/service/app.ts
-src/knowledge/service/config.ts
-src/knowledge/service/health.ts
-src/knowledge/service/dispatch.ts
-src/knowledge/service/app.test.ts
-src/knowledge/service/config.test.ts
-docs/development/reports/P0-T03-standalone-pi-knowledge-service.md
-docs/development/verification/P0-T03-standalone-pi-knowledge-service.md
-```
-
-Modified:
-
-```text
-package.json
-tsconfig.build.json
-knip.json
-```
-
-Task-status documentation is also updated separately as P0-T03 progresses.
-
-## Architecture decisions
-
-1. **Reuse Fastify already present in the repository.** No new transport dependency or RPC framework is introduced.
-2. **Keep the process under `src/knowledge/`, not `src/server/`.** The service is part of the same Git repository but has a distinct process boundary.
-3. **Make the build boundary explicit.** `tsconfig.build.json` now emits Knowledge service files so the process is not development-only.
-4. **Require service authentication.** Both health and dispatch are behind the bearer-token boundary; loopback alone is not treated as authentication.
-5. **Fail closed on bind address.** Configuration accepts only explicit IPv4/IPv6 loopback addresses.
-6. **Reject unknown protocol fields.** The initial contract is deliberately not an extensible generic proxy envelope.
-7. **Keep dispatch input operation-scoped.** The envelope carries `input: unknown`; only the selected allowlisted operation interprets and validates it. No recursive generic JSON/RPC schema layer is introduced.
-8. **Keep Workspace authority outside P0-T03.** `workspace.echo` validates and echoes supplied scope data but does not claim that data is authoritative. P0-T04 will be responsible for constructing it from `PairedPluginRequestContext`.
-9. **Bound serialized responses before sending.** Response limiting is enforced on UTF-8 JSON bytes rather than relying on operation-specific assumptions.
-10. **Preserve stable structured failures.** Authentication, parse, schema, operation, version, size and not-found errors use the same envelope and request-id correlation behavior.
-11. **Do not touch inherited session/auth behavior.** The P0-T02 baseline `piSessionService.promptQueue` failure remains unrelated maintenance scope.
+No PI WEB sessiond/server route is modified by P0-T03.
 
 ## Security / correctness invariants
 
-- Default bind is `127.0.0.1`.
-- Configured bind cannot be `0.0.0.0` or another non-loopback address.
-- Service startup requires a non-trivial token.
-- Missing/wrong bearer tokens are rejected before dispatch.
-- Browser code is not changed and receives no service port/token knowledge.
-- Only `capabilities.get` and `workspace.echo` are accepted.
-- Unknown request fields are rejected.
-- Operation input is validated only by the selected allowlisted operation.
-- `workspace.echo` cannot carry an arbitrary proxy target.
-- Malformed JSON and malformed schema fail closed.
-- Protocol versions other than `1` fail closed.
-- Request bodies are bounded by Fastify `bodyLimit`.
-- Serialized JSON responses are byte-bounded before send.
-- Response-limit fallback remains a structured error envelope.
-- Dispatch request ids are returned for valid dispatch envelopes; failures before a valid envelope use the server request id.
-- Service code does not open SQLite, read arbitrary files, perform network proxying, invoke models, or depend on sessiond.
+- loopback-only configuration;
+- token authentication required for health and dispatch;
+- Browser receives no service port/token knowledge;
+- exact initial operation allowlist;
+- no arbitrary target/proxy input;
+- malformed JSON/schema fail closed;
+- incompatible protocol versions fail closed;
+- request body bounded by Fastify body limit;
+- serialized JSON response byte-bounded before send;
+- stable error envelope and request-id correlation;
+- no SQLite, arbitrary file reads, network proxying, models, or sessiond dependency in service code.
 
-## Automated verification
+## Implementation corrections found during verification
 
-### Coverage added
+Local verification exposed ordinary strict-type/lint issues before acceptance. They were fixed without lowering repository rules:
 
-`src/knowledge/service/app.test.ts` covers:
+- Fastify error-handler `unknown` values are explicitly narrowed before reading `code` / `statusCode`;
+- strict `restrict-template-expressions` findings were fixed with explicit numeric string conversion;
+- no `eslint-disable`, unsafe assertion escape, or lint configuration weakening was introduced;
+- recursive generic JSON validation was removed in favor of shallow operation-specific validation, avoiding unnecessary deep recursion while preserving the narrow allowlisted contract;
+- response minimum bound remains 512 bytes so the structured fallback error itself can remain bounded;
+- the focused app test includes a real loopback `listen` / authenticated `fetch` / `close` lifecycle without sessiond.
 
-1. authenticated health response;
-2. `capabilities.get`;
-3. `workspace.echo`;
-4. missing/wrong token rejection;
-5. malformed JSON rejection and stable error envelope;
-6. malformed schema rejection;
-7. arbitrary proxy-target field rejection;
-8. unsupported operation rejection;
-9. incompatible protocol rejection;
-10. request byte-limit enforcement;
-11. response byte-limit enforcement.
+## Verification evidence
 
-`src/knowledge/service/config.test.ts` covers:
+### Focused tests
 
-- default loopback bind;
-- explicit IPv6 loopback;
-- non-loopback bind rejection;
-- required/minimum token;
-- configured port and byte-limit validation, including minimum request/response bounds.
+Command:
 
-### Execution state
-
-**Not yet counted as PASS.**
-
-The ChatGPT execution container available for this task cannot resolve `github.com`, so it cannot clone the branch or install the repository dependency tree. A draft stacked PR (#4) was created specifically to trigger repository CI, but as of this report GitHub exposes **no workflow run/status record** for the P0-T03 head, matching the no-run behavior previously observed on PR #3.
-
-Therefore the following are **written but not yet evidenced as passing**:
-
-```text
-focused P0-T03 tests
-typecheck
-ESLint
-knip
-production build
-package dry-run/full-suite regression
+```bash
+npm test -- \
+  src/knowledge/service/app.test.ts \
+  src/knowledge/service/config.test.ts
 ```
 
-This report intentionally does not convert source review into test evidence.
-
-### Source-level review corrections already made
-
-A strict-rule review against `eslint.config.js` found and corrected ordinary type assertions that would violate:
+Result:
 
 ```text
-@typescript-eslint/consistent-type-assertions: assertionStyle never
+Test Files  2 passed (2)
+Tests       14 passed (14)
 ```
 
-The same strict-lint review removed unnecessary `async` Fastify handlers/hooks while keeping `buildKnowledgeApp()` genuinely asynchronous through `app.ready()`.
+**PASS.**
 
-A response-boundary review found that a 256-byte minimum response configuration could be smaller than the structured fallback error when a maximum-length request id is present. The service/config minimum response limit was raised to 512 bytes, the fallback status normalized to HTTP 500, and the configured lower bounds were added to focused tests.
+### Static/build/package gates
 
-A follow-up `stylisticTypeChecked` review found that a recursive index-signature JSON type would either violate the repository's preferred `Record` style or become a TypeScript circular type alias when mechanically converted. The generic recursive JSON abstraction was removed instead. Dispatch keeps `input` as `unknown` and validates it only inside each allowlisted operation, which is both simpler and closer to the intended narrow contract.
+Locally executed after the strictness fixes:
 
-These are implementation corrections, not substitutes for executing ESLint/tests.
+```text
+TypeScript: PASS
+ESLint: PASS
+Knip: PASS
+Build: PASS
+pack:dry: PASS
+dist/knowledge/service/main.js: PASS
+git diff --check against P0-T02 base: PASS
+```
 
-## Manual verification
+The earlier pre-fix TypeScript/build/lint failures are not acceptance evidence; they were diagnosed, corrected, and the final gates were rerun successfully.
 
-**Pending.**
+### Full-suite regression
 
-Real-process verification must still demonstrate on a developer machine:
+Final observed suite result:
 
-- standalone start without PI WEB sessiond;
-- default loopback listener;
-- authenticated health;
-- both operations;
-- auth/schema/version/unsupported negative cases;
-- real request and response limit behavior;
-- clean SIGINT/SIGTERM stop.
+```text
+Test Files  1 failed | 373 passed (374)
+Tests       1 failed | 3752 passed | 2 skipped (3755)
+```
 
-Exact commands are in the Human Verification Guide.
+The sole failure is:
 
-## Known limitations
+```text
+src/server/sessions/piSessionService.promptQueue.test.ts
+PiSessionService prompt, queue, and auth warnings
+refreshes auth state and dedupes warnings when logout removes the current model's credentials
+expected 1
+received 0
+```
 
-- P0-T03 has not yet received actual local automated/static/build evidence.
-- GitHub Actions has not produced a workflow run for PR #4 at the time of this report.
-- Real process start/stop/listener behavior is not yet manually accepted.
-- `workspace.echo` is intentionally non-authoritative; it does not read PI WEB state.
-- No server-plugin → service adapter exists yet; P0-T04 is not started.
-- No Browser → sessiond → service E2E exists yet; P0-T05 is not started.
-- No persistence, ingestion, retrieval, model or Notes behavior exists.
-- Service lifecycle supervision/installation policy is outside this contract skeleton task.
-- The inherited P0-T02/P0-T01 `src/server/sessions/piSessionService.promptQueue.test.ts` compatibility failure remains unrelated and must not be patched inside P0-T03.
+This exact failure was independently reproduced on the P0-T01 baseline during P0-T02 acceptance and is therefore classified as **inherited**, not a P0-T03 regression. P0-T03 did not modify session/auth behavior to make the inherited test green.
+
+P0-T03-attributable full-suite failures: **0**.
+
+### Real standalone process acceptance
+
+The repository verification script was executed locally against the built `dist/knowledge/service/main.js` entry and reported:
+
+```text
+P0-T03 REAL PROCESS ACCEPTANCE: PASS
+```
+
+The passing process acceptance covered:
+
+- independent service start without PI WEB/sessiond;
+- listener bound to `127.0.0.1:8515`;
+- explicit rejection of `0.0.0.0` configuration;
+- authenticated `/v1/health` and request-id correlation;
+- `capabilities.get`;
+- `workspace.echo`;
+- missing-token rejection;
+- wrong-token rejection;
+- malformed-JSON rejection;
+- malformed-schema rejection;
+- arbitrary proxy-target rejection;
+- unsupported-operation rejection;
+- incompatible-protocol rejection with expected-version details;
+- real request-byte-limit rejection;
+- real response-byte-limit rejection on a secondary process configured to 512 bytes;
+- SIGTERM/SIGINT clean shutdown;
+- release of verification listener ports after stop.
+
+**PASS.**
+
+## Known limitations / next boundary
+
+- GitHub Actions produced no workflow run/status record for this stacked PR; acceptance evidence is the executed local verification above, not source review.
+- `workspace.echo` does not read PI WEB state and is not authoritative.
+- No server-plugin → service adapter exists in P0-T03.
+- No Browser → sessiond → service E2E exists in P0-T03.
+- No persistence, ingestion, retrieval, model, or Notes behavior exists.
+- Service lifecycle supervision/installation policy is outside this contract-skeleton task.
+- The inherited `piSessionService.promptQueue` failure remains separate maintenance scope.
 
 ## Result
 
-**PARTIAL — implementation and repository contract/test skeleton are present, but required automated/static/build and real-process verification evidence is still outstanding.**
+**PASS — the standalone authenticated loopback `pi-knowledge` contract/process boundary is implemented and accepted with focused tests, strict static/build/package gates, full-suite regression classification, and real-process start/listen/HTTP/limit/stop verification.**
 
-P0-T03 must not be declared PASS until the verification guide has been run and the actual results are recorded here.
+P0-T04 was not started or mixed into this branch.
 
 ## Next task
 
-Finish P0-T03 verification and documentation closure only.
+P0-T04 — Thin server-plugin → `pi-knowledge` adapter.
 
-**Do not begin P0-T04 until P0-T03 is formally accepted as PASS.**
+P0-T04 may begin only as a separate task/branch after this P0-T03 acceptance record; its scope is the thin host-authoritative adapter, not persistence or heavy Knowledge processing.

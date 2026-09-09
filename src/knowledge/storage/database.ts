@@ -18,7 +18,10 @@ export interface KnowledgeDatabase extends MigrationDatabase {
   pragma(source: string, options?: { simple?: boolean }): unknown;
 }
 
-type DatabaseConstructor = new (filename: string) => KnowledgeDatabase;
+type DatabaseConstructor = new (
+  filename: string,
+  options?: { readonly?: boolean; fileMustExist?: boolean },
+) => KnowledgeDatabase;
 
 function loadDatabaseConstructor(): DatabaseConstructor {
   const require = createRequire(import.meta.url);
@@ -42,6 +45,23 @@ export function openKnowledgeDatabase(filename: string): KnowledgeDatabase {
     db.pragma("foreign_keys = ON");
     if (filename !== ":memory:") db.pragma("journal_mode = WAL");
     applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);
+    return db;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
+export function openKnowledgeDatabaseReadOnly(filename: string): KnowledgeDatabase {
+  const Database = loadDatabaseConstructor();
+  const db = new Database(filename, { readonly: true, fileMustExist: true });
+  try {
+    const version = db.pragma("user_version", { simple: true });
+    if (version !== KNOWLEDGE_SCHEMA_VERSION) {
+      throw new Error(
+        `Knowledge snapshot schema ${String(version)} does not match supported schema ${String(KNOWLEDGE_SCHEMA_VERSION)}`,
+      );
+    }
     return db;
   } catch (error) {
     db.close();

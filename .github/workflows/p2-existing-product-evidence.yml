@@ -89,21 +89,18 @@ jobs:
           TOKEN_RESPONSE=$(curl -fsS -X POST http://127.0.0.1:3001/api/request-token \
             -H 'Content-Type: application/json' \
             -d '{"password":"p2-t11-ci-auth"}')
-          printf '%s\n' "$TOKEN_RESPONSE" > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/token-response.json
           TOKEN=$(printf '%s' "$TOKEN_RESPONSE" | jq -r '.token // empty')
           test -n "$TOKEN"
+          printf '%s\n' "$TOKEN_RESPONSE" | jq 'del(.token)' > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/token-response.redacted.json
 
           KEY_RESPONSE=$(curl -fsS -X POST http://127.0.0.1:3001/api/system/generate-api-key \
             -H "Authorization: Bearer $TOKEN" \
             -H 'Content-Type: application/json' \
             -d '{"name":"p2-t11-ci"}')
-          printf '%s\n' "$KEY_RESPONSE" > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/api-key-response.redacted.json
           API_KEY=$(printf '%s' "$KEY_RESPONSE" | jq -r '.apiKey.secret // .apiKey // .secret // empty')
           test -n "$API_KEY"
-          jq 'if .apiKey.secret then .apiKey.secret="<redacted>" elif (.apiKey|type)=="string" then .apiKey="<redacted>" elif .secret then .secret="<redacted>" else . end' \
-            /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/api-key-response.redacted.json \
-            > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/api-key-response.tmp.json
-          mv /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/api-key-response.tmp.json /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/api-key-response.redacted.json
+          printf '%s\n' "$KEY_RESPONSE" | jq 'if .apiKey.secret then .apiKey.secret="<redacted>" elif (.apiKey|type)=="string" then .apiKey="<redacted>" elif .secret then .secret="<redacted>" else . end' \
+            > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/api-key-response.redacted.json
 
           WORKSPACE_RESPONSE=$(curl -fsS -X POST http://127.0.0.1:3001/api/v1/workspace/new \
             -H "Authorization: Bearer $API_KEY" \
@@ -164,22 +161,19 @@ jobs:
           docker logs p2-open-webui
           exit 1
 
-      - name: Verify runtime API and Knowledge creation
+      - name: Verify Knowledge runtime API
         run: |
           set -euo pipefail
-          curl -fsS http://127.0.0.1:3000/openapi.json > /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/openapi.json
-          node - <<'NODE'
-          const fs = require('fs');
-          const api = JSON.parse(fs.readFileSync('/tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/openapi.json', 'utf8'));
-          for (const p of ['/api/v1/knowledge/create', '/api/v1/knowledge/{id}/file/add', '/api/v1/files/']) {
-            if (!api.paths?.[p]) throw new Error(`missing runtime OpenAPI path: ${p}`);
-          }
-          NODE
-          curl -fsS -X POST http://127.0.0.1:3000/api/v1/knowledge/create \
+          # Production Open WebUI intentionally disables FastAPI /openapi.json;
+          # exact route existence is frozen by the source-contract job above.
+          # Here we execute the actual fixed-release Knowledge endpoint.
+          HTTP_CODE=$(curl -sS -o /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/knowledge-create.json \
+            -w '%{http_code}' -X POST http://127.0.0.1:3000/api/v1/knowledge/create \
             -H 'Content-Type: application/json' \
-            -d '{"name":"p2-t11-smoke","description":"fixed-version CI smoke"}' \
-            > /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/knowledge-create.json
-          test "$(jq -r '.name' /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/knowledge-create.json)" = "p2-t11-smoke"
+            -d '{"name":"p2-t11-smoke","description":"fixed-version CI smoke"}')
+          printf '%s\n' "$HTTP_CODE" > /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/knowledge-create.status
+          test "$HTTP_CODE" = "200"
+          test "$(jq -r '.name // empty' /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/knowledge-create.json)" = "p2-t11-smoke"
 
       - name: Record runtime footprint
         if: always()

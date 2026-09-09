@@ -44,7 +44,7 @@ class FakeKnowledgeDatabase implements KnowledgeDatabase {
     return undefined;
   }
 
-  close(): void {}
+  close(): void { /* no-op test database */ }
 }
 
 function chunks(): StructureAwareChunk[] {
@@ -60,15 +60,15 @@ describe("FTS5 baseline index", () => {
     db.authorityResult = undefined;
     const index = new Fts5BaselineIndex(db);
 
-    expect(() =>
+    expect(() => {
       index.replaceArtifactChunks({
         knowledgeWorkspaceId: "workspace-1",
         indexBuildId: "build-1",
         sourceVersionId: "version-1",
         parsedArtifactId: "artifact-1",
         chunks: chunks(),
-      }),
-    ).toThrow(/do not belong to the requested Knowledge Workspace/);
+      });
+    }).toThrow(/do not belong to the requested Knowledge Workspace/);
     expect(db.execLog).toEqual([]);
     expect(db.prepared.some((call) => call.sql.includes("INSERT INTO chunks"))).toBe(false);
   });
@@ -157,9 +157,9 @@ describe("FTS5 baseline index", () => {
     expect(() => index.search({ knowledgeWorkspaceId: "workspace-1", indexBuildId: "build-1", query: "  " })).toThrow(
       /query must not be empty/,
     );
-    expect(() =>
-      index.search({ knowledgeWorkspaceId: "workspace-1", indexBuildId: "build-1", query: "x", limit: 101 }),
-    ).toThrow(/between 1 and 100/);
+    expect(() => {
+      index.search({ knowledgeWorkspaceId: "workspace-1", indexBuildId: "build-1", query: "x", limit: 101 });
+    }).toThrow(/between 1 and 100/);
     expect(() =>
       index.replaceArtifactChunks({
         knowledgeWorkspaceId: "workspace-1",

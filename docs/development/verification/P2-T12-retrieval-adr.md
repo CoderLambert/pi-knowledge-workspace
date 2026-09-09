@@ -1,136 +1,173 @@
 # P2-T12 verification — Retrieval ADR
 
-Status: **BLOCKED ON EVIDENCE**
+Status: **BLOCKED ON FINAL PRODUCT EVIDENCE**
 
 ## Purpose
 
 This guide closes the P2 retrieval decision. It is intentionally not satisfiable with unit fixtures or architectural preference alone.
 
-## 1. Resolve applicable P2 experiment debt
+## 1. Retrieval experiment debt — RESOLVED / CLASSIFIED
 
-Before editing ADR-029's Decision section, record dated evidence for:
+### P2-T04 FTS baseline — COMPLETE
 
-### P2-T04 FTS baseline
+Real expanded-corpus evidence exists with:
 
-- complete development observations;
-- Recall@10, MRR, all-required-Evidence coverage;
-- category failures/representative misses;
-- latency/RSS/index bytes.
+```text
+Recall@10 = 1.0
+MRR = 0.928921568627451
+all-required Evidence coverage = 1.0
+category failures = none
+```
 
-### P2-T05 lexical normalization
+### P2-T05 lexical normalization — COMPLETE
 
-- all four fixed development profiles;
-- least-complex selected profile or explicit baseline/no-improvement decision;
-- frozen configuration before holdout.
+All four fixed profiles executed. Plain `baseline` is frozen because no more complex profile materially improved development quality. One-shot holdout occurred only after freeze.
 
-### P2-T06 Dense
+### P2-T06 Dense — COMPLETE / REJECTED
 
-If Dense remains a candidate:
+Both fixed multilingual Dense profiles regressed FTS quality. No Dense profile was selected.
 
-- one/two fixed model profiles with exact revision/dimensions/preprocessing;
-- real development quality/resource metrics;
-- one frozen winner or explicit Dense-not-useful conclusion.
+### P2-T07 sqlite-vec — NOT APPLICABLE
 
-If Dense is rejected from real evidence, record P2-T08 as not applicable rather than manufacturing a Hybrid run.
+sqlite-vec is only a Dense deployment mechanism. Dense was rejected, so sqlite-vec target acceptance is not required for the V1 decision.
 
-### P2-T07 sqlite-vec
+### P2-T08 Hybrid/RRF — NOT APPLICABLE
 
-Required only if sqlite-vec is considered for the chosen Dense deployment:
+Hybrid was conditional on Dense proving useful. Do not manufacture a Hybrid benchmark after the prerequisite failed.
 
-- trusted extension version/path;
-- load/reload after restart;
-- scoped KNN before Top-K;
-- concurrency/resource measurements;
-- adopt/do-not-adopt decision.
+### P2-T09 benchmark report — PASS
 
-### P2-T08 Hybrid
+Frozen FTS development report generated from real observations:
 
-Required only after Dense is proven useful:
+```text
+50 queries / 42 answerable / 8 no-answer
+Recall@10 = 1.0
+MRR = 0.9365079365079365
+all-required Evidence coverage = 1.0
+category failures = none
+```
 
-- same development set for FTS, Dense and Hybrid;
-- full quality/category/resource comparison;
-- frozen RRF configuration;
-- material benefit vs simpler option.
+### P2-T10 deterministic direct-file Pi run — COMPLETE
 
-### P2-T09 benchmark report
+Real Omarchy/Pi execution:
 
-Generate a reproducible development report from complete real observations and record dataset/repo/config/model revisions.
+```text
+50 queries
+any-required Evidence coverage = 1.0
+all-required Evidence coverage = 1.0
+citation precision = 0.7758620689655172 (45/58)
+no-answer correct abstention = 0.625 (5/8)
+median latency = 10165.077273999981 ms
+p95 latency = 14855.569325999997 ms
+max latency = 18050.93610000005 ms
+Pi 0.85.1 / openai-codex / gpt-6-astra
+```
 
-### P2-T10 direct-file Pi baseline
+The automated run is complete, but P2-T10 remains PARTIAL until independent human semantic review is recorded.
 
-Run the same development user tasks with fixed files supplied directly to Pi, then record deterministic Evidence/citation/no-answer metrics and independent human answer correctness.
+## 2. Remaining P2-T10 human review — REQUIRED
 
-### P2-T11 existing products
+Complete the generated local worksheet:
 
-Run fixed-version AnythingLLM and Open WebUI hands-on with the same corpus/tasks, including source-update/restart historical-citation durability and target operational cost.
+```text
+/tmp/pi-knowledge-p2-evidence/p2-t10/human-review-development.md
+```
 
-## 2. Fill the ADR decision table
+For all 50 development answers record:
 
-Replace `UNRUN` / `HANDS-ON UNRUN` cells in `docs/architecture/ADR-029-v1-retrieval-strategy.md` only with actual measured evidence references.
+- correct / partially correct / incorrect;
+- unsupported claims;
+- version/conflict mistakes;
+- important omitted evidence;
+- no-answer hallucination/abstention behavior.
 
-Do not convert a documentation claim, unit fixture, or synthetic observation into benchmark evidence.
+The model under test must not be its own sole reviewer.
 
-## 3. Apply the decision criteria in order
+## 3. Remaining P2-T11 external-product hands-on — REQUIRED
+
+For fixed versions of:
+
+- AnythingLLM;
+- Open WebUI Knowledge;
+
+record on the same target machine as applicable:
+
+- exact product/model/embedding/retrieval versions;
+- same fixed P2 development corpus/query behavior;
+- Chinese/mixed/code/version/conflict/no-answer quality;
+- source version A → citation → update to B → restart → reopen old citation;
+- multi-version/conflict behavior;
+- nearest note/reuse feature and source stability;
+- Pi/API/MCP workflow fit;
+- install/update/backup friction;
+- idle/query RSS, p95 and persistent/index bytes.
+
+Public documentation claims are context, not PASS evidence.
+
+## 4. Current retrieval candidate
+
+Measured retrieval evidence narrows the V1 candidate to:
+
+```text
+SQLite FTS5
+unicode61
+lexicalProfile = baseline
+naturalLanguageCompiler = quoted-literal-or
+Top-K = 10
+```
+
+Do not reintroduce Dense/sqlite-vec/Hybrid unless new development evidence explicitly reopens that decision.
+
+## 5. Fill the final ADR product-value rows
+
+After P2-T10 human review and P2-T11 hands-on, update `docs/architecture/ADR-029-v1-retrieval-strategy.md` with:
+
+- direct-file semantic correctness/partial/incorrect counts;
+- unsupported/version/conflict/no-answer observations;
+- external-product historical citation durability;
+- same-corpus external-product quality;
+- operational/workflow comparison;
+- final justification for retaining or rejecting the FTS-only Knowledge product architecture.
+
+## 6. Apply decision criteria
 
 Evaluate:
 
 1. required Evidence correctness/coverage;
 2. code/version/Chinese/mixed/conflict behavior;
 3. immutable historical Evidence compatibility;
-4. measured product value over direct-file Pi;
+4. product value over direct-file Pi and mature local substitutes;
 5. simplicity/maintainability;
 6. latency/RSS/index cost;
 7. installation/restart/backup reliability.
 
-When measured quality is materially equivalent, prefer the simpler stack. Simplicity cannot override a material required-Evidence failure.
+## 7. Holdout integrity
 
-## 4. Record exactly one V1 decision
+Confirm the P2-T05 retrieval configuration was frozen before its one-shot holdout and holdout did not feed retuning.
 
-The expected final choices are intentionally narrow:
+Do not run P2-T10 holdout for tuning.
 
-```text
-FTS only
-```
+## 8. Final acceptance procedure
 
-possibly with the selected deterministic lexical normalization, or:
+Only after sections 2 and 3 are complete:
 
-```text
-FTS + Dense + RRF
-```
+1. update ADR-029's final evidence table;
+2. record exactly one V1 architecture decision;
+3. if evidence still supports FTS only, freeze the exact configuration/revision;
+4. change ADR-029 from `BLOCKED ON FINAL PRODUCT EVIDENCE` to `Accepted`;
+5. update P2 task/report/debt status safely;
+6. define the retrieval-config revision consumed by P3 ScopeManifest/AnswerRun provenance;
+7. stop before P3 unless explicitly authorized.
 
-with exact frozen lexical/model/preprocessing/RRF/deployment revisions.
-
-If benchmark evidence forces a materially different architecture, stop and open a new architecture decision rather than silently widening ADR-029.
-
-## 5. Holdout integrity
-
-Verify that configurations were frozen before holdout and that holdout failures did not feed back into the selected configuration during the same experiment cycle.
-
-Record development and holdout reports separately.
-
-## 6. Update dependent architecture records
-
-After the decision:
-
-- change ADR-029 from `BLOCKED ON EVIDENCE` to `Accepted`;
-- update the architecture baseline with the exact retrieval revision contract;
-- update P2-T04..T12 reports/debt statuses as supported by evidence;
-- update DEVELOPMENT-PLAN / CHANGELOG / canonical verification-debt ledger safely;
-- define the retrieval-config revision consumed by P3 ScopeManifest.
-
-## 7. Repository/direct-base audit
+## 9. Repository/direct-base audit
 
 ```bash
 git diff --check origin/research/p2-existing-product-comparison...HEAD
 git diff --name-status origin/research/p2-existing-product-comparison...HEAD
 ```
 
-While blocked, expected P2-T12 scope is ADR-029 plus task report/verification and safe bookkeeping only. No P3 schema/runtime implementation belongs here.
-
-## 8. P3 gate
-
-Only after ADR-029 is Accepted and the required P2 evidence is recorded may P3-T01 branch from P2-T12.
+Expected P2-T12 scope remains exactly ADR-029 plus task report and verification guide. No P3 schema/runtime implementation belongs here.
 
 ## PASS condition
 
-P2-T12 is PASS only when the final retrieval choice is supported by dated reproducible P2 evidence, ADR-029 is Accepted, the P2 gate is closed, and the exact retrieval configuration/revision contract is available for P3 durable provenance.
+P2-T12 is PASS only when the final product-value evidence is complete, ADR-029 is Accepted with a dated evidence-backed decision, and the exact retrieval configuration/revision contract is available for P3 durable provenance.

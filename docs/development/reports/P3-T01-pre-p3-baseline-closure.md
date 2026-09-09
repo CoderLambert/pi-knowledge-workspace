@@ -74,17 +74,86 @@ This task does not:
 - alter P2 evidence;
 - enter P3 Slice A feature work.
 
-## Verification status
+## CI evidence
 
-Repository CI is required to confirm:
+PR #56 head before this report update:
 
-1. the 12 known TypeScript errors are removed;
-2. focused Knowledge tests for the touched areas pass;
-3. `npm run verify` progresses beyond the previous typecheck stop point;
-4. any later failure is compared with the inherited base before classification.
+```text
+8ca13266b58e76530f7fac00de03df6b1abea622
+```
 
-Until the new PR CI is observed, this task remains **PARTIAL**.
+GitHub Actions CI run:
+
+```text
+34391016986
+```
+
+### TypeScript gate
+
+**PASS.**
+
+`npm run verify` executed:
+
+```text
+npm run typecheck
+→ tsc --noEmit
+→ exit 0
+```
+
+The previous 12 TypeScript errors are no longer present. CI then advanced to ESLint, proving this task removed the original typecheck stop condition.
+
+### Newly exposed inherited lint baseline
+
+CI then failed at ESLint with:
+
+```text
+261 errors
+0 warnings
+```
+
+across a broad pre-existing Knowledge/plugin surface, including many files untouched by P3-T01.
+
+Examples include:
+
+```text
+pi-web-plugins/knowledge/*
+src/knowledge/eval/*
+src/knowledge/storage/*
+src/knowledge/service/*
+src/knowledge/runtime/*
+src/server/knowledgeSelectedMachineFederation.integration.test.ts
+```
+
+This is a broader inherited lint baseline that the parent CI could not reveal because the parent stopped earlier at TypeScript. P3-T01 does not expand to a 261-error repository-wide lint rewrite; that would violate this task's narrow scope and make regression attribution worse.
+
+Touched files also contain older lint debt (for example pre-existing non-null assertions/empty fixture methods/void-expression assertions) that existed before this task's minimal TypeScript fixes. Those are not silently folded into this task.
+
+### Other workflow observations
+
+- P2 FTS Evidence workflow completed successfully on the head.
+- P2 Lexical Evidence reached the native SQLite runtime probe and failed there after its diagnostic typecheck/lint/knip/build/package steps reported success; the frozen P2 benchmark was not rerun/tuned by this task.
+
+## Current verification status
+
+Achieved:
+
+1. known 12 TypeScript errors removed;
+2. `npm run verify` progresses beyond typecheck;
+3. task diff remains six files: four narrow code/test fixes plus report/verification docs;
+4. no product/ADR/evidence scope expansion.
+
+Still open:
+
+1. repository CI remains red at inherited ESLint baseline;
+2. CI therefore has not reached the full `npm test` stage, so touched-area test execution is not yet obtained from the main CI workflow;
+3. the broader lint baseline needs its own dependency-safe cleanup plan rather than being hidden inside this task.
+
+## Status decision
+
+**PARTIAL.**
+
+P3-T01 has closed the original TypeScript blocker, but the objective of establishing a trustworthy pre-Slice-A static/test baseline is not fully achieved while the newly exposed inherited lint baseline prevents CI from reaching later gates.
 
 ## User verification
 
-No user-local/browser/Fleet/hardware verification is required for this cleanup task. All acceptance evidence should be obtainable from repository CI.
+No user-local/browser/Fleet/hardware verification is required. This is autonomous repository implementation debt and should continue without requesting immediate user participation.

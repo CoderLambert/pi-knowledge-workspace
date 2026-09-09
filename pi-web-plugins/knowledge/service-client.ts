@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
+import { fetch as undiciFetch } from "undici";
 
 export const KNOWLEDGE_SERVICE_PROTOCOL_VERSION = 1;
 export const KNOWLEDGE_SERVICE_DEFAULT_HOST = "127.0.0.1";
@@ -95,11 +96,11 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
     options.maxResponseBytes ?? KNOWLEDGE_SERVICE_DEFAULT_MAX_RESPONSE_BYTES,
     "maxResponseBytes",
   );
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const fetchImpl = options.fetchImpl ?? undiciFetch;
   const baseUrl = `http://${formatHost(host)}:${String(port)}`;
 
   return Object.freeze({
-    dispatch(
+    async dispatch(
       operation: KnowledgeServiceOperation,
       input: unknown,
       signal: AbortSignal,
@@ -165,7 +166,7 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
       });
     },
 
-    health(signal: AbortSignal): Promise<Record<string, unknown>> {
+    async health(signal: AbortSignal): Promise<Record<string, unknown>> {
       throwIfAborted(signal);
       return withRequestDeadline(signal, timeoutMs, async (deadlineSignal) => {
         const response = await performFetch(

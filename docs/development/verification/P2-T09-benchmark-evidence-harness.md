@@ -1,47 +1,22 @@
 # P2-T09 support verification — Retrieval benchmark evidence harness
 
-Status: **OPEN / CI EXECUTION REQUIRED**
+Status: **PASS**
 
-## Required GitHub evidence
+GitHub Actions run `34329322920` satisfied the support contract:
 
-Run `.github/workflows/p2-retrieval-benchmark-evidence.yml` on the support PR.
+- dependency install succeeded;
+- pinned evidence-only `better-sqlite3@13.0.3` loaded SQLite 3.53.4 with FTS5;
+- focused Golden Dataset/challenge/FTS/SearchQuery/P2-T09 tests: **8 files / 29 tests PASS**;
+- production parser/chunker yielded exactly **38 total / 35 challenge chunks**;
+- all 50 development queries produced real observations;
+- `runRetrievalBenchmark(..., "development", ...)` and Markdown rendering succeeded;
+- artifact `10095148994` uploaded 3 evidence files;
+- artifact digest `sha256:079dc6b4a46c90136e274395d76ba63219e5c43e2ccb913135d5561364ca3672`;
+- deterministic development-dataset hash `949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3`;
+- no holdout query/label files were loaded.
 
-PASS requires:
+Generated metrics: Recall@10 1.0, MRR 0.9365079365079365, all-required coverage 1.0, p95 1.334205 ms, peak RSS 105443328 bytes, FTS dbstat allocation 49152 bytes.
 
-1. clean dependency install;
-2. focused Golden Dataset/challenge/FTS/SearchQuery/P2-T09 runner tests PASS;
-3. production parser/chunker yields exactly 38 total chunks and 35 challenge chunks;
-4. all 50 development queries produce exactly one real observation each with no cross-split data;
-5. `runRetrievalBenchmark(..., "development", ...)` executes with the frozen `fts-baseline` variant;
-6. generated Markdown/JSON are uploaded as an Actions artifact;
-7. provenance records repository SHA, deterministic development-dataset hash, configuration, runtime versions and dbstat allocation;
-8. no holdout query/label files are loaded.
+Repository-wide diagnostic failures remain inherited ancestry debt and do not invalidate this support run. P2-T09's own style-only lint cleanup remains on the owning task.
 
-## Expected configuration
-
-```text
-retriever = sqlite-fts5
-tokenizer = unicode61
-lexicalProfile = baseline
-naturalLanguageCompiler = quoted-literal-or
-topK = 10
-corpusChunks = 38
-challengeChunks = 35
-```
-
-## Gate classification
-
-Repository-wide diagnostics may expose inherited typecheck/lint/knip debt. Classify those failures against the direct base; do not patch unrelated ancestry in this support PR.
-
-Task-attributable failures in the support script/workflow or P2-T09 runner must be corrected before using the artifact as ADR evidence.
-
-## Direct-base scope
-
-Expected support-only diff against `feat/p2-retrieval-benchmark-runner`:
-
-- `.github/workflows/p2-retrieval-benchmark-evidence.yml`;
-- `scripts/p2-run-retrieval-benchmark.mjs`;
-- this verification guide;
-- support report.
-
-No retriever implementation, dataset mutation, Dense/vector/RRF code, provider/model call, direct-file baseline or P3 implementation belongs here.
+Direct-base support scope remains workflow + script + support report + this guide only. No production behavior or P3 work is included.

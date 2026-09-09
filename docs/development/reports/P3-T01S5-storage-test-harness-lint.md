@@ -1,6 +1,6 @@
 # P3-T01S5 — Storage Test Harness Lint Baseline
 
-Status: **PARTIAL**
+Status: **PASS**
 
 Date: 2026-09-10
 
@@ -17,14 +17,16 @@ Continue inherited pre-P3 static cleanup with a bounded test-only storage slice 
 
 The test semantics and production contracts are unchanged.
 
-## Expected verification
+## Verification
+
+GitHub CI run `34413038219` confirmed on Ubuntu:
 
 ```text
 npm run typecheck → PASS
 ESLint 242 → 233 errors
 ```
 
-Nine inherited lint findings are targeted. CI evidence is required before PASS.
+All nine targeted inherited lint findings disappeared. The remaining 233 findings are inherited baseline debt outside this support slice. The P2 FTS and lexical evidence workflows on the same head also completed successfully; no frozen evidence or retrieval configuration was changed or retuned.
 
 ## Scope exclusions
 

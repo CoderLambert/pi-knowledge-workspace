@@ -103,8 +103,10 @@ async function dispatchViewer(
   signal: AbortSignal,
 ): Promise<JsonObject> {
   // KnowledgeServiceOperation predates P1 viewer operations; the wire client itself
-  // carries arbitrary operation strings and the standalone service owns the allowlist.
-  return await serviceClient.dispatch(operation as KnowledgeServiceOperation, input, signal);
+  // serializes JSON and the standalone service owns the operation allowlist. A successful
+  // client dispatch has already parsed and validated an object-shaped JSON result.
+  const result = await serviceClient.dispatch(operation as KnowledgeServiceOperation, input, signal);
+  return result as JsonObject;
 }
 
 async function knowledgePluginHealth(

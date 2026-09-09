@@ -35,6 +35,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install pinned evidence-only SQLite driver
+        run: npm install --no-save --package-lock=false better-sqlite3@13.0.3
+
+      - name: Probe SQLite and FTS5
+        run: >-
+          node -e "const Database=require('better-sqlite3');
+          const db=new Database(':memory:');
+          db.exec('CREATE VIRTUAL TABLE t USING fts5(body); INSERT INTO t(body) VALUES (\'hello\');');
+          const version=db.prepare('SELECT sqlite_version() AS v').get().v;
+          const hit=db.prepare(\"SELECT count(*) AS n FROM t WHERE t MATCH 'hello'\").get().n;
+          if(hit!==1) process.exit(1);
+          console.log({betterSqlite3:require('better-sqlite3/package.json').version,sqlite:version,fts5:true});
+          db.close();"
+
       - name: Diagnostic typecheck
         continue-on-error: true
         run: npm run typecheck

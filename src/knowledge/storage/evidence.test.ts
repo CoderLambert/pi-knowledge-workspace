@@ -129,7 +129,7 @@ describe("Stable Evidence entity", () => {
   });
 
   it("snapshots locator metadata instead of retaining the caller's mutable object", () => {
-    const locator: Record<string, unknown> = { heading: "Before", nested: { ordinal: 1 } };
+    const locator = { heading: "Before", nested: { ordinal: 1 } };
     const evidence = createStableEvidence({
       knowledgeWorkspaceId: WORKSPACE_ID,
       parsedArtifactId: "artifact-1",
@@ -139,7 +139,7 @@ describe("Stable Evidence entity", () => {
     });
 
     locator.heading = "After";
-    (locator.nested as { ordinal: number }).ordinal = 9;
+    locator.nested.ordinal = 9;
     expect(evidence.locatorSnapshot).toEqual({ heading: "Before", nested: { ordinal: 1 } });
   });
 });

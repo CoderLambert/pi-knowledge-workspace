@@ -1,10 +1,8 @@
 # P2-T10 support — Direct-file Pi evidence harness
 
-Status: **REAL DEVELOPMENT RUN PASS / QUERY-TEXT HUMAN REVIEW RECONFIRMATION REQUIRED**
+Status: **PASS — REAL DEVELOPMENT HARNESS + OWNER-DELEGATED INDEPENDENT SEMANTIC REVIEW COMPLETE**
 
-## Stable model evidence
-
-The frozen 50-query Omarchy/Pi development run remains valid and unchanged:
+## Frozen real run
 
 ```text
 repoSha = db71e7c6d746709ce152269b68b020bd05bdb0dd
@@ -13,87 +11,45 @@ Pi = 0.85.1
 provider/model = openai-codex / gpt-6-astra
 queries = 50
 answerable/no-answer = 42 / 8
-any/all required Evidence coverage = 1.0 / 1.0
-citation precision = 0.7758620689655172 (45/58)
-no-answer correct abstention = 0.625 (5/8)
-median/p95/max latency ms = 10165.077273999981 / 14855.569325999997 / 18050.93610000005
+required Evidence coverage = 1.0 / 1.0
+citationPrecision = 0.7758620689655172
+noAnswerCorrectAbstentionRate = 0.625
 ```
 
-No holdout was executed.
+The preserved `answers-development.jsonl` contains 58 requested citations, all 58 mapped and zero unmapped. The evaluator's `45/58` citation precision is Golden-label relevance, not mapping success.
 
-## Human-review defect
+## Independent semantic review
 
-The first assisted-review helper displayed the query using `query.query`. The Golden query schema uses `query.text`, so all 50 review screens showed `QUERY undefined`.
-
-The first completed review is preserved as provisional evidence only:
+The repository owner explicitly delegated final adjudication to GPT-5.6 Sol, independent of the tested `gpt-6-astra`. This is an owner-authorized independent model review, not a human review.
 
 ```text
-correct / partially correct / incorrect = 46 / 1 / 3
-unsupported claims = 0
+answers file SHA-256 = eed0f944d546220d96c82431e3dfd0037efb574d72e541ae1db09b9fa158ba2b
+review digest = 0e450d064781a0390e192e4338e0b1cb45a43297ee2a5629428b3351f1dd9e84
+correct = 48
+partially correct = 0
+incorrect = 2
+no-answer hallucinations = 2
 version/conflict mistakes = 0
-no-answer hallucinations = 3
-evidence omissions = 0
-review digest = 044f7a1bb1d150dc027e728d29e53a5b48e31208719da0e144a14e1916b8fc08
+material Evidence omissions = 0
 ```
 
-This defect does not affect the model run, deterministic citation/Evidence metrics, or raw evidence. It affects only the independent semantic-review acceptance gate because the reviewer did not see the actual query text.
+Incorrect cases: `dev-015`, `dev-032`.
 
-The defective helper has been removed from the support branch so it cannot be reused accidentally.
+## Golden answerability defect
 
-## Repair
+`dev-035` is categorized as `no-answer`, but the challenge-expanded corpus directly contains enough evidence to compare `fsPromises.cp` with `fsPromises.copyFile`. The model answer is semantically correct. Historical deterministic metrics remain frozen; the dataset inconsistency is recorded rather than repaired inside P2-T10.
 
-The corrected helper reads the existing model evidence and previous human decisions:
+## Review-helper defect history
 
-```bash
-node scripts/p2-reconfirm-direct-file-pi-review.mjs
-```
+The first assisted helper displayed `query.query` instead of Golden `query.text`, so its 50-row result (`46/1/3`, digest `044f7a1b...fc08`) remains provisional only. A corrected reconfirmation helper and query-display CI check were added and passed, but the owner subsequently delegated final adjudication directly from the uploaded answer bundle, so no provider/model rerun was needed.
 
-For every query it shows:
+## Canonical support CI
 
-- real Golden `query.text`;
-- Pi answer;
-- expected required Evidence;
-- previous human classification and issue flags.
+Dedicated repair run `34340358494` passed focused evaluator tests, ESLint, helper syntax, 50-query `query.text` display contract, and prepare-only harness. Artifact `10099478555`; digest `sha256:efd6c3cbc19cd7a9566a4df29f4f7f067b70c22457ec647b64bc0446156ece1f`.
 
-Controls:
+## Scope
 
-```text
-Enter = keep previous classification
-c = correct
-p = partially correct
-i = incorrect
-q = save and quit
-```
-
-It never invokes Pi/provider inference and never reruns the benchmark or holdout. Progress is resumable. The final digest is bound to the dataset hash, model-evidence repo SHA, previous review digest, exact query-text digest, and reconfirmed per-query decisions.
-
-Output:
-
-```text
-/tmp/pi-knowledge-p2-evidence/p2-t10/human-review-query-display-reconfirmation.json
-/tmp/pi-knowledge-p2-evidence/p2-t10/human-review-query-display-reconfirmation.md
-/tmp/pi-knowledge-p2-evidence/p2-t10/human-review-query-display-reconfirmation-summary.json
-```
-
-## Regression gate
-
-CI runs:
-
-```bash
-node --check scripts/p2-reconfirm-direct-file-pi-review.mjs
-npx eslint scripts/p2-reconfirm-direct-file-pi-review.mjs
-node scripts/p2-reconfirm-direct-file-pi-review.mjs --verify-query-display
-```
-
-The query-display check fails if the 50 development rows do not expose non-empty `text` fields and records a query-text digest. CI also reruns the focused evaluator tests/lint and frozen prepare-only contract without provider access.
-
-## Acceptance boundary
-
-P2-T10 remains **PARTIAL** until the corrected query-text reconfirmation reaches 50/50 and its aggregate summary/digest are recorded. The provisional `044f7a1b...fc08` review digest must not be used to mark P2-T10 PASS.
-
-## Support scope
-
-PR #53 remains support-only with exactly five direct-base files:
+Direct-base support scope remains exactly five files:
 
 ```text
 .github/workflows/p2-direct-file-pi-evidence.yml
@@ -103,4 +59,4 @@ docs/development/reports/P2-T10-direct-file-pi-evidence-harness.md
 docs/development/verification/P2-T10-direct-file-pi-evidence-harness.md
 ```
 
-No production retrieval behavior, provider credential material, dataset mutation, P2-T11/P2-T12 implementation, holdout execution or P3 code is included.
+No holdout rerun, no P3 implementation, and no automatic merge.

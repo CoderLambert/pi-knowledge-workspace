@@ -40,9 +40,7 @@ describe("structure-aware chunker", () => {
     const chunks = chunkParsedArtifact(input, { targetBytes: 10 });
 
     expect(chunks.length).toBeGreaterThan(1);
-    expect(chunks.every((chunk) => chunk.nodeKinds).every((kinds) => kinds.length === 1 && kinds[0] === "code-block")).toBe(
-      true,
-    );
+    expect(chunks.every((chunk) => chunk.nodeKinds.length === 1 && chunk.nodeKinds[0] === "code-block")).toBe(true);
     for (const chunk of chunks) {
       expect(chunk.endByte).toBeGreaterThan(chunk.startByte);
       expect(Buffer.from(chunk.text, "utf8").byteLength).toBeLessThanOrEqual(10);

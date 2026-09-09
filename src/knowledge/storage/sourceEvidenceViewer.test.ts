@@ -34,7 +34,12 @@ function fakeDatabase(rows: {
             const artifact = rows.artifacts.find((row) => row["id"] === artifactId);
             const version = rows.versions.find((row) => row["id"] === artifact?.["source_version_id"]);
             const source = rows.sources.find((row) => row["id"] === version?.["source_id"]);
-            if (artifact === undefined || version === undefined || source?.["knowledge_workspace_id"] !== workspaceId) return undefined;
+            if (
+              artifact === undefined
+              || version === undefined
+              || source === undefined
+              || source["knowledge_workspace_id"] !== workspaceId
+            ) return undefined;
             return {
               source_id: source["id"],
               display_name: source["display_name"],

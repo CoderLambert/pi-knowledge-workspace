@@ -36,7 +36,9 @@ Schema v5 extends the existing P1-T07 `jobs` / `job_attempts` persistence with:
 
 Every successful claim increments both `attempt` and `fencing_token` and creates one durable attempt record. Heartbeat and terminal transitions require the active worker identity and fencing token in the SQL compare-and-swap predicate.
 
-Therefore a worker holding token N cannot complete work after its lease is recovered and a later worker has claimed token N+1.
+Terminal transitions additionally require an **unexpired lease**. Normal success/failure requires `cancel_requested=0`; cancellation acknowledgement requires `cancel_requested=1`. This prevents an expired worker from committing merely because recovery has not yet run, and prevents a worker from reporting success after cancellation was requested.
+
+Therefore a worker holding token N cannot complete work after lease expiry, cancellation, recovery, or a later claim with token N+1.
 
 P1-T17 must consume these primitives instead of updating running-job rows directly.
 
@@ -64,8 +66,8 @@ Repository-owned contract coverage now checks:
 - idempotent submit lookup;
 - claim increments attempt/fencing and records attempt ownership;
 - heartbeat SQL requires current owner/token and an unexpired lease;
-- stale worker completion fails its CAS and rolls back;
-- queued versus running cancellation semantics;
+- stale/expired worker completion requires active lease, current fencing and no cancellation;
+- queued versus running cancellation semantics plus fenced cancellation acknowledgement;
 - expired lease recovery closes the fenced attempt and requeues work;
 - deadline-expired jobs cannot be newly claimed;
 - oversized result/error metadata is rejected before database writes.
@@ -84,6 +86,6 @@ No new ADR is required. The task implements the job durability/lease/fencing mod
 
 P1-T17 may proceed against the following unverified contract:
 
-> one local worker claims through `DurableJobStore`; active execution owns a lease/fencing token; stale tokens cannot heartbeat or commit terminal state; worker recovery uses the state-machine transition rather than ad-hoc SQL.
+> one local worker claims through `DurableJobStore`; active execution owns an unexpired lease/fencing token; stale/expired/cancelled tokens cannot heartbeat or commit terminal state; worker recovery uses the state-machine transition rather than ad-hoc SQL.
 
 The native SQLite/concurrency risk must remain recorded until executable acceptance is available.

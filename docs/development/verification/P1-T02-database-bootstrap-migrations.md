@@ -2,65 +2,73 @@
 
 Status: **OPEN / PARTIAL**
 
-## 1. Install the ADR-selected driver safely
+## Verified locally on 2026-09-09
 
-From this branch, use the repository's pinned npm toolchain:
+On the user's Omarchy/Linux checkout with Node 26.7.0:
+
+- `npm install better-sqlite3@13.0.3` updated `package.json` + `package-lock.json` coherently;
+- clean `rm -rf node_modules && npm ci` succeeded;
+- `npm ls better-sqlite3` resolved `better-sqlite3@13.0.3`;
+- native load succeeded with SQLite `3.53.4`;
+- real FTS5 create/insert/MATCH query succeeded;
+- `npm test -- src/knowledge/storage/database.test.ts` passed **7/7**, including real `openKnowledgeDatabase(":memory:")`, schema version, foreign keys and FTS5;
+- `npm run typecheck` passed;
+- `npm run knip` passed with `Excellent, Knip found no issues` (one non-failing redundant-entry configuration hint remains);
+- `npm run build` passed;
+- `npm run pack:dry` passed and included Knowledge database/migration/service outputs;
+- staged pre-commit typecheck/Knip/ESLint/Vitest passed;
+- `git diff --check` passed.
+
+Commit `926e1ae1` is the dependency/test integration commit. The previous unlisted `better-sqlite3` defect is resolved at the owning P1-T02 branch.
+
+## Remaining 1 — packaged native-runtime acceptance
+
+Create a real tarball and install it into a clean isolated directory:
 
 ```bash
-npm install better-sqlite3@^13.0.3
+npm pack
+TMP_DIR="$(mktemp -d)"
+cd "$TMP_DIR"
+npm init -y
+npm install /absolute/path/to/jmfederico-pi-web-1.202609.0.tgz
 ```
 
-PASS evidence:
+Then resolve the installed package and import its built Knowledge database module. Open `:memory:`, verify `user_version`, `foreign_keys`, create/query an FTS5 virtual table, and confirm the installed dependency resolves `better-sqlite3@13.0.3`.
 
-- both `package.json` and `package-lock.json` change coherently;
-- `npm ci` succeeds from a clean dependency tree;
-- `npm ls better-sqlite3` resolves one 13.x version;
-- no hand-edited/stale lockfile state exists.
+PASS evidence must prove the chain:
 
-## 2. Focused tests
-
-```bash
-npm test -- src/knowledge/storage/database.test.ts
+```text
+npm pack
+→ clean directory
+→ npm install tarball
+→ installed package dependency resolution
+→ native better-sqlite3 load
+→ packaged dist/knowledge/storage/database.js
+→ migration
+→ FTS5
 ```
 
-Expected: all 6 tests pass.
+`pack:dry` alone is not sufficient.
 
-## 3. Real SQLite acceptance
+## Remaining 2 — repository gates / failure classification
 
-Add/run a temporary local probe or extend the focused test with the installed driver and verify:
-
-1. `openKnowledgeDatabase(":memory:")` returns successfully;
-2. `PRAGMA user_version` is `1`;
-3. `PRAGMA foreign_keys` is `1`;
-4. all ten P1-T02 tables exist in `sqlite_schema`;
-5. reopening a file DB is idempotent and retains `user_version = 1`;
-6. setting `PRAGMA user_version = 2` causes a subsequent open to fail closed;
-7. a transaction that throws leaves no inserted row;
-8. a successful transaction commits its row.
-
-For a file DB also confirm `PRAGMA journal_mode` returns `wal`.
-
-## 4. Repository gates
+Run:
 
 ```bash
-npm run typecheck
 npm run lint
-npm run knip
-npm run build
-npm run pack:dry
 npm test
 git diff --check origin/experiment/p1-sqlite-driver-decision...HEAD
 git diff --name-status origin/experiment/p1-sqlite-driver-decision...HEAD
 ```
 
-Do not patch known inherited baseline failures merely to make the full suite green.
+Do not patch known inherited baseline failures merely to make the suite green. Classify failures as inherited vs P1-T02-attributable using direct-base evidence.
 
-## 5. Scope review
+## Remaining 3 — scope review
 
-The direct-base diff may contain only P1-T02 database bootstrap/migration implementation, tests, dependency metadata generated for the selected driver, report/verification, changelog/plan/debt bookkeeping, and an ADR only if a new architectural decision actually becomes necessary.
+The direct-base diff may contain only P1-T02 database bootstrap/migration implementation, tests, npm-generated dependency metadata, report/verification and required bookkeeping.
 
-No P1-T03 installation/workspace identity behavior, blob storage, source domain, ingestion, parsing, indexing, retrieval, Fleet, or UI implementation belongs here.
+No P1-T03 installation/workspace identity behavior, blob storage, source domain, ingestion, parsing, indexing, retrieval, Fleet or UI implementation belongs here.
 
 ## PASS condition
 
-P1-T02 remains PARTIAL until the selected native driver is lockfile-integrated and the focused + real SQLite + static/build/package gates above produce passing evidence. Environmental/native packaging limitations must be recorded rather than silently waived.
+P1-T02 remains PARTIAL until packaged native-runtime acceptance and the remaining repository-wide gate classification are recorded. The native driver, lockfile integration, real SQLite open and FTS5 behavior are already locally proven and should not be repeated merely to satisfy bookkeeping.

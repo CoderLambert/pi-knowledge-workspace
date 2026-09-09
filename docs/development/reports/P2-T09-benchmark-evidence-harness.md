@@ -1,50 +1,51 @@
 # P2-T09 support — Retrieval benchmark evidence harness
 
-Status: **IMPLEMENTED / EXECUTION PENDING**
+Status: **PASS**
 
 ## Purpose
 
-Provide one narrow CI-only harness that executes the frozen FTS baseline on the corrected expanded development corpus and feeds the resulting complete observations into P2-T09's real `runRetrievalBenchmark()` + `renderRetrievalBenchmarkMarkdown()` implementation.
+Execute the frozen FTS baseline on the corrected expanded development corpus and feed complete real observations into P2-T09's `runRetrievalBenchmark()` + `renderRetrievalBenchmarkMarkdown()` implementation.
 
-## Stack
+## Successful evidence
 
-Base: canonical P2-T09 / `feat/p2-retrieval-benchmark-runner` / PR #41.
+GitHub Actions run `34329322920` completed successfully.
 
-This is a support layer only. It does not change retrieval behavior or P2-T09 report-runner semantics.
+Artifact: `10095148994`
 
-## Frozen input
+Digest: `sha256:079dc6b4a46c90136e274395d76ba63219e5c43e2ccb913135d5561364ca3672`
 
-- 3 original immutable corpus snapshots;
-- 3 development-only challenge artifacts;
-- expected production chunk pressure: 38 total / 35 challenge chunks;
-- existing development queries and Stable Evidence labels unchanged;
-- Top-K = 10;
-- P2-T05 selected lexical profile = `baseline`;
-- P1-T13 natural-language compiler = quoted literal terms joined with OR;
-- active IndexBuild publication/search lease semantics inherited from the corrected ancestry.
+Runtime:
 
-No holdout file is loaded by this harness.
+```text
+Ubuntu 24.04.4
+Node 24.20.0
+better-sqlite3 13.0.3
+SQLite 3.53.4
+FTS5 PASS
+```
 
-## Production path
+Focused suite: **8 files / 29 tests PASS**.
 
-`openKnowledgeDatabase -> canonicalizeParsedArtifact -> chunkParsedArtifact -> Fts5BaselineIndex -> IndexBuildPublisher -> SearchQueryApi -> runRetrievalBenchmark`
+Observed corpus pressure: **38 total / 35 challenge chunks**.
 
-The script stores all 50 real development observations in the evidence artifact, then renders the benchmark through the P2-T09 runner rather than manually copying aggregate metrics.
+Generated development result:
 
-## Evidence outputs
+```text
+queries: 50
+answerable: 42
+Recall@10: 1.0
+MRR: 0.9365079365079365
+all-required coverage: 1.0
+category failures: none
+median / p95 / max: 0.794373 / 1.334205 / 3.400616 ms
+peak RSS: 105443328 bytes
+FTS dbstat allocation: 49152 bytes
+```
 
-The workflow uploads:
+Development dataset hash: `949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3`.
 
-- `retrieval-benchmark-development.md` — generated runner output;
-- `retrieval-benchmark-development.json` — provenance + generated report;
-- `observations-development.json` — complete development observations.
+Artifact contains generated Markdown, provenance/report JSON and all 50 development observations. No holdout files were loaded.
 
-Provenance includes repository SHA, a deterministic hash across the frozen development dataset files, configuration, SQLite version, Node version, chunk counts, dbstat FTS bytes and runner-specific peak RSS.
+## Scope
 
-## Boundaries
-
-- No Dense/Hybrid variant is generated because P2-T06 rejected both fixed Dense candidates on development quality.
-- No holdout is consumed or exposed.
-- GitHub latency/RSS remain runner-specific evidence.
-- No production code is changed.
-- No P3 work is included.
+Support-only. No production retrieval behavior, dataset mutation, Dense/vector/RRF adoption, provider/model calls, P2-T10/P2-T11 implementation or P3 code.

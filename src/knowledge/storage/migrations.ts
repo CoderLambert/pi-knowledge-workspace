@@ -199,6 +199,24 @@ ALTER TABLE job_attempts ADD COLUMN worker_id TEXT;
 CREATE INDEX jobs_status_lease_idx ON jobs(status, lease_expires_at);
 `,
   },
+  {
+    version: 6,
+    name: "atomic-index-build-publication",
+    sql: `
+CREATE TABLE index_publication_migration_guard (
+  row_count INTEGER NOT NULL CHECK (row_count = 0)
+);
+INSERT INTO index_publication_migration_guard(row_count) SELECT COUNT(*) FROM index_builds;
+DROP TABLE index_publication_migration_guard;
+ALTER TABLE knowledge_workspaces ADD COLUMN active_index_build_id TEXT REFERENCES index_builds(id);
+ALTER TABLE knowledge_workspaces ADD COLUMN index_generation INTEGER NOT NULL DEFAULT 0 CHECK (index_generation >= 0);
+ALTER TABLE index_builds ADD COLUMN base_generation INTEGER NOT NULL DEFAULT 0 CHECK (base_generation >= 0);
+ALTER TABLE index_builds ADD COLUMN base_active_build_id TEXT;
+ALTER TABLE index_builds ADD COLUMN validated_at TEXT;
+ALTER TABLE index_builds ADD COLUMN published_at TEXT;
+CREATE INDEX index_builds_workspace_status_idx ON index_builds(knowledge_workspace_id, status);
+`,
+  },
 ];
 
 function readUserVersion(db: MigrationDatabase): number {

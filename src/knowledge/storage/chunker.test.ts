@@ -44,8 +44,8 @@ describe("structure-aware chunker", () => {
       true,
     );
     for (const chunk of chunks) {
-      expect(() => new TextDecoder("utf-8", { fatal: true }).decode(Buffer.from(chunk.text, "utf8"))).not.toThrow();
       expect(chunk.endByte).toBeGreaterThan(chunk.startByte);
+      expect(Buffer.from(chunk.text, "utf8").byteLength).toBeLessThanOrEqual(10);
     }
   });
 
@@ -69,7 +69,7 @@ describe("structure-aware chunker", () => {
     const input = artifact("Alpha 😀 beta", "txt");
     const malformed: ParsedArtifactCanonical = {
       ...input,
-      documentStructure: [{ kind: "paragraph", startByte: 1, endByte: input.canonicalBytes.byteLength }],
+      documentStructure: [{ kind: "paragraph", startByte: 7, endByte: input.canonicalBytes.byteLength }],
     };
 
     expect(() => chunkParsedArtifact(malformed, { targetBytes: 20 })).toThrow(/invalid canonical UTF-8 byte range/);

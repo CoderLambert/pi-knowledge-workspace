@@ -34,6 +34,28 @@ jobs:
       - name: Install repository dependencies
         run: npm ci
 
+      # Run Level-1 gates independently so an inherited failure in one gate
+      # does not prevent attribution of the remaining gates for P2-T05.
+      - name: Diagnostic typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Diagnostic lint
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Diagnostic knip
+        continue-on-error: true
+        run: npm run knip
+
+      - name: Diagnostic build
+        continue-on-error: true
+        run: npm run build
+
+      - name: Diagnostic package dry-run
+        continue-on-error: true
+        run: npm run pack:dry
+
       - name: Ensure native SQLite runtime and probe FTS5
         shell: bash
         run: |

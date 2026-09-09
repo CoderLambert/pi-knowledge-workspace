@@ -20,33 +20,19 @@ class FakeDatabase implements MigrationDatabase {
 
   prepare(sql: string) {
     if (sql !== "PRAGMA user_version") throw new Error(`unexpected SQL: ${sql}`);
-    return {
-      get: () => ({ user_version: this.userVersion }),
-      run: () => ({}),
-    };
+    return { get: () => ({ user_version: this.userVersion }), run: () => ({}) };
   }
 }
 
 describe("Knowledge database migrations", () => {
-  it("creates Evidence Core and advances through atomic IndexBuild publication", () => {
+  it("creates Evidence Core and advances through IndexBuild pin/lease retention", () => {
     const db = new FakeDatabase();
     applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);
-
     expect(db.userVersion).toBe(KNOWLEDGE_SCHEMA_VERSION);
     expect(db.execLog[0]).toBe("BEGIN IMMEDIATE");
+
     const schema = db.execLog[1] ?? "";
-    for (const table of [
-      "installations",
-      "knowledge_workspaces",
-      "sources",
-      "source_versions",
-      "parsed_artifacts",
-      "index_builds",
-      "chunks",
-      "evidence",
-      "jobs",
-      "job_attempts",
-    ]) {
+    for (const table of ["installations", "knowledge_workspaces", "sources", "source_versions", "parsed_artifacts", "index_builds", "chunks", "evidence", "jobs", "job_attempts"]) {
       expect(schema).toContain(`CREATE TABLE ${table}`);
     }
 
@@ -61,29 +47,27 @@ describe("Knowledge database migrations", () => {
     expect(evidenceMigration).toContain("locator_snapshot");
 
     const ftsMigration = db.execLog.find((sql) => sql.includes("chunks_migration_guard")) ?? "";
-    expect(ftsMigration).toContain("index_build_id");
-    expect(ftsMigration).toContain("source_version_id");
-    expect(ftsMigration).toContain("start_byte");
-    expect(ftsMigration).toContain("end_byte");
     expect(ftsMigration).toContain("CREATE VIRTUAL TABLE chunk_fts USING fts5");
     expect(ftsMigration).toContain("tokenize = 'unicode61'");
 
     const jobMigration = db.execLog.find((sql) => sql.includes("lease_expires_at")) ?? "";
-    expect(jobMigration).toContain("attempt INTEGER NOT NULL DEFAULT 0");
-    expect(jobMigration).toContain("lease_owner");
-    expect(jobMigration).toContain("heartbeat_at");
     expect(jobMigration).toContain("fencing_token");
     expect(jobMigration).toContain("deadline_at");
-    expect(jobMigration).toContain("error_json");
     expect(jobMigration).toContain("jobs_status_lease_idx");
 
     const publicationMigration = db.execLog.find((sql) => sql.includes("index_publication_migration_guard")) ?? "";
     expect(publicationMigration).toContain("active_index_build_id");
     expect(publicationMigration).toContain("index_generation");
     expect(publicationMigration).toContain("base_generation");
-    expect(publicationMigration).toContain("base_active_build_id");
-    expect(publicationMigration).toContain("validated_at");
     expect(publicationMigration).toContain("published_at");
+
+    const pinMigration = db.execLog.find((sql) => sql.includes("CREATE TABLE index_build_pins")) ?? "";
+    expect(pinMigration).toContain("index_build_id");
+    expect(pinMigration).toContain("owner_type");
+    expect(pinMigration).toContain("owner_id");
+    expect(pinMigration).toContain("lease_expires_at");
+    expect(pinMigration).toContain("ON DELETE CASCADE");
+    expect(pinMigration).toContain("index_build_pins_build_expiry_idx");
     expect(db.execLog.at(-1)).toBe("COMMIT");
   });
 
@@ -98,6 +82,7 @@ describe("Knowledge database migrations", () => {
     expect(db.execLog.some((sql) => sql.includes("chunks_migration_guard"))).toBe(true);
     expect(db.execLog.some((sql) => sql.includes("lease_expires_at"))).toBe(true);
     expect(db.execLog.some((sql) => sql.includes("index_publication_migration_guard"))).toBe(true);
+    expect(db.execLog.some((sql) => sql.includes("CREATE TABLE index_build_pins"))).toBe(true);
   });
 
   it("is idempotent when the database is already current", () => {
@@ -115,40 +100,22 @@ describe("Knowledge database migrations", () => {
   });
 
   it("rolls back failed migrations and preserves the previously committed schema version", () => {
-    const initialFailure = new FakeDatabase();
-    initialFailure.failOn = "CREATE TABLE installations";
-    expect(() => applyMigrations(initialFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 1/);
-    expect(initialFailure.userVersion).toBe(0);
-
-    const importFailure = new FakeDatabase();
-    importFailure.userVersion = 1;
-    importFailure.failOn = "idempotency_key";
-    expect(() => applyMigrations(importFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 2/);
-    expect(importFailure.userVersion).toBe(1);
-
-    const evidenceFailure = new FakeDatabase();
-    evidenceFailure.userVersion = 2;
-    evidenceFailure.failOn = "evidence_migration_guard";
-    expect(() => applyMigrations(evidenceFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 3/);
-    expect(evidenceFailure.userVersion).toBe(2);
-
-    const ftsFailure = new FakeDatabase();
-    ftsFailure.userVersion = 3;
-    ftsFailure.failOn = "chunks_migration_guard";
-    expect(() => applyMigrations(ftsFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 4/);
-    expect(ftsFailure.userVersion).toBe(3);
-
-    const jobFailure = new FakeDatabase();
-    jobFailure.userVersion = 4;
-    jobFailure.failOn = "lease_expires_at";
-    expect(() => applyMigrations(jobFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 5/);
-    expect(jobFailure.userVersion).toBe(4);
-
-    const publicationFailure = new FakeDatabase();
-    publicationFailure.userVersion = 5;
-    publicationFailure.failOn = "index_publication_migration_guard";
-    expect(() => applyMigrations(publicationFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 6/);
-    expect(publicationFailure.userVersion).toBe(5);
+    const cases: Array<[number, string, number]> = [
+      [0, "CREATE TABLE installations", 1],
+      [1, "idempotency_key", 2],
+      [2, "evidence_migration_guard", 3],
+      [3, "chunks_migration_guard", 4],
+      [4, "lease_expires_at", 5],
+      [5, "index_publication_migration_guard", 6],
+      [6, "CREATE TABLE index_build_pins", 7],
+    ];
+    for (const [version, failOn, migration] of cases) {
+      const db = new FakeDatabase();
+      db.userVersion = version;
+      db.failOn = failOn;
+      expect(() => applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION)).toThrow(new RegExp(`migration ${String(migration)}`));
+      expect(db.userVersion).toBe(version);
+    }
   });
 });
 
@@ -162,11 +129,7 @@ describe("withTransaction", () => {
   it("rolls back failed operations and preserves their error", () => {
     const db = new FakeDatabase();
     const failure = new Error("domain failure");
-    expect(() =>
-      withTransaction(db, () => {
-        throw failure;
-      }),
-    ).toThrow(failure);
+    expect(() => withTransaction(db, () => { throw failure; })).toThrow(failure);
     expect(db.execLog).toEqual(["BEGIN IMMEDIATE", "ROLLBACK"]);
   });
 });

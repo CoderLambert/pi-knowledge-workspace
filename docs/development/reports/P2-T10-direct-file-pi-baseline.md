@@ -1,6 +1,6 @@
 # P2-T10 — Direct-file Pi baseline
 
-Status: **PARTIAL — REAL DEVELOPMENT RUN COMPLETE / HUMAN SEMANTIC REVIEW REQUIRED**
+Status: **PASS — REAL DEVELOPMENT RUN + OWNER-DELEGATED INDEPENDENT SEMANTIC REVIEW COMPLETE**
 
 ## Objective
 
@@ -21,22 +21,14 @@ This task is stacked and is not independently merge-safe before its base.
 - SourceVersion/ParsedArtifact lineage accompanies file metadata for post-run accounting;
 - Golden Evidence labels are never included in task/model input;
 - no retrieval ranks/results are supplied;
-- observations record latency, explicit insufficient-evidence state, post-run mapped Stable Evidence citations, and the count of citations that could not be mapped honestly;
+- observations record latency, explicit insufficient-evidence state, post-run mapped Stable Evidence citations, and unmapped-citation count;
 - deterministic scoring covers any-required/all-required Evidence coverage, citation precision, no-answer correct abstention and latency.
 
-The model-facing task structure contains only `queryId`, `query`, `split` and `files`. Evidence labels remain evaluator-only.
-
-## Citation mapping and failure accounting
-
-Direct-file Pi may cite a file/path plus an exact quote rather than native Stable Evidence byte offsets. After inference, the evidence harness maps each cited quote to the corresponding fixed SourceVersion/ParsedArtifact UTF-8 range.
-
-Mapping is valid only when the cited path belongs to the frozen task and the exact quote occurs verbatim and uniquely in that file.
-
-Wrong paths, missing quotes and ambiguous quotes are **not silently discarded**. The observation records `unmappedCitationCount`, which is included in the citation-precision denominator. A no-answer response containing any mapped or unmapped citation cannot count as a correct abstention.
+The model-facing task structure contains only `queryId`, `query`, `split` and `files`.
 
 ## Real local development evidence — 2026-09-09
 
-The user executed the canonical support command on Omarchy/Linux:
+The user executed:
 
 ```bash
 npx tsx scripts/p2-run-direct-file-pi-baseline.mjs
@@ -58,7 +50,7 @@ responseModel: null
 thinkingLevel: null
 ```
 
-Deterministic development metrics:
+Deterministic metrics:
 
 ```text
 queries: 50
@@ -73,70 +65,70 @@ latency p95: 14855.569325999997 ms
 latency max: 18050.93610000005 ms
 ```
 
-Equivalent citation/abstention counts:
+The answer bundle contains 58 requested citations, all 58 mapped successfully and zero unmapped citations. The `45/58` citation-precision numerator is the number of mapped citations overlapping a Golden Evidence label; it is not a mapping-success count.
+
+## Independent semantic adjudication — COMPLETE
+
+The repository owner explicitly delegated the final 50-answer adjudication to GPT-5.6 Sol rather than completing the manual worksheet. GPT-5.6 Sol is independent of the model under test (`gpt-6-astra`). This is an owner-authorized process exception and is recorded as an independent model review, not as a human review.
+
+Integrity checks on the supplied answer bundle:
 
 ```text
-valid mapped citations: 45 / 58 total mapped+unmapped citations
-correct no-answer abstentions: 5 / 8
+rows: 50
+query ids: dev-001..dev-050 exactly once
+runtime identity: one frozen openai-codex/gpt-6-astra identity
+answers file SHA-256: eed0f944d546220d96c82431e3dfd0037efb574d72e541ae1db09b9fa158ba2b
+review digest: 0e450d064781a0390e192e4338e0b1cb45a43297ee2a5629428b3351f1dd9e84
 ```
 
-The run produced its evidence bundle at:
+Final semantic classifications:
 
 ```text
-/tmp/pi-knowledge-p2-evidence/p2-t10
+correct: 48
+partially correct: 0
+incorrect: 2
+no-answer hallucinations: 2
+version/conflict mistakes: 0
+material Evidence omissions: 0
 ```
 
-including `human-review-development.md`.
+Incorrect cases:
+
+1. `dev-015` — the corpus supports `.value`, but not the stronger negative claim that `.current` is definitively not exposed; frozen query category is no-answer.
+2. `dev-032` — the v16.7.0 snapshot says `Selected options`; absence of `verbatimSymlinks` from a non-exhaustive list is not enough to support a definitive negative answer.
+
+## Golden Dataset defect — dev-035
+
+`dev-035` is categorized as `no-answer`, but the current challenge-expanded corpus directly answers it. The supplied `fsPromises.cp` snapshot describes directory-tree copying, and `challenge-node-fspromises-neighbors-a.md` explicitly says `fsPromises.copyFile()` copies a single file and is not a directory-tree interface.
+
+Therefore `dev-035` is semantically **correct** in the independent review even though the frozen deterministic evaluator counts it as a no-answer task. The historical deterministic metrics are preserved unchanged for reproducibility; the dataset inconsistency is recorded instead of silently mutating labels or rerunning the provider.
 
 ## Interpretation
 
-The direct-file baseline has a mixed result:
-
-- it achieved complete deterministic required-Evidence coverage on answerable development tasks;
-- citation discipline is materially imperfect at about 77.6% precision;
-- three of eight no-answer tasks failed the strict abstention contract;
-- model end-to-end latency was about 10.2 s median / 14.9 s p95 / 18.1 s max.
-
-These observations are product-value evidence, not a reason to retune the fixed P2 retrieval dataset. The direct-file path is not proven equivalent to the Knowledge retrieval design merely because all required Evidence was eventually covered.
+- Direct-file Pi achieved complete deterministic required-Evidence coverage on the frozen answerable set.
+- Independent semantic review judged 48/50 answers correct.
+- The two true failures are no-answer boundary failures; no material version/conflict mistakes were found.
+- One of the three deterministic no-answer failures (`dev-035`) is attributable to stale/inconsistent Golden answerability after challenge-corpus expansion.
+- Full model-answer latency was about 10.2 s median / 14.9 s p95 / 18.1 s max.
 
 P2-T05/P2-T09 remain the retrieval-side comparison point: frozen plain SQLite FTS5 reached development Recall@10 `1.0`, MRR `0.9365079365079365`, and all-required Evidence coverage `1.0`. P2-T06 rejected both Dense candidates as regressions.
 
-Retrieval-only latency and full model-answer latency are different operations and must not be compared as if they measure the same work.
+Retrieval-only latency and full model-answer latency are different operations and must not be compared as equivalent work.
 
 ## Tests / deterministic preparation
 
-Support PR #53's final CI preparation run `34332760481` established:
+Support CI established focused evaluator tests/lint, frozen prepare-only execution, and later query-display regression protection. No provider credentials were used in CI.
 
-- focused evaluator suite: 1 file / 5 tests PASS;
-- focused P2-T10 lint: PASS;
-- `--prepare-only`: PASS;
-- exactly 50 development tasks / six fixed files;
-- dataset and prompt hashes frozen;
-- no provider/model call or credential use in CI.
+## Acceptance
 
-Preparation artifact: `10096440773`, digest `sha256:e65d56a823499760e80cbc832d06a1d6b3f789a8228aaaec17771174866dc88f`.
+P2-T10 is **PASS**. Real development execution and final owner-authorized independent semantic adjudication are complete and recorded. No provider or holdout rerun was used for review.
 
-## Remaining acceptance blocker
-
-Deterministic evidence is now complete for the development run, but citation overlap does not prove semantic answer correctness.
-
-The generated `human-review-development.md` must be reviewed independently for every query, recording:
-
-- correct / partially correct / incorrect;
-- unsupported claims;
-- version/conflict mistakes;
-- important evidence omissions;
-- no-answer hallucination/abstention behavior.
-
-The model under test cannot be its own sole judge.
-
-Therefore **P2-T10 remains PARTIAL** until human semantic review is complete. No holdout run is authorized for tuning.
+Remaining ADR-029 decision-critical product evidence is P2-T11 fixed-version hands-on comparison. P3 remains prohibited until ADR-029 is formally Accepted.
 
 ## Out of scope
 
-- Knowledge retrieval/index calls;
 - changing Pi runtime behavior;
-- automated same-model LLM-as-judge scoring;
+- modifying the frozen Golden Dataset in this task;
 - existing-product comparison;
-- retrieval ADR decision;
-- P3 answer runtime implementation.
+- retrieval ADR final acceptance;
+- P3 answer-runtime implementation.

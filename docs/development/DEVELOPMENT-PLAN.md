@@ -253,7 +253,7 @@ P3 is no longer the old linear “Ask then separate Notes subsystem” plan. It 
 
 ## P3-T00 — Planning Rebaseline
 
-**Status: PASS when this docs-only task lands on its Draft PR.**
+**Status: PASS.**
 
 Objective:
 
@@ -267,20 +267,21 @@ This task is analysis/documentation only; no verification guide is required.
 
 ## P3-T01 — Pre-P3 baseline closure
 
-**Status: next implementation task.**
+**Status: PARTIAL — TypeScript blocker closed; inherited ESLint baseline remains.**
 
 Objective:
 
-> Remove the known inherited Knowledge static/test debt from the P3 base so new regressions have a trustworthy signal.
+> Remove the inherited Knowledge static/test debt from the P3 base so new regressions have a trustworthy signal.
 
-Known current baseline includes the 12 TypeScript errors in:
+Current verified baseline:
 
 ```text
-src/knowledge/service/viewerDispatch.ts
-src/knowledge/storage/chunker.test.ts
-src/knowledge/storage/evidence.test.ts
-src/knowledge/storage/sourceEvidenceViewer.test.ts
+P3-T01 typecheck blocker: 12 errors → 0
+P3-T01S1 plugin-test lint slice: 261 ESLint errors → 254
+P3-T01S2 runtime-contract lint slice: 254 ESLint errors → 252
 ```
+
+The remaining ESLint findings are inherited across pre-existing Knowledge/plugin code. They must be closed in bounded, subsystem-scoped support slices; do not turn P3-T01 into one repository-wide rewrite.
 
 Scope rules:
 
@@ -292,10 +293,11 @@ Scope rules:
 
 Required exit:
 
-- `npm run typecheck` passes for task-attributable code;
-- focused Knowledge tests covering touched areas pass;
+- `npm run typecheck` remains green;
+- inherited lint/static debt is reduced through reviewable support slices until Slice A gets a trustworthy regression signal;
+- focused Knowledge tests covering touched areas pass when reachable;
 - any remaining full-suite failure is classified against baseline;
-- report + verification guide are present.
+- report + verification guide are present for behavior-changing support work.
 
 ---
 
@@ -697,8 +699,8 @@ As of 2026-09-10:
 | P2-T11 | PASS | Mature-product evidence is decision-sufficient; full Open WebUI long run de-scoped with audit trail. |
 | P2-T12 | PASS | ADR-029 Accepted. |
 | P2 stack | PASS | Final ancestry restack is clean; #54 and #44 include latest #43 with task-only scopes. |
-| P3-T00 | PASS after this planning PR | Rebaseline plan to ADR-029. |
-| P3-T01 | next | Close inherited Knowledge static/test baseline before Slice A. |
+| P3-T00 | PASS | Rebaseline plan to ADR-029. |
+| P3-T01 | PARTIAL | Typecheck is green; inherited ESLint baseline reduced from 261 to 252 through bounded support slices. |
 
 Current architecture/development base:
 
@@ -707,8 +709,8 @@ experiment/p2-retrieval-adr
 81a06a6700c80b63ad796cdfbeee5a49a5c939cd
 ```
 
-Current next implementation task after the planning rebaseline:
+Current next implementation task:
 
-# **P3-T01 — Pre-P3 baseline closure**
+# **Continue P3-T01 bounded inherited lint closure**
 
 No P3 production feature should bypass this task's regression-signal cleanup unless a new blocker/evidence requires the plan to be re-reviewed.

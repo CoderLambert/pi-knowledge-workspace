@@ -4,7 +4,7 @@ import { mkdirSync } from "node:fs";
 
 import { applyMigrations, type MigrationDatabase } from "./migrations.js";
 
-export const KNOWLEDGE_SCHEMA_VERSION = 3;
+export const KNOWLEDGE_SCHEMA_VERSION = 4;
 
 export interface SqliteStatement {
   run(...params: unknown[]): { changes: number | bigint; lastInsertRowid: number | bigint };

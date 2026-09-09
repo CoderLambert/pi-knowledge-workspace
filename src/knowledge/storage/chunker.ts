@@ -32,8 +32,6 @@ export function chunkParsedArtifact(
   }
 
   const bytes = artifact.canonicalBytes;
-  // P1-T08 promises valid canonical UTF-8; verify at this task boundary so a
-  // corrupt/misconstructed artifact fails closed rather than producing ranges.
   new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 
   if (bytes.byteLength === 0) return [];
@@ -83,8 +81,6 @@ export function chunkParsedArtifact(
         continue;
       }
 
-      // A chunk is a contiguous canonical range, so inter-node whitespace is
-      // included automatically between current.startByte and node.endByte.
       if (node.endByte - current.startByte <= targetBytes) {
         current.endByte = node.endByte;
         current.nodes.push(node);
@@ -133,8 +129,6 @@ function splitUtf8Range(
     let end = Math.min(start + targetBytes, endByte);
     while (end > start && end < endByte && isContinuationByte(bytes[end]!)) end -= 1;
     if (end === start) {
-      // targetBytes may be smaller than one UTF-8 code point. Advance to the
-      // next boundary so progress is guaranteed while preserving valid UTF-8.
       end = Math.min(start + 1, endByte);
       while (end < endByte && isContinuationByte(bytes[end]!)) end += 1;
     }
@@ -145,7 +139,7 @@ function splitUtf8Range(
 }
 
 function assertStructureIsValid(bytes: Uint8Array, nodes: readonly DocumentNode[]): void {
-  let previousStart = -1;
+  let previousEnd = 0;
   for (const node of nodes) {
     if (
       !Number.isSafeInteger(node.startByte) ||
@@ -153,13 +147,13 @@ function assertStructureIsValid(bytes: Uint8Array, nodes: readonly DocumentNode[
       node.startByte < 0 ||
       node.endByte <= node.startByte ||
       node.endByte > bytes.byteLength ||
-      node.startByte < previousStart ||
+      node.startByte < previousEnd ||
       !isUtf8Boundary(bytes, node.startByte) ||
       !isUtf8Boundary(bytes, node.endByte)
     ) {
       throw new Error("ParsedArtifact document structure contains an invalid canonical UTF-8 byte range");
     }
-    previousStart = node.startByte;
+    previousEnd = node.endByte;
   }
 }
 

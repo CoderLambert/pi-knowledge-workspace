@@ -57,11 +57,13 @@ interface ArtifactDocument {
 interface ViewerState {
   loading: boolean;
   sources: SourceSummary[];
-  selectedSource?: SourceDetail;
-  document?: ArtifactDocument;
+  selectedSource?: SourceDetail | undefined;
+  document?: ArtifactDocument | undefined;
   evidenceId: string;
-  error?: string;
+  error?: string | undefined;
 }
+
+type ViewerRequestInput = null | Record<string, string | number>;
 
 const states = new Map<string, ViewerState>();
 
@@ -260,7 +262,7 @@ async function openArtifact(context: WorkspacePanelContext, parsedArtifactId: st
     state.document = parseDocument(await requestBackend(context, "knowledge.viewer.artifact.open", {
       parsedArtifactId,
       ...(evidenceId.trim().length === 0 ? {} : { evidenceId: evidenceId.trim() }),
-      maxBytes: 48 * 1024,
+      maxBytes: 40 * 1024,
     }));
   } catch (error) {
     state.error = boundedErrorMessage(error);
@@ -270,7 +272,11 @@ async function openArtifact(context: WorkspacePanelContext, parsedArtifactId: st
   }
 }
 
-async function requestBackend(context: WorkspacePanelContext, operation: string, input: unknown): Promise<unknown> {
+async function requestBackend(
+  context: WorkspacePanelContext,
+  operation: string,
+  input: ViewerRequestInput,
+): Promise<unknown> {
   const backend = context.pairedBackend;
   if (backend?.requestVersion !== 1) throw new Error("Paired backend request capability is unavailable");
   return await backend.request(operation, input);
@@ -326,7 +332,9 @@ function parseDocument(value: unknown): ArtifactDocument {
   const artifact = requireRecord(document["parsedArtifact"], "ParsedArtifact");
   const rawHighlight = document["highlight"];
   const highlight = rawHighlight === null ? null : parseHighlight(rawHighlight);
-  if (typeof document["text"] !== "string" || typeof document["truncated"] !== "boolean") {
+  const text = document["text"];
+  const truncated = document["truncated"];
+  if (typeof text !== "string" || typeof truncated !== "boolean") {
     throw new Error("Artifact document text/truncation metadata is invalid");
   }
   return {
@@ -340,7 +348,10 @@ function parseDocument(value: unknown): ArtifactDocument {
       parserVersion: requireString(artifact, "parserVersion"), canonicalTextSha256: requireString(artifact, "canonicalTextSha256"),
       createdAt: requireString(artifact, "createdAt"),
     },
-    text: document["text"], byteLength: requireInteger(document, "byteLength"), truncated: document["truncated"], highlight,
+    text,
+    byteLength: requireInteger(document, "byteLength"),
+    truncated,
+    highlight,
   };
 }
 

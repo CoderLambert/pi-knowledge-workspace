@@ -8,6 +8,8 @@ export const KNOWLEDGE_OPERATIONS = [
 
 export type KnowledgeOperation = (typeof KNOWLEDGE_OPERATIONS)[number];
 
+const KNOWLEDGE_OPERATION_SET: ReadonlySet<string> = new Set(KNOWLEDGE_OPERATIONS);
+
 export function isKnowledgeOperation(value: string): value is KnowledgeOperation {
-  return (KNOWLEDGE_OPERATIONS as readonly string[]).includes(value);
+  return KNOWLEDGE_OPERATION_SET.has(value);
 }

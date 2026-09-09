@@ -38,7 +38,9 @@ describe("Stable Evidence entity", () => {
     expect(evidence.quoteHash).toBe(
       createHash("sha256").update(Buffer.from("Evidence 😀 quote", "utf8")).digest("hex"),
     );
-    expect(() => assertEvidenceMatchesArtifact(evidence, canonicalBytes)).not.toThrow();
+    expect(() => {
+      assertEvidenceMatchesArtifact(evidence, canonicalBytes);
+    }).not.toThrow();
   });
 
   it("uses byte range rather than quote text to distinguish duplicated passages", () => {
@@ -91,9 +93,9 @@ describe("Stable Evidence entity", () => {
       locatorSnapshot: {},
     });
 
-    expect(() => assertEvidenceMatchesArtifact(evidence, bytes("staple quote"))).toThrow(
-      "Evidence no longer matches authoritative ParsedArtifact bytes",
-    );
+    expect(() => {
+      assertEvidenceMatchesArtifact(evidence, bytes("staple quote"));
+    }).toThrow("Evidence no longer matches authoritative ParsedArtifact bytes");
   });
 
   it("rejects empty, mid-code-point and out-of-bounds Evidence ranges", () => {
@@ -129,7 +131,8 @@ describe("Stable Evidence entity", () => {
   });
 
   it("snapshots locator metadata instead of retaining the caller's mutable object", () => {
-    const locator: Record<string, unknown> = { heading: "Before", nested: { ordinal: 1 } };
+    const nested = { ordinal: 1 };
+    const locator: Record<string, unknown> = { heading: "Before", nested };
     const evidence = createStableEvidence({
       knowledgeWorkspaceId: WORKSPACE_ID,
       parsedArtifactId: "artifact-1",
@@ -139,7 +142,7 @@ describe("Stable Evidence entity", () => {
     });
 
     locator["heading"] = "After";
-    (locator["nested"] as { ordinal: number }).ordinal = 9;
+    nested.ordinal = 9;
     expect(evidence.locatorSnapshot).toEqual({ heading: "Before", nested: { ordinal: 1 } });
   });
 });

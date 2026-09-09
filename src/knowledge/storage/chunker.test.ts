@@ -13,8 +13,10 @@ describe("structure-aware chunker", () => {
     const chunks = chunkParsedArtifact(input, { targetBytes: 200 });
 
     expect(chunks).toHaveLength(1);
-    expect(chunks[0]).toMatchObject({ ordinal: 0, startByte: 0, nodeKinds: ["heading", "paragraph"] });
-    expect(chunks[0]!.text).toBe("# Heading\nParagraph one.\nParagraph two.");
+    const first = chunks[0];
+    if (first === undefined) throw new Error("Expected one chunk");
+    expect(first).toMatchObject({ ordinal: 0, startByte: 0, nodeKinds: ["heading", "paragraph"] });
+    expect(first.text).toBe("# Heading\nParagraph one.\nParagraph two.");
   });
 
   it("starts a new chunk at a heading boundary when both sections fit independently", () => {
@@ -30,7 +32,9 @@ describe("structure-aware chunker", () => {
     const chunks = chunkParsedArtifact(input, { targetBytes: 20 });
 
     expect(chunks.length).toBeGreaterThan(1);
-    expect(chunks[0]!.nodeKinds).toContain("heading");
+    const first = chunks[0];
+    if (first === undefined) throw new Error("Expected at least one chunk");
+    expect(first.nodeKinds).toContain("heading");
     expect(chunks.every((chunk) => Buffer.byteLength(chunk.text, "utf8") <= 20)).toBe(true);
     expect(chunks.flatMap((chunk) => chunk.nodeKinds)).toContain("list-item");
   });

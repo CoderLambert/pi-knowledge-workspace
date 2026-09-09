@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P1-T15 — PARTIAL
+
+- Added a host-authoritative Source / Evidence Viewer spanning PI WEB paired-backend operations, Workspace-scoped Source lists/details, SourceVersion history, ParsedArtifact rendering and UTF-8 byte-accurate Evidence highlights.
+- Historical citations are fail-closed: an Evidence must belong to the explicitly requested historical ParsedArtifact, and the viewer never redirects it to the Source's latest version or rereads the mutable Workspace file.
+- Added read-model, service-dispatch and paired-backend contract tests including updated-Source/historical-Evidence and CJK byte-boundary cases. Production `pi-knowledge` injection still depends on a durable P1-T08 `ParsedArtifactReadStore`; executable/static/browser/Fleet evidence remains OPEN verification debt.
+
 ### P1-T08 — PARTIAL
 
 - Added deterministic MD/TXT ParsedArtifact canonicalization from immutable SourceVersion/blob bytes only; mutable Workspace paths are never reopened during parsing.

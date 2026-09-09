@@ -14,14 +14,14 @@ describe("structure-aware chunker", () => {
 
     expect(chunks).toHaveLength(1);
     expect(chunks[0]).toMatchObject({ ordinal: 0, startByte: 0, nodeKinds: ["heading", "paragraph"] });
-    expect(chunks[0]!.text).toBe("# Heading\nParagraph one.\nParagraph two.");
+    expect(chunks[0]!.text).toBe("# Heading\nParagraph one.\nParagraph two.\n");
   });
 
   it("starts a new chunk at a heading boundary when both sections fit independently", () => {
     const input = artifact("# One\nAlpha\n\n# Two\nBeta\n");
     const chunks = chunkParsedArtifact(input, { targetBytes: 100 });
 
-    expect(chunks.map((chunk) => chunk.text)).toEqual(["# One\nAlpha", "# Two\nBeta"]);
+    expect(chunks.map((chunk) => chunk.text)).toEqual(["# One\nAlpha\n", "# Two\nBeta\n"]);
     expect(chunks.map((chunk) => chunk.ordinal)).toEqual([0, 1]);
   });
 
@@ -40,9 +40,7 @@ describe("structure-aware chunker", () => {
     const chunks = chunkParsedArtifact(input, { targetBytes: 10 });
 
     expect(chunks.length).toBeGreaterThan(1);
-    expect(chunks.every((chunk) => chunk.nodeKinds).every((kinds) => kinds.length === 1 && kinds[0] === "code-block")).toBe(
-      true,
-    );
+    expect(chunks.every((chunk) => chunk.nodeKinds.length === 1 && chunk.nodeKinds[0] === "code-block")).toBe(true);
     for (const chunk of chunks) {
       expect(chunk.endByte).toBeGreaterThan(chunk.startByte);
       expect(Buffer.from(chunk.text, "utf8").byteLength).toBeLessThanOrEqual(10);

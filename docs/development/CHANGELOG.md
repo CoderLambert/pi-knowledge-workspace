@@ -22,6 +22,18 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P1-T18 — PARTIAL
+
+- Added schema v6 and atomic IndexBuild publication using a Workspace-owned active-build pointer plus monotonically increasing generation and candidate base-generation/base-active snapshots.
+- Publication requires explicit validation and a transactional compare-and-swap; stale or out-of-order rebuild completion cannot overwrite a newer active build, while the previous active build is retained for P1-T19 retention/GC.
+- Replaced P1-T13's temporary latest-completed resolver with an active-published resolver. Real SQLite migration/CAS/out-of-order concurrency and repository executable/static/build gates remain OPEN verification debt.
+
+### P1-T17 — PARTIAL
+
+- Added the V1 single-concurrency durable worker loop over P1-T16: bounded expired-lease recovery, queued deadline expiry, deterministic candidate discovery, fenced claim, automatic heartbeat/cancellation and fenced terminal completion.
+- The worker executes at most one handler per iteration, rejects stale terminal ownership as `lost-lease`, fails unknown job kinds explicitly and introduces no external queue/broker infrastructure.
+- Added six loop-policy scenarios; real heartbeat timing, two-process kill/restart recovery, stale-worker fencing and repository executable/static/build gates remain OPEN verification debt.
+
 ### P1-T16 — PARTIAL
 
 - Added schema v5 and a reusable durable job state machine with attempt count, lease owner/expiry, heartbeat, monotonically increasing fencing token, deadline, cancellation flag and bounded result/error metadata.

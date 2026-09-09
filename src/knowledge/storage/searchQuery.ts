@@ -58,27 +58,26 @@ export interface SearchIndexBuildResolver {
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 100;
 
-/**
- * P1 baseline resolver. P1-T18 will replace recency selection with atomic active-build publication.
- * Until then, only a completed build is eligible; callers never select the IndexBuild directly.
- */
-export class LatestCompletedIndexBuildResolver implements SearchIndexBuildResolver {
+/** Resolves only the Workspace's atomically published active IndexBuild. */
+export class ActiveIndexBuildResolver implements SearchIndexBuildResolver {
   constructor(private readonly db: KnowledgeDatabase) {}
 
   resolve(knowledgeWorkspaceId: string): string {
     const workspaceId = requireNonEmpty(knowledgeWorkspaceId, "knowledgeWorkspaceId");
     const row = this.db
       .prepare(`
-SELECT id
-FROM index_builds
-WHERE knowledge_workspace_id = ?
-  AND completed_at IS NOT NULL
-ORDER BY completed_at DESC, created_at DESC, id DESC
+SELECT ib.id
+FROM knowledge_workspaces kw
+JOIN index_builds ib ON ib.id = kw.active_index_build_id
+WHERE kw.id = ?
+  AND ib.knowledge_workspace_id = kw.id
+  AND ib.status = 'active'
+  AND ib.published_at IS NOT NULL
 LIMIT 1
 `)
       .get(workspaceId) as { id?: unknown } | undefined;
     if (!row || typeof row.id !== "string" || row.id.trim().length === 0) {
-      throw new Error(`No completed IndexBuild is available for Knowledge Workspace: ${workspaceId}`);
+      throw new Error(`No active IndexBuild is published for Knowledge Workspace: ${workspaceId}`);
     }
     return row.id;
   }
@@ -89,7 +88,7 @@ export class SearchQueryApi {
   constructor(
     private readonly db: KnowledgeDatabase,
     private readonly index: Fts5BaselineIndex,
-    private readonly buildResolver: SearchIndexBuildResolver = new LatestCompletedIndexBuildResolver(db),
+    private readonly buildResolver: SearchIndexBuildResolver = new ActiveIndexBuildResolver(db),
   ) {}
 
   query(input: SearchQueryInput): SearchQueryResult {

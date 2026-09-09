@@ -12,7 +12,7 @@ interface PreparedCall {
 
 class FakeKnowledgeDatabase implements KnowledgeDatabase {
   readonly prepared: PreparedCall[] = [];
-  completedBuildRow: unknown = { id: "build-2" };
+  activeBuildRow: unknown = { id: "build-2" };
   searchRows: unknown[] = [];
   metadataRows = new Map<string, unknown>();
 
@@ -25,7 +25,7 @@ class FakeKnowledgeDatabase implements KnowledgeDatabase {
       run: () => ({ changes: 1, lastInsertRowid: 1 }),
       get: (...params: unknown[]) => {
         call.gets.push(params);
-        if (sql.includes("FROM index_builds")) return this.completedBuildRow;
+        if (sql.includes("FROM knowledge_workspaces kw")) return this.activeBuildRow;
         if (sql.includes("FROM chunks c")) return this.metadataRows.get(String(params[0]));
         return undefined;
       },
@@ -59,7 +59,7 @@ function metadata(chunkId: string, sourceVersionId = "version-1") {
 }
 
 describe("search.query baseline", () => {
-  it("selects a completed Workspace IndexBuild server-side and returns stable handles plus source/locator metadata", () => {
+  it("selects the atomically published Workspace IndexBuild server-side and returns stable handles plus source/locator metadata", () => {
     const db = new FakeKnowledgeDatabase();
     db.searchRows = [
       {
@@ -98,9 +98,11 @@ describe("search.query baseline", () => {
       },
     ]);
 
-    const buildLookup = db.prepared.find((call) => call.sql.includes("FROM index_builds"));
+    const buildLookup = db.prepared.find((call) => call.sql.includes("FROM knowledge_workspaces kw"));
     expect(buildLookup?.gets[0]).toEqual(["workspace-1"]);
-    expect(buildLookup?.sql.replace(/\s+/g, " ")).toContain("knowledge_workspace_id = ? AND completed_at IS NOT NULL");
+    expect(buildLookup?.sql.replace(/\s+/g, " ")).toContain("ib.id = kw.active_index_build_id");
+    expect(buildLookup?.sql.replace(/\s+/g, " ")).toContain("ib.status = 'active'");
+    expect(buildLookup?.sql.replace(/\s+/g, " ")).toContain("ib.published_at IS NOT NULL");
   });
 
   it("applies allowed SourceVersion scope and result budget before invoking FTS Top-K", () => {
@@ -139,13 +141,13 @@ describe("search.query baseline", () => {
     expect(db.prepared.some((call) => call.sql.includes("FROM chunk_fts"))).toBe(false);
   });
 
-  it("fails closed when no completed IndexBuild exists", () => {
+  it("fails closed when no active published IndexBuild exists", () => {
     const db = new FakeKnowledgeDatabase();
-    db.completedBuildRow = undefined;
+    db.activeBuildRow = undefined;
     const api = new SearchQueryApi(db, new Fts5BaselineIndex(db));
 
     expect(() => api.query({ knowledgeWorkspaceId: "workspace-1", query: "needle" })).toThrow(
-      /No completed IndexBuild is available/,
+      /No active IndexBuild is published/,
     );
     expect(db.prepared.some((call) => call.sql.includes("FROM chunk_fts"))).toBe(false);
   });

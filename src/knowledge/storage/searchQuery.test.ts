@@ -15,7 +15,7 @@ class FakeKnowledgeDatabase implements KnowledgeDatabase {
   readonly prepared: PreparedCall[] = [];
   searchRows: unknown[] = [];
   metadataRows = new Map<string, unknown>();
-  exec(): void {}
+  exec(): void { /* no-op test database */ }
   prepare(sql: string): SqliteStatement {
     const call: PreparedCall = { sql, gets: [], alls: [] };
     this.prepared.push(call);
@@ -33,7 +33,7 @@ class FakeKnowledgeDatabase implements KnowledgeDatabase {
     };
   }
   pragma(): unknown { return undefined; }
-  close(): void {}
+  close(): void { /* no-op test database */ }
 }
 
 function metadata(chunkId: string, sourceVersionId = "version-1") {

@@ -1,0 +1,82 @@
+name: P2 Lexical Evidence
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/p2-lexical-evidence.yml"
+      - "scripts/p2-run-lexical-evidence.mjs"
+      - "eval/corpus/**"
+      - "eval/queries/**"
+      - "eval/labels/**"
+      - "src/knowledge/eval/**"
+      - "src/knowledge/storage/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lexical-evidence:
+    name: Lexical profiles (Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Ensure native SQLite runtime and probe FTS5
+        shell: bash
+        run: |
+          if ! node -e 'require.resolve("better-sqlite3")' >/dev/null 2>&1; then
+            npm install --no-save --package-lock=false better-sqlite3@13.0.3
+          fi
+          node - <<'NODE'
+          const Database = require('better-sqlite3');
+          const db = new Database(':memory:');
+          const sqlite = db.prepare('select sqlite_version() version').get().version;
+          db.exec('create virtual table __p2_fts_probe using fts5(text)');
+          db.prepare('insert into __p2_fts_probe(text) values (?)').run('probe token');
+          const row = db.prepare("select text from __p2_fts_probe where __p2_fts_probe match 'probe'").get();
+          console.log(JSON.stringify({
+            node: process.version,
+            betterSqlite3: require('better-sqlite3/package.json').version,
+            sqlite,
+            fts5: row?.text === 'probe token',
+          }, null, 2));
+          db.close();
+          NODE
+
+      - name: Run corrected-ancestry and P2-T05 focused tests
+        run: |
+          npm test -- \
+            src/knowledge/eval/goldenDataset.test.ts \
+            src/knowledge/eval/representativeCorpus.test.ts \
+            src/knowledge/eval/queryAnnotations.test.ts \
+            src/knowledge/eval/retrievalChallengeCorpus.test.ts \
+            src/knowledge/storage/searchQuery.test.ts \
+            src/knowledge/storage/fts5Index.test.ts \
+            src/knowledge/eval/ftsBaselineEvaluation.test.ts \
+            src/knowledge/eval/lexicalNormalization.test.ts \
+            src/knowledge/eval/lexicalNormalizationEvaluation.test.ts
+
+      - name: Run four development profiles, freeze winner, then one-shot holdout
+        run: npx tsx scripts/p2-run-lexical-evidence.mjs
+
+      - name: Upload P2-T05 evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-t05-lexical-evidence
+          path: /tmp/pi-knowledge-p2-evidence/p2-t05
+          if-no-files-found: warn
+          retention-days: 14

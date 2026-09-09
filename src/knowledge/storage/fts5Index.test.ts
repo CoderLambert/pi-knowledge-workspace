@@ -160,15 +160,15 @@ describe("FTS5 baseline index", () => {
     expect(() => {
       index.search({ knowledgeWorkspaceId: "workspace-1", indexBuildId: "build-1", query: "x", limit: 101 });
     }).toThrow(/between 1 and 100/);
-    expect(() =>
+    expect(() => {
       index.replaceArtifactChunks({
         knowledgeWorkspaceId: "workspace-1",
         indexBuildId: "build-1",
         sourceVersionId: "version-1",
         parsedArtifactId: "artifact-1",
         chunks: [{ ordinal: 1, startByte: 0, endByte: 1, text: "x", nodeKinds: [] }],
-      }),
-    ).toThrow(/ordinals must be contiguous/);
+      });
+    }).toThrow(/ordinals must be contiguous/);
   });
 
   it("fails closed when SQLite returns a malformed FTS5 row", () => {

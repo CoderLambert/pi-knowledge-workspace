@@ -51,6 +51,85 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  anythingllm-smoke:
+    name: AnythingLLM 1.16.1 headless smoke
+    needs: contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Start fixed AnythingLLM release
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm /tmp/p2-anythingllm-storage
+          docker pull ghcr.io/mintplex-labs/anything-llm:1.16.1
+          docker image inspect ghcr.io/mintplex-labs/anything-llm:1.16.1 > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/image-inspect.json
+          docker run -d --name p2-anythingllm -p 3001:3001 --cap-add SYS_ADMIN \
+            -e STORAGE_DIR=/app/server/storage \
+            -e AUTH_TOKEN=p2-t11-ci-auth \
+            -e JWT_SECRET=p2-t11-ci-jwt-secret-1234567890 \
+            -e DISABLE_TELEMETRY=true \
+            -v /tmp/p2-anythingllm-storage:/app/server/storage \
+            ghcr.io/mintplex-labs/anything-llm:1.16.1
+
+      - name: Wait for AnythingLLM
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:3001/api/ping >/tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/ping.json; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs p2-anythingllm
+          exit 1
+
+      - name: Verify headless auth and workspace API
+        run: |
+          set -euo pipefail
+          TOKEN_RESPONSE=$(curl -fsS -X POST http://127.0.0.1:3001/api/request-token \
+            -H 'Content-Type: application/json' \
+            -d '{"password":"p2-t11-ci-auth"}')
+          printf '%s\n' "$TOKEN_RESPONSE" > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/token-response.json
+          TOKEN=$(printf '%s' "$TOKEN_RESPONSE" | jq -r '.token // empty')
+          test -n "$TOKEN"
+
+          KEY_RESPONSE=$(curl -fsS -X POST http://127.0.0.1:3001/api/system/generate-api-key \
+            -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"p2-t11-ci"}')
+          printf '%s\n' "$KEY_RESPONSE" > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/api-key-response.redacted.json
+          API_KEY=$(printf '%s' "$KEY_RESPONSE" | jq -r '.apiKey.secret // .apiKey // .secret // empty')
+          test -n "$API_KEY"
+          jq 'if .apiKey.secret then .apiKey.secret="<redacted>" elif (.apiKey|type)=="string" then .apiKey="<redacted>" elif .secret then .secret="<redacted>" else . end' \
+            /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/api-key-response.redacted.json \
+            > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/api-key-response.tmp.json
+          mv /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/api-key-response.tmp.json /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/api-key-response.redacted.json
+
+          WORKSPACE_RESPONSE=$(curl -fsS -X POST http://127.0.0.1:3001/api/v1/workspace/new \
+            -H "Authorization: Bearer $API_KEY" \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"p2-t11-smoke","chatMode":"query","topN":4}')
+          printf '%s\n' "$WORKSPACE_RESPONSE" > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/workspace-create.json
+          test "$(printf '%s' "$WORKSPACE_RESPONSE" | jq -r '.workspace.name // empty')" = "p2-t11-smoke"
+
+      - name: Record AnythingLLM runtime footprint
+        if: always()
+        run: |
+          mkdir -p /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm
+          docker stats --no-stream --format '{{json .}}' p2-anythingllm > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/docker-stats.jsonl || true
+          du -sb /tmp/p2-anythingllm-storage > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/persistent-bytes.txt || true
+          docker logs p2-anythingllm > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/container.log 2>&1 || true
+          docker stop p2-anythingllm || true
+
+      - name: Upload AnythingLLM smoke proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-t11-anythingllm-smoke
+          path: /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm
+          if-no-files-found: error
+          retention-days: 14
+
   open-webui-smoke:
     name: Open WebUI v0.11.3 headless smoke
     needs: contracts

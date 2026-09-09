@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P1-T20 — PARTIAL
+
+- Added `pi-knowledge backup --db --data-dir --output`, directory-format atomic publication, read-only online SQLite snapshot, manifest/hash closure, and verified SourceVersion blob export.
+- Backup object closure is derived from the SQLite snapshot, never the mutable live connection; the command never migrates or retunes the source DB and never overwrites an existing backup destination.
+- Complete backups with ParsedArtifacts intentionally fail closed until the missing production durable ParsedArtifact provider is wired. Real WAL/package execution and full artifact backup remain OPEN verification debt.
+
 ### P1-T19 — PARTIAL
 
 - Added schema v7 `index_build_pins`, finite query leases, durable future-owner pins, bounded expired-pin cleanup and retained-IndexBuild GC.
@@ -98,7 +104,7 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 - Added a repository-owned restricted Pi SDK runtime probe with exactly four model-visible tools: `knowledge_sources`, `knowledge_search`, `knowledge_read`, and `submit_answer`.
 - The probe disables project/global extensions, skills, prompt templates, themes, AGENTS/context files, persisted settings/sessions, models.json loading, credential-file loading, and model-network refresh.
-- Tests assert the four-tool allowlist, absence of built-in shell/filesystem tools, and zero discovery of seeded project resources.
+- Tests assert the four-tool allowlist, absence of built-in shell/filesystem tools, and zero discovery of seeded project/global resources or persisted command credentials/configuration.
 - Focused/static/build/package execution remains OPEN verification debt; P0-T07 stays PARTIAL until executable evidence is recorded.
 
 ### P0-T06 — PARTIAL

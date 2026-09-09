@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "corpus-challenge-node-fspromises-neighbors-b-v22-3-0",
+  "relativePath": "corpus/challenge-node-fspromises-neighbors-b.md",
+  "mediaType": "text/markdown",
+  "language": "mixed",
+  "source": {
+    "title": "Node.js v22.3.0 fs/promises neighboring APIs — development retrieval challenge B",
+    "uri": "https://github.com/nodejs/node/blob/v22.3.0/doc/api/fs.md",
+    "capturedAt": "2026-09-09T00:00:00.000Z",
+    "version": "tag:v22.3.0"
+  },
+  "parsedArtifact": {
+    "parsedArtifactId": "pa-4a4f1ce41ca9e525",
+    "sourceVersionId": "sv-1bb7bdf4300f9f9c",
+    "parserFingerprint": "md-txt-parser-v1",
+    "normalizationFingerprint": "utf8-bom-strip+newline-lf-v1",
+    "canonicalTextSha256": "1bb7bdf4300f9f9c4a4f1ce41ca9e5251d0cfb2bc16620c18311e81731c4d7ea"
+  }
+}

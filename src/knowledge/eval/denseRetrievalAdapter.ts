@@ -105,12 +105,12 @@ export async function embedDenseInputs(
   signal: AbortSignal,
 ): Promise<readonly Float32Array[]> {
   validateDenseExperimentProfiles([adapter.profile]);
-  if (signal.aborted) throw abortReason(signal);
+  throwIfAborted(signal);
   if (inputs.length === 0) return [];
 
   const prepared = inputs.map((input) => prepareDenseInput(input, adapter.profile, kind));
   const vectors = await adapter.embed(prepared, kind, signal);
-  if (signal.aborted) throw abortReason(signal);
+  throwIfAborted(signal);
   if (vectors.length !== prepared.length) {
     throw new Error("Dense adapter returned a vector count that does not match the input count");
   }
@@ -153,11 +153,11 @@ export class InMemoryDenseEvaluationIndex {
     }
 
     const allowed = input.allowedSourceVersionIds;
-    if (allowed !== undefined && allowed.length === 0) return [];
+    if (allowed?.length === 0) return [];
     const allowedSet = allowed === undefined ? undefined : new Set(allowed.map((id) => requireIdentity(id)));
 
     return this.chunks
-      .filter((chunk) => allowedSet === undefined || allowedSet.has(chunk.sourceVersionId))
+      .filter((chunk) => allowedSet?.has(chunk.sourceVersionId) ?? true)
       .map((chunk) => ({
         chunkId: chunk.chunkId,
         sourceVersionId: chunk.sourceVersionId,
@@ -205,6 +205,10 @@ function requireIdentity(value: string): string {
 
 function requireNonEmpty(value: string, label: string): void {
   if (value.trim().length === 0) throw new TypeError(`${label} must not be empty`);
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw abortReason(signal);
 }
 
 function abortReason(signal: AbortSignal): Error {

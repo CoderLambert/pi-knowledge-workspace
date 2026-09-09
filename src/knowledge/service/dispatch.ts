@@ -1,3 +1,4 @@
+import { KNOWLEDGE_ERROR_CODES, KnowledgeServiceError } from "../contracts/errors.js";
 import { KNOWLEDGE_OPERATIONS, type KnowledgeOperation } from "../contracts/operations.js";
 import {
   PI_KNOWLEDGE_PROTOCOL_VERSION,
@@ -29,7 +30,9 @@ export function dispatchKnowledgeOperation(
         service: PI_KNOWLEDGE_SERVICE_NAME,
         serviceVersion: PI_KNOWLEDGE_SERVICE_VERSION,
         protocolVersion: PI_KNOWLEDGE_PROTOCOL_VERSION,
-        operations: [...KNOWLEDGE_OPERATIONS],
+        operations: dependencies.viewer === undefined
+          ? ["capabilities.get", "workspace.echo"]
+          : [...KNOWLEDGE_OPERATIONS],
         limits: {
           maxRequestBytes: limits.maxRequestBytes,
           maxResponseBytes: limits.maxResponseBytes,
@@ -38,11 +41,7 @@ export function dispatchKnowledgeOperation(
     case "workspace.echo": {
       const scope = parseWorkspaceEchoInput(input);
       return scope.workspaceLabel === undefined
-        ? {
-            projectId: scope.projectId,
-            workspaceId: scope.workspaceId,
-            workspacePath: scope.workspacePath,
-          }
+        ? { projectId: scope.projectId, workspaceId: scope.workspaceId, workspacePath: scope.workspacePath }
         : {
             projectId: scope.projectId,
             workspaceId: scope.workspaceId,
@@ -73,7 +72,11 @@ export function dispatchKnowledgeOperation(
 
 function requireViewer(dependencies: KnowledgeDispatchDependencies): KnowledgeViewerDispatch {
   if (dependencies.viewer === undefined) {
-    throw new Error("Knowledge Source/Evidence viewer runtime is not configured");
+    throw new KnowledgeServiceError(
+      KNOWLEDGE_ERROR_CODES.unsupportedOperation,
+      "Knowledge Source/Evidence viewer runtime is not configured",
+      503,
+    );
   }
   return dependencies.viewer;
 }
@@ -87,14 +90,14 @@ function parseViewerRequest(
   const body = requireRecord(value, `${operation} input`);
   const allowed = new Set(["scope", ...requiredFields, ...optionalFields]);
   for (const key of Object.keys(body)) {
-    if (!allowed.has(key)) throw new TypeError(`${operation} input contains unsupported field: ${key}`);
+    if (!allowed.has(key)) throw invalid(`${operation} input contains unsupported field: ${key}`);
   }
   for (const key of requiredFields) requireString(body, key, operation);
 
   const rawScope = requireRecord(body["scope"], `${operation} scope`);
   const allowedScope = new Set(["projectId", "workspaceId", "workspacePath", "workspaceLabel"]);
   for (const key of Object.keys(rawScope)) {
-    if (!allowedScope.has(key)) throw new TypeError(`${operation} scope contains unsupported field: ${key}`);
+    if (!allowedScope.has(key)) throw invalid(`${operation} scope contains unsupported field: ${key}`);
   }
   const workspaceLabel = optionalString(rawScope, "workspaceLabel", operation);
   return {
@@ -110,7 +113,7 @@ function parseViewerRequest(
 
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new TypeError(`${label} must be an object`);
+    throw invalid(`${label} must be an object`);
   }
   return value as Record<string, unknown>;
 }
@@ -118,7 +121,7 @@ function requireRecord(value: unknown, label: string): Record<string, unknown> {
 function requireString(record: Record<string, unknown>, key: string, operation: string): string {
   const value = record[key];
   if (typeof value !== "string" || value.trim().length === 0) {
-    throw new TypeError(`${operation} ${key} must be a non-empty string`);
+    throw invalid(`${operation} ${key} must be a non-empty string`);
   }
   return value;
 }
@@ -127,7 +130,7 @@ function optionalString(record: Record<string, unknown>, key: string, operation:
   const value = record[key];
   if (value === undefined) return undefined;
   if (typeof value !== "string" || value.trim().length === 0) {
-    throw new TypeError(`${operation} ${key} must be a non-empty string when supplied`);
+    throw invalid(`${operation} ${key} must be a non-empty string when supplied`);
   }
   return value;
 }
@@ -136,7 +139,11 @@ function optionalPositiveInteger(record: Record<string, unknown>, key: string, o
   const value = record[key];
   if (value === undefined) return undefined;
   if (!Number.isSafeInteger(value) || (value as number) <= 0) {
-    throw new TypeError(`${operation} ${key} must be a positive integer when supplied`);
+    throw invalid(`${operation} ${key} must be a positive integer when supplied`);
   }
   return value as number;
+}
+
+function invalid(message: string): KnowledgeServiceError {
+  return new KnowledgeServiceError(KNOWLEDGE_ERROR_CODES.invalidRequest, message, 400);
 }

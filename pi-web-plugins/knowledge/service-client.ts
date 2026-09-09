@@ -13,7 +13,38 @@ const KNOWLEDGE_SERVICE_TOKEN_MIN_LENGTH = 16;
 const KNOWLEDGE_SERVICE_REQUEST_ID_HEADER = "x-request-id";
 const KNOWLEDGE_SERVICE_MAX_REQUEST_ID_LENGTH = 128;
 
-type FetchLike = typeof fetch;
+interface FetchHeadersLike {
+  get(name: string): string | null;
+}
+
+interface FetchBodyReaderLike {
+  read(): Promise<{ done: true; value?: undefined } | { done: false; value: Uint8Array }>;
+  cancel(reason?: unknown): Promise<void>;
+  releaseLock(): void;
+}
+
+interface FetchBodyLike {
+  getReader(): FetchBodyReaderLike;
+  cancel(reason?: unknown): Promise<void>;
+}
+
+interface FetchResponseLike {
+  readonly ok: boolean;
+  readonly status: number;
+  readonly headers: FetchHeadersLike;
+  readonly body: FetchBodyLike | null;
+}
+
+interface FetchRequestInitLike {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  signal?: AbortSignal;
+}
+
+type FetchLike = (input: string, init?: FetchRequestInitLike) => Promise<FetchResponseLike>;
+
+const serverFetch: FetchLike = async (input, init) => undiciFetch(input, init);
 
 export type KnowledgeServiceOperation = "capabilities.get" | "workspace.echo";
 
@@ -96,7 +127,7 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
     options.maxResponseBytes ?? KNOWLEDGE_SERVICE_DEFAULT_MAX_RESPONSE_BYTES,
     "maxResponseBytes",
   );
-  const fetchImpl = options.fetchImpl ?? (undiciFetch as FetchLike);
+  const fetchImpl = options.fetchImpl ?? serverFetch;
   const baseUrl = `http://${formatHost(host)}:${String(port)}`;
 
   return Object.freeze({
@@ -245,9 +276,9 @@ async function withRequestDeadline<T>(
 async function performFetch(
   fetchImpl: FetchLike,
   url: string,
-  init: RequestInit,
+  init: FetchRequestInitLike,
   signal: AbortSignal,
-): Promise<Response> {
+): Promise<FetchResponseLike> {
   try {
     return await fetchImpl(url, { ...init, signal });
   } catch (error) {
@@ -259,7 +290,7 @@ async function performFetch(
   }
 }
 
-async function readBoundedJsonBody(response: Response, maxBytes: number): Promise<unknown> {
+async function readBoundedJsonBody(response: FetchResponseLike, maxBytes: number): Promise<unknown> {
   const contentLength = response.headers.get("content-length");
   if (contentLength !== null) {
     const parsedLength = Number(contentLength);
@@ -281,7 +312,7 @@ async function readBoundedJsonBody(response: Response, maxBytes: number): Promis
   const chunks: Buffer[] = [];
   let totalBytes = 0;
   try {
-    while (true) {
+    for (;;) {
       const chunk = await reader.read();
       if (chunk.done) break;
       totalBytes += chunk.value.byteLength;
@@ -318,7 +349,7 @@ async function readBoundedJsonBody(response: Response, maxBytes: number): Promis
   }
 }
 
-async function cancelBody(response: Response): Promise<void> {
+async function cancelBody(response: FetchResponseLike): Promise<void> {
   if (response.body === null) return;
   await response.body.cancel().catch(() => undefined);
 }
@@ -332,7 +363,7 @@ function requireProtocolVersion(record: Record<string, unknown>): void {
   }
 }
 
-function requireCorrelatedRequestId(response: Response, requestId: string): void {
+function requireCorrelatedRequestId(response: FetchResponseLike, requestId: string): void {
   const headerRequestId = response.headers.get(KNOWLEDGE_SERVICE_REQUEST_ID_HEADER);
   if (headerRequestId !== requestId) {
     throw new KnowledgeServiceClientError(

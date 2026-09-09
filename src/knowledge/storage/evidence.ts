@@ -9,6 +9,7 @@ import {
 
 export interface StableEvidence {
   id: string;
+  knowledgeWorkspaceId: string;
   parsedArtifactId: string;
   startByte: number;
   endByte: number;
@@ -19,6 +20,7 @@ export interface StableEvidence {
 }
 
 export interface CreateStableEvidenceInput {
+  knowledgeWorkspaceId: string;
   parsedArtifactId: string;
   canonicalBytes: Uint8Array;
   range: Utf8ByteRange;
@@ -34,6 +36,9 @@ export interface CreateStableEvidenceInput {
  * Those values are always derived server-side from the canonical bytes.
  */
 export function createStableEvidence(input: CreateStableEvidenceInput): StableEvidence {
+  if (input.knowledgeWorkspaceId.trim().length === 0) {
+    throw new TypeError("knowledgeWorkspaceId must not be empty");
+  }
   if (input.parsedArtifactId.trim().length === 0) {
     throw new TypeError("parsedArtifactId must not be empty");
   }
@@ -51,6 +56,7 @@ export function createStableEvidence(input: CreateStableEvidenceInput): StableEv
 
   return Object.freeze({
     id: input.id ?? randomUUID(),
+    knowledgeWorkspaceId: input.knowledgeWorkspaceId,
     parsedArtifactId: input.parsedArtifactId,
     startByte: input.range.startByte,
     endByte: input.range.endByte,

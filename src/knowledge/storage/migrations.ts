@@ -217,6 +217,24 @@ ALTER TABLE index_builds ADD COLUMN published_at TEXT;
 CREATE INDEX index_builds_workspace_status_idx ON index_builds(knowledge_workspace_id, status);
 `,
   },
+  {
+    version: 7,
+    name: "index-build-pin-lease-gc",
+    sql: `
+CREATE TABLE index_build_pins (
+  id TEXT PRIMARY KEY,
+  index_build_id TEXT NOT NULL REFERENCES index_builds(id) ON DELETE CASCADE,
+  owner_type TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  lease_expires_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(index_build_id, owner_type, owner_id)
+);
+CREATE INDEX index_build_pins_build_expiry_idx ON index_build_pins(index_build_id, lease_expires_at);
+CREATE INDEX index_build_pins_expiry_idx ON index_build_pins(lease_expires_at);
+`,
+  },
 ];
 
 function readUserVersion(db: MigrationDatabase): number {

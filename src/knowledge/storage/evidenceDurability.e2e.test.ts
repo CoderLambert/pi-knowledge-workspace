@@ -1,22 +1,48 @@
 import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { KnowledgeBackupCreator, type BackupArtifactProvider, type BackupCapableDatabase, type BackupManifestArtifact } from "./backup.js";
+import {
+  KnowledgeBackupCreator,
+  type BackupArtifactProvider,
+  type BackupCapableDatabase,
+  type BackupManifestArtifact,
+} from "./backup.js";
 import { ContentAddressedBlobStore } from "./blobStore.js";
 import { chunkParsedArtifact } from "./chunker.js";
-import { openKnowledgeDatabase, openKnowledgeDatabaseReadOnly, type KnowledgeDatabase } from "./database.js";
-import { assertEvidenceMatchesArtifact, createStableEvidence, type StableEvidence } from "./evidence.js";
-import { EvidenceReadApi, type ParsedArtifactReadStore, type ReadableParsedArtifact } from "./evidenceRead.js";
+import {
+  openKnowledgeDatabase,
+  openKnowledgeDatabaseReadOnly,
+  type KnowledgeDatabase,
+} from "./database.js";
+import {
+  assertEvidenceMatchesArtifact,
+  createStableEvidence,
+  type StableEvidence,
+} from "./evidence.js";
+import {
+  EvidenceReadApi,
+  type ParsedArtifactReadStore,
+  type ReadableParsedArtifact,
+} from "./evidenceRead.js";
 import { Fts5BaselineIndex } from "./fts5Index.js";
 import { MdTextImportJobs } from "./importJobs.js";
 import { IndexBuildPublisher } from "./indexBuildPublication.js";
 import { IndexBuildRetention } from "./indexBuildRetention.js";
-import { ParsedArtifactCanonicalizer, type DocumentNode, type ParsedArtifactCanonical } from "./parsedArtifact.js";
-import { KnowledgeRestore, type RestoreArtifactSink, type RestoreEvidenceVerifier } from "./restore.js";
+import {
+  ParsedArtifactCanonicalizer,
+  type DocumentNode,
+  type ParsedArtifactCanonical,
+} from "./parsedArtifact.js";
+import {
+  KnowledgeRestore,
+  type RestoreArtifactSink,
+  type RestoreEvidenceVerifier,
+} from "./restore.js";
 import { SourceDomain, type KnowledgeSourceVersion } from "./sourceDomain.js";
 import { captureWorkspaceFile } from "./workspaceFileReader.js";
 
@@ -24,6 +50,7 @@ const roots: string[] = [];
 const WORKSPACE_ID = "workspace-durability";
 const INSTALLATION_ID = "installation-durability";
 const HISTORICAL_QUOTE = "历史证据必须精确保留 😀";
+const SEARCH_ANCHOR = "durabilityanchor";
 
 interface ArtifactBundle {
   knowledgeWorkspaceId: string;
@@ -52,7 +79,14 @@ describe("P1-T22 Evidence durability E2E", () => {
     await mkdir(path.dirname(sourcePath), { recursive: true });
     await mkdir(dataRoot, { recursive: true });
 
-    const originalText = `# Stable Evidence\n\n${HISTORICAL_QUOTE}\n\nOnly the historical version contains the original wording.\n`;
+    const originalText = [
+      "# Stable Evidence",
+      "",
+      `${SEARCH_ANCHOR} ${HISTORICAL_QUOTE}`,
+      "",
+      "Only the historical version contains the original wording.",
+      "",
+    ].join("\n");
     await writeFile(sourcePath, originalText, "utf8");
 
     let db = openKnowledgeDatabase(databasePath);
@@ -71,25 +105,44 @@ describe("P1-T22 Evidence durability E2E", () => {
     });
     const imported = await imports.run(submitted.id);
     expect(imported.status).toBe("succeeded");
-    const sourceId = imported.result!.sourceId;
-    const originalVersion = requireVersion(sources, sourceId, imported.result!.sourceVersionId);
+    if (imported.result === null) throw new Error("Import succeeded without a durable result");
+    const sourceId = imported.result.sourceId;
+    const originalVersion = requireVersion(sources, sourceId, imported.result.sourceVersionId);
 
     // Parse, index, search and create server-derived Stable Evidence.
     const canonicalizer = new ParsedArtifactCanonicalizer(blobs);
     const originalCanonical = await canonicalizer.fromSourceVersion(originalVersion, "md");
     const originalArtifactId = "artifact-original-v1";
-    persistArtifact(db, artifacts, originalArtifactId, originalCanonical, originalVersion.id, originalCanonical.parserFingerprint);
+    persistArtifact(
+      db,
+      artifacts,
+      originalArtifactId,
+      originalCanonical,
+      originalVersion.id,
+      originalCanonical.parserFingerprint,
+    );
 
     const publisher = new IndexBuildPublisher(db);
     const fts = new Fts5BaselineIndex(db);
-    const build1 = publishIndex(db, publisher, fts, originalArtifactId, originalVersion.id, originalCanonical, 2400);
+    const build1 = publishIndex(
+      publisher,
+      fts,
+      originalArtifactId,
+      originalVersion.id,
+      originalCanonical,
+      2400,
+    );
     const hits = fts.search({
       knowledgeWorkspaceId: WORKSPACE_ID,
       indexBuildId: build1,
-      query: "历史证据",
+      query: SEARCH_ANCHOR,
       limit: 5,
     });
-    expect(hits.some((hit) => hit.parsedArtifactId === originalArtifactId && hit.text.includes(HISTORICAL_QUOTE))).toBe(true);
+    expect(
+      hits.some(
+        (hit) => hit.parsedArtifactId === originalArtifactId && hit.text.includes(HISTORICAL_QUOTE),
+      ),
+    ).toBe(true);
 
     const quoteRange = byteRangeFor(originalCanonical.canonicalText, HISTORICAL_QUOTE);
     const evidence = createStableEvidence({
@@ -102,20 +155,48 @@ describe("P1-T22 Evidence durability E2E", () => {
       createdAt: "2026-09-09T00:00:00.000Z",
     });
     persistEvidence(db, evidence);
-    expect(new EvidenceReadApi(artifacts).read({ knowledgeWorkspaceId: WORKSPACE_ID, evidence }).text).toBe(HISTORICAL_QUOTE);
+    expect(
+      new EvidenceReadApi(artifacts).read({ knowledgeWorkspaceId: WORKSPACE_ID, evidence }).text,
+    ).toBe(HISTORICAL_QUOTE);
 
     // Rechunk the same immutable artifact with a different experimental budget.
-    const build2 = publishIndex(db, publisher, fts, originalArtifactId, originalVersion.id, originalCanonical, 32);
+    const build2 = publishIndex(
+      publisher,
+      fts,
+      originalArtifactId,
+      originalVersion.id,
+      originalCanonical,
+      32,
+    );
     expect(build2).not.toBe(build1);
 
     // Reparse the same SourceVersion under a new parser fingerprint without rewriting the old artifact.
     const reparsedArtifactId = "artifact-original-v2-parser";
-    persistArtifact(db, artifacts, reparsedArtifactId, originalCanonical, originalVersion.id, "md-txt-parser-v2-e2e");
-    const build3 = publishIndex(db, publisher, fts, reparsedArtifactId, originalVersion.id, originalCanonical, 48);
+    persistArtifact(
+      db,
+      artifacts,
+      reparsedArtifactId,
+      originalCanonical,
+      originalVersion.id,
+      "md-txt-parser-v2-e2e",
+    );
+    const build3 = publishIndex(
+      publisher,
+      fts,
+      reparsedArtifactId,
+      originalVersion.id,
+      originalCanonical,
+      48,
+    );
     expect(build3).not.toBe(build2);
 
     // Update the same Source with different bytes that no longer contain the historical quote.
-    const updatedText = "# Stable Evidence\n\nThe current version intentionally replaces the historical wording.\n";
+    const updatedText = [
+      "# Stable Evidence",
+      "",
+      "The current version intentionally replaces the historical wording.",
+      "",
+    ].join("\n");
     await writeFile(sourcePath, updatedText, "utf8");
     const capturedUpdate = await captureWorkspaceFile(workspaceRoot, "docs/guide.md");
     const updatedVersion = await sources.manualUpdate(sourceId, capturedUpdate.bytes);
@@ -123,8 +204,22 @@ describe("P1-T22 Evidence durability E2E", () => {
     const updatedCanonical = await canonicalizer.fromSourceVersion(updatedVersion, "md");
     expect(updatedCanonical.canonicalText).not.toContain(HISTORICAL_QUOTE);
     const updatedArtifactId = "artifact-current";
-    persistArtifact(db, artifacts, updatedArtifactId, updatedCanonical, updatedVersion.id, updatedCanonical.parserFingerprint);
-    const build4 = publishIndex(db, publisher, fts, updatedArtifactId, updatedVersion.id, updatedCanonical, 2400);
+    persistArtifact(
+      db,
+      artifacts,
+      updatedArtifactId,
+      updatedCanonical,
+      updatedVersion.id,
+      updatedCanonical.parserFingerprint,
+    );
+    const build4 = publishIndex(
+      publisher,
+      fts,
+      updatedArtifactId,
+      updatedVersion.id,
+      updatedCanonical,
+      2400,
+    );
 
     // GC every replaced IndexBuild. SourceVersion / ParsedArtifact / Evidence history must remain.
     const retention = new IndexBuildRetention(db);
@@ -132,7 +227,9 @@ describe("P1-T22 Evidence durability E2E", () => {
     expect(deletedBuilds).toEqual(expect.arrayContaining([build1, build2, build3]));
     expect(deletedBuilds).not.toContain(build4);
     expect(loadEvidence(db, evidence.id).parsedArtifactId).toBe(originalArtifactId);
-    expect(db.prepare("SELECT COUNT(*) AS count FROM parsed_artifacts WHERE id=?").get(originalArtifactId)).toEqual({ count: 1 });
+    expect(
+      db.prepare("SELECT COUNT(*) AS count FROM parsed_artifacts WHERE id=?").get(originalArtifactId),
+    ).toEqual({ count: 1 });
 
     // Process restart: reopen the file-backed database and prove the old artifact still resolves.
     db.close();
@@ -157,11 +254,15 @@ describe("P1-T22 Evidence durability E2E", () => {
       },
     );
     const manifest = await backup.create(backupPath);
-    expect(manifest.artifacts.some((artifact) => artifact.parsedArtifactId === originalArtifactId)).toBe(true);
-    expect(manifest.blobs.some((blob) => blob.contentSha256 === originalVersion.contentSha256)).toBe(true);
+    expect(
+      manifest.artifacts.some((artifact) => artifact.parsedArtifactId === originalArtifactId),
+    ).toBe(true);
+    expect(
+      manifest.blobs.some((blob) => blob.contentSha256 === originalVersion.contentSha256),
+    ).toBe(true);
     db.close();
 
-    // Restore validates the full closure and re-verifies every historical Evidence before atomic publication.
+    // Restore validates the full closure and re-verifies every historical Evidence before publication.
     const restore = new KnowledgeRestore({
       openSnapshotDatabase: openKnowledgeDatabaseReadOnly,
       artifactSink: new FixtureArtifactSink(),
@@ -182,10 +283,15 @@ describe("P1-T22 Evidence durability E2E", () => {
       expect(restoredRead.parsedArtifactId).toBe(originalArtifactId);
       expect(restoredRead.sourceVersionId).toBe(originalVersion.id);
 
-      const latestVersion = restoredDb.prepare(
-        "SELECT id FROM source_versions WHERE source_id=? ORDER BY created_at DESC, id DESC LIMIT 1",
-      ).get(sourceId) as { id: string };
-      expect(latestVersion.id).toBe(updatedVersion.id);
+      expect(
+        restoredDb.prepare("SELECT COUNT(*) AS count FROM source_versions WHERE source_id=?").get(sourceId),
+      ).toEqual({ count: 2 });
+      expect(
+        restoredDb.prepare("SELECT id FROM source_versions WHERE id=? AND source_id=?").get(
+          updatedVersion.id,
+          sourceId,
+        ),
+      ).toEqual({ id: updatedVersion.id });
       expect(restoredEvidence.parsedArtifactId).not.toBe(updatedArtifactId);
     } finally {
       restoredDb.close();
@@ -195,7 +301,10 @@ describe("P1-T22 Evidence durability E2E", () => {
 
 function seedWorkspace(db: KnowledgeDatabase, workspaceRoot: string): void {
   const createdAt = "2026-09-09T00:00:00.000Z";
-  db.prepare("INSERT INTO installations (id, created_at) VALUES (?, ?)").run(INSTALLATION_ID, createdAt);
+  db.prepare("INSERT INTO installations (id, created_at) VALUES (?, ?)").run(
+    INSTALLATION_ID,
+    createdAt,
+  );
   db.prepare(
     `INSERT INTO knowledge_workspaces
      (id, installation_id, canonical_realpath, external_binding, created_at)
@@ -203,8 +312,14 @@ function seedWorkspace(db: KnowledgeDatabase, workspaceRoot: string): void {
   ).run(WORKSPACE_ID, INSTALLATION_ID, workspaceRoot, "pi-web:durability", createdAt);
 }
 
-function requireVersion(sources: SourceDomain, sourceId: string, sourceVersionId: string): KnowledgeSourceVersion {
-  const version = sources.listSourceVersions(sourceId).find((candidate) => candidate.id === sourceVersionId);
+function requireVersion(
+  sources: SourceDomain,
+  sourceId: string,
+  sourceVersionId: string,
+): KnowledgeSourceVersion {
+  const version = sources.listSourceVersions(sourceId).find(
+    (candidate) => candidate.id === sourceVersionId,
+  );
   if (!version) throw new Error(`Missing SourceVersion: ${sourceVersionId}`);
   return version;
 }
@@ -221,7 +336,13 @@ function persistArtifact(
     `INSERT INTO parsed_artifacts
      (id, source_version_id, parser_version, canonical_text_sha256, created_at)
      VALUES (?, ?, ?, ?, ?)`,
-  ).run(parsedArtifactId, sourceVersionId, parserVersion, canonical.canonicalTextSha256, new Date().toISOString());
+  ).run(
+    parsedArtifactId,
+    sourceVersionId,
+    parserVersion,
+    canonical.canonicalTextSha256,
+    new Date().toISOString(),
+  );
   artifacts.write({
     knowledgeWorkspaceId: WORKSPACE_ID,
     parsedArtifactId,
@@ -234,7 +355,6 @@ function persistArtifact(
 }
 
 function publishIndex(
-  _db: KnowledgeDatabase,
   publisher: IndexBuildPublisher,
   fts: Fts5BaselineIndex,
   parsedArtifactId: string,
@@ -257,7 +377,8 @@ function publishIndex(
 function persistEvidence(db: KnowledgeDatabase, evidence: StableEvidence): void {
   db.prepare(
     `INSERT INTO evidence
-     (id, knowledge_workspace_id, parsed_artifact_id, start_byte, end_byte, exact_quote, quote_hash, locator_snapshot, created_at)
+     (id, knowledge_workspace_id, parsed_artifact_id, start_byte, end_byte,
+      exact_quote, quote_hash, locator_snapshot, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     evidence.id,
@@ -304,7 +425,9 @@ class FixtureArtifactStore implements ParsedArtifactReadStore, BackupArtifactPro
 
   read(knowledgeWorkspaceId: string, parsedArtifactId: string): ReadableParsedArtifact {
     const bundle = this.readSync(parsedArtifactId);
-    if (bundle.knowledgeWorkspaceId !== knowledgeWorkspaceId) throw new Error("Fixture artifact Workspace mismatch");
+    if (bundle.knowledgeWorkspaceId !== knowledgeWorkspaceId) {
+      throw new Error("Fixture artifact Workspace mismatch");
+    }
     return {
       knowledgeWorkspaceId: bundle.knowledgeWorkspaceId,
       parsedArtifactId: bundle.parsedArtifactId,
@@ -320,14 +443,12 @@ class FixtureArtifactStore implements ParsedArtifactReadStore, BackupArtifactPro
 
   write(bundle: ArtifactBundle): void {
     const filename = this.filename(bundle.parsedArtifactId);
-    const directory = path.dirname(filename);
-    // The E2E writes artifacts sequentially; sync setup avoids introducing a second durability mechanism.
-    require("node:fs").mkdirSync(directory, { recursive: true });
-    require("node:fs").writeFileSync(filename, `${JSON.stringify(bundle)}\n`, { flag: "wx", mode: 0o600 });
+    mkdirSync(path.dirname(filename), { recursive: true });
+    writeFileSync(filename, `${JSON.stringify(bundle)}\n`, { flag: "wx", mode: 0o600 });
   }
 
   private readSync(parsedArtifactId: string): ArtifactBundle {
-    const raw = require("node:fs").readFileSync(this.filename(parsedArtifactId), "utf8") as string;
+    const raw = readFileSync(this.filename(parsedArtifactId), "utf8");
     const bundle = JSON.parse(raw) as ArtifactBundle;
     verifyBundle(bundle, parsedArtifactId);
     return bundle;
@@ -339,7 +460,11 @@ class FixtureArtifactStore implements ParsedArtifactReadStore, BackupArtifactPro
 }
 
 class FixtureArtifactSink implements RestoreArtifactSink {
-  async writeArtifactBundle(targetRoot: string, artifact: BackupManifestArtifact, bytes: Uint8Array): Promise<void> {
+  async writeArtifactBundle(
+    targetRoot: string,
+    artifact: BackupManifestArtifact,
+    bytes: Uint8Array,
+  ): Promise<void> {
     const bundle = JSON.parse(Buffer.from(bytes).toString("utf8")) as ArtifactBundle;
     verifyBundle(bundle, artifact.parsedArtifactId);
     if (
@@ -351,7 +476,11 @@ class FixtureArtifactSink implements RestoreArtifactSink {
     }
     const directory = path.join(targetRoot, "artifacts");
     await mkdir(directory, { recursive: true });
-    await writeFile(path.join(directory, `${artifactFilename(artifact.parsedArtifactId)}.json`), bytes, { flag: "wx", mode: 0o600 });
+    await writeFile(
+      path.join(directory, `${artifactFilename(artifact.parsedArtifactId)}.json`),
+      bytes,
+      { flag: "wx", mode: 0o600 },
+    );
   }
 }
 
@@ -363,10 +492,18 @@ class FixtureEvidenceVerifier implements RestoreEvidenceVerifier {
       const artifacts = new FixtureArtifactStore(input.dataRoot);
       for (const row of rows) {
         const evidence = loadEvidence(db, row.id);
-        const artifact = artifacts.read(evidence.knowledgeWorkspaceId, evidence.parsedArtifactId);
+        const artifact = artifacts.read(
+          evidence.knowledgeWorkspaceId,
+          evidence.parsedArtifactId,
+        );
         assertEvidenceMatchesArtifact(evidence, artifact.canonicalBytes);
-        const exact = new EvidenceReadApi(artifacts).read({ knowledgeWorkspaceId: evidence.knowledgeWorkspaceId, evidence });
-        if (exact.text !== evidence.exactQuote) throw new Error(`Restored Evidence quote mismatch: ${evidence.id}`);
+        const exact = new EvidenceReadApi(artifacts).read({
+          knowledgeWorkspaceId: evidence.knowledgeWorkspaceId,
+          evidence,
+        });
+        if (exact.text !== evidence.exactQuote) {
+          throw new Error(`Restored Evidence quote mismatch: ${evidence.id}`);
+        }
       }
     } finally {
       db.close();
@@ -380,7 +517,9 @@ function verifyBundle(bundle: ArtifactBundle, parsedArtifactId: string): void {
   }
   const bytes = Buffer.from(bundle.canonicalBytesBase64, "base64");
   const hash = createHash("sha256").update(bytes).digest("hex");
-  if (hash !== bundle.canonicalTextSha256) throw new Error(`Fixture ParsedArtifact hash mismatch: ${parsedArtifactId}`);
+  if (hash !== bundle.canonicalTextSha256) {
+    throw new Error(`Fixture ParsedArtifact hash mismatch: ${parsedArtifactId}`);
+  }
 }
 
 function artifactFilename(parsedArtifactId: string): string {

@@ -1,6 +1,6 @@
 # P2-T10 support — Direct-file Pi evidence harness
 
-Status: **REAL DEVELOPMENT RUN PASS / HUMAN SEMANTIC REVIEW REQUIRED**
+Status: **REAL DEVELOPMENT RUN PASS / ASSISTED HUMAN SEMANTIC REVIEW REQUIRED**
 
 ## Purpose
 
@@ -24,7 +24,7 @@ artifact = 10096440773
 artifact digest = sha256:e65d56a823499760e80cbc832d06a1d6b3f789a8228aaaec17771174866dc88f
 ```
 
-The CI path did not execute `pi`, contact a model provider, or consume provider credentials.
+The CI path did not execute `pi`, contact a model provider, or consume provider credentials. The current support branch additionally syntax-checks and lints the assisted human-review helper; that helper gate requires revalidation after its introduction.
 
 ## Real local development execution — PASS
 
@@ -135,16 +135,59 @@ The real run wrote:
 - `raw/<query>.jsonl` — raw Pi JSON event stream for every query;
 - optional `raw/<query>.stderr.txt` when Pi emits stderr;
 - `task-manifest-development.json` — frozen model-facing task manifest;
-- `human-review-development.md` — independent semantic-review worksheet.
+- `human-review-development.md` — original independent semantic-review worksheet.
+
+## Assisted human review
+
+To avoid making the reviewer manually reconstruct all 50 rows, support now includes:
+
+```bash
+node scripts/p2-review-direct-file-pi-baseline.mjs
+```
+
+This helper **does not invoke Pi, does not contact a provider, and does not delete or regenerate the model evidence bundle**. It reads the existing local `answers-development.jsonl`, frozen development labels and corpus metadata, then presents one query at a time with:
+
+- original query/categories;
+- full Pi answer;
+- expected required Evidence quotes;
+- actual requested citations and mapped/unmapped state;
+- deterministic warnings;
+- a rule-based starting classification.
+
+Reviewer controls are intentionally minimal:
+
+```text
+Enter = accept suggestion
+c = correct
+p = partially correct
+i = incorrect
+q = save and quit
+```
+
+For non-correct answers, issue flags are prefilled from deterministic signals where possible and can be accepted or overridden. Progress is saved after every answer and resumes safely against the same dataset/evidence SHA.
+
+When complete, the helper writes:
+
+- `human-review-development.json` — per-query human decisions;
+- `human-review-development.md` — completed aggregate/per-query record;
+- `human-review-summary.json` — compact counts plus SHA-256 review digest.
+
+The deterministic suggestion is only triage. The human remains the final semantic reviewer; the model under test is not used as its own judge.
 
 ## Remaining boundary
 
-The harness execution itself is now **PASS**. Machine scoring does not establish semantic answer correctness, so P2-T10 still requires a human reviewer to complete `human-review-development.md`.
-
-The reviewer must classify every answer as `correct`, `partially correct`, or `incorrect` and record unsupported claims, version/conflict mistakes, no-answer hallucinations and important omitted evidence.
-
-The model under test cannot be its own sole judge.
+The 50-query model harness execution is **PASS**. P2-T10 remains PARTIAL until the independent reviewer completes the assisted review and its summary/digest are recorded.
 
 ## Scope
 
-Support-only. No Knowledge retrieval behavior, provider credential material, holdout execution, existing-product comparison, ADR selection or P3 implementation is included.
+Support-only. Current direct-base scope is five files:
+
+```text
+.github/workflows/p2-direct-file-pi-evidence.yml
+scripts/p2-run-direct-file-pi-baseline.mjs
+scripts/p2-review-direct-file-pi-baseline.mjs
+docs/development/reports/P2-T10-direct-file-pi-evidence-harness.md
+docs/development/verification/P2-T10-direct-file-pi-evidence-harness.md
+```
+
+No Knowledge retrieval behavior, provider credential material, holdout execution, existing-product comparison, ADR selection or P3 implementation is included.

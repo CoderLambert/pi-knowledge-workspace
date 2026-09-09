@@ -28,7 +28,7 @@ class FakeDatabase implements MigrationDatabase {
 }
 
 describe("Knowledge database migrations", () => {
-  it("creates the initial evidence-core schema then applies the import-job durability migration", () => {
+  it("creates the Evidence Core schema and advances through stable Evidence byte addressing", () => {
     const db = new FakeDatabase();
     applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);
 
@@ -53,6 +53,15 @@ describe("Knowledge database migrations", () => {
     expect(importMigration).toContain("cancel_requested");
     expect(importMigration).toContain("result_json");
     expect(importMigration).toContain("jobs_workspace_kind_idempotency_idx");
+
+    const evidenceMigration = db.execLog.find((sql) => sql.includes("stable-evidence-byte-addressing")) ??
+      db.execLog.find((sql) => sql.includes("evidence_migration_guard")) ?? "";
+    expect(evidenceMigration).toContain("parsed_artifact_id");
+    expect(evidenceMigration).toContain("start_byte");
+    expect(evidenceMigration).toContain("end_byte");
+    expect(evidenceMigration).toContain("exact_quote");
+    expect(evidenceMigration).toContain("quote_hash");
+    expect(evidenceMigration).toContain("locator_snapshot");
     expect(db.execLog.at(-1)).toBe("COMMIT");
   });
 
@@ -60,9 +69,10 @@ describe("Knowledge database migrations", () => {
     const db = new FakeDatabase();
     db.userVersion = 1;
     applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);
-    expect(db.userVersion).toBe(2);
+    expect(db.userVersion).toBe(KNOWLEDGE_SCHEMA_VERSION);
     expect(db.execLog.some((sql) => sql.includes("CREATE TABLE installations"))).toBe(false);
     expect(db.execLog.some((sql) => sql.includes("idempotency_key"))).toBe(true);
+    expect(db.execLog.some((sql) => sql.includes("evidence_migration_guard"))).toBe(true);
   });
 
   it("is idempotent when the database is already current", () => {
@@ -85,11 +95,17 @@ describe("Knowledge database migrations", () => {
     expect(() => applyMigrations(initialFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 1/);
     expect(initialFailure.userVersion).toBe(0);
 
-    const upgradeFailure = new FakeDatabase();
-    upgradeFailure.userVersion = 1;
-    upgradeFailure.failOn = "idempotency_key";
-    expect(() => applyMigrations(upgradeFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 2/);
-    expect(upgradeFailure.userVersion).toBe(1);
+    const importFailure = new FakeDatabase();
+    importFailure.userVersion = 1;
+    importFailure.failOn = "idempotency_key";
+    expect(() => applyMigrations(importFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 2/);
+    expect(importFailure.userVersion).toBe(1);
+
+    const evidenceFailure = new FakeDatabase();
+    evidenceFailure.userVersion = 2;
+    evidenceFailure.failOn = "evidence_migration_guard";
+    expect(() => applyMigrations(evidenceFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 3/);
+    expect(evidenceFailure.userVersion).toBe(2);
   });
 });
 
@@ -103,7 +119,11 @@ describe("withTransaction", () => {
   it("rolls back failed operations and preserves their error", () => {
     const db = new FakeDatabase();
     const failure = new Error("domain failure");
-    expect(() => withTransaction(db, () => { throw failure; })).toThrow(failure);
+    expect(() =>
+      withTransaction(db, () => {
+        throw failure;
+      }),
+    ).toThrow(failure);
     expect(db.execLog).toEqual(["BEGIN IMMEDIATE", "ROLLBACK"]);
   });
 });

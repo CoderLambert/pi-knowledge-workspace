@@ -172,14 +172,16 @@ export class DurableJobStore {
 
   retry(jobId: string): DurableJob {
     const id = nonEmpty(jobId, "jobId");
-    const now = this.now().toISOString();
-    const update = this.db.prepare(
-      `UPDATE jobs SET status='queued', cancel_requested=0, result_json=NULL, error_json=NULL,
-       lease_owner=NULL, lease_expires_at=NULL, heartbeat_at=NULL, updated_at=?
-       WHERE id=? AND status='failed'`,
-    ).run(now, id);
-    one(update.changes, `Job ${id} cannot retry from its current state`);
-    return this.get(id);
+    return withTransaction(this.db, () => {
+      const now = this.now().toISOString();
+      const update = this.db.prepare(
+        `UPDATE jobs SET status='queued', cancel_requested=0, result_json=NULL, error_json=NULL,
+         lease_owner=NULL, lease_expires_at=NULL, heartbeat_at=NULL, updated_at=?
+         WHERE id=? AND status='failed'`,
+      ).run(now, id);
+      one(update.changes, `Job ${id} cannot retry from its current state`);
+      return this.get(id);
+    });
   }
 
   recoverExpiredLease(jobId: string, fencingToken: number): DurableJob {
@@ -219,13 +221,14 @@ export class DurableJobStore {
       const current = this.get(id);
       if (current.status !== "running") throw new Error(`Job ${id} is not running`);
       const now = this.now().toISOString();
-      const cancelClause = needsCancel ? " AND cancel_requested=1" : "";
+      const cancelClause = needsCancel ? " AND cancel_requested=1" : " AND cancel_requested=0";
       const update = this.db.prepare(
         `UPDATE jobs SET status=?, result_json=?, error_json=?, lease_owner=NULL,
          lease_expires_at=NULL, heartbeat_at=NULL, updated_at=?
-         WHERE id=? AND status='running' AND lease_owner=? AND fencing_token=?${cancelClause}`,
-      ).run(status, resultJson, errorJson, now, id, worker, token);
-      one(update.changes, `Job ${id} completion rejected stale worker/fencing token`);
+         WHERE id=? AND status='running' AND lease_owner=? AND fencing_token=?
+           AND lease_expires_at>=?${cancelClause}`,
+      ).run(status, resultJson, errorJson, now, id, worker, token, now);
+      one(update.changes, `Job ${id} completion rejected stale, expired, cancelled, or non-owner lease`);
       this.finishAttempt(id, current.attempt, token, status, now, errorJson);
       return this.get(id);
     });

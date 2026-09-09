@@ -118,6 +118,35 @@ CREATE UNIQUE INDEX jobs_workspace_kind_idempotency_idx
   WHERE idempotency_key IS NOT NULL;
 `,
   },
+  {
+    version: 3,
+    name: "stable-evidence-byte-addressing",
+    sql: `
+CREATE TABLE evidence_migration_guard (
+  row_count INTEGER NOT NULL CHECK (row_count = 0)
+);
+INSERT INTO evidence_migration_guard(row_count) SELECT COUNT(*) FROM evidence;
+DROP TABLE evidence_migration_guard;
+DROP TABLE evidence;
+CREATE TABLE evidence (
+  id TEXT PRIMARY KEY,
+  knowledge_workspace_id TEXT NOT NULL REFERENCES knowledge_workspaces(id),
+  parsed_artifact_id TEXT NOT NULL REFERENCES parsed_artifacts(id),
+  start_byte INTEGER NOT NULL CHECK (start_byte >= 0),
+  end_byte INTEGER NOT NULL CHECK (end_byte > start_byte),
+  exact_quote TEXT NOT NULL,
+  quote_hash TEXT NOT NULL CHECK (
+    length(quote_hash) = 64
+    AND quote_hash = lower(quote_hash)
+    AND quote_hash NOT GLOB '*[^0-9a-f]*'
+  ),
+  locator_snapshot TEXT NOT NULL CHECK (json_valid(locator_snapshot)),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX evidence_workspace_idx ON evidence(knowledge_workspace_id);
+CREATE INDEX evidence_artifact_range_idx ON evidence(parsed_artifact_id, start_byte, end_byte);
+`,
+  },
 ];
 
 function readUserVersion(db: MigrationDatabase): number {

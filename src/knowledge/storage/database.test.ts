@@ -28,7 +28,7 @@ class FakeDatabase implements MigrationDatabase {
 }
 
 describe("Knowledge database migrations", () => {
-  it("creates Evidence Core and advances through the scoped FTS5 baseline schema", () => {
+  it("creates Evidence Core and advances through the durable-job schema", () => {
     const db = new FakeDatabase();
     applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);
 
@@ -67,6 +67,15 @@ describe("Knowledge database migrations", () => {
     expect(ftsMigration).toContain("end_byte");
     expect(ftsMigration).toContain("CREATE VIRTUAL TABLE chunk_fts USING fts5");
     expect(ftsMigration).toContain("tokenize = 'unicode61'");
+
+    const jobMigration = db.execLog.find((sql) => sql.includes("lease_expires_at")) ?? "";
+    expect(jobMigration).toContain("attempt INTEGER NOT NULL DEFAULT 0");
+    expect(jobMigration).toContain("lease_owner");
+    expect(jobMigration).toContain("heartbeat_at");
+    expect(jobMigration).toContain("fencing_token");
+    expect(jobMigration).toContain("deadline_at");
+    expect(jobMigration).toContain("error_json");
+    expect(jobMigration).toContain("jobs_status_lease_idx");
     expect(db.execLog.at(-1)).toBe("COMMIT");
   });
 
@@ -79,6 +88,7 @@ describe("Knowledge database migrations", () => {
     expect(db.execLog.some((sql) => sql.includes("idempotency_key"))).toBe(true);
     expect(db.execLog.some((sql) => sql.includes("evidence_migration_guard"))).toBe(true);
     expect(db.execLog.some((sql) => sql.includes("chunks_migration_guard"))).toBe(true);
+    expect(db.execLog.some((sql) => sql.includes("lease_expires_at"))).toBe(true);
   });
 
   it("is idempotent when the database is already current", () => {
@@ -118,6 +128,12 @@ describe("Knowledge database migrations", () => {
     ftsFailure.failOn = "chunks_migration_guard";
     expect(() => applyMigrations(ftsFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 4/);
     expect(ftsFailure.userVersion).toBe(3);
+
+    const jobFailure = new FakeDatabase();
+    jobFailure.userVersion = 4;
+    jobFailure.failOn = "lease_expires_at";
+    expect(() => applyMigrations(jobFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 5/);
+    expect(jobFailure.userVersion).toBe(4);
   });
 });
 

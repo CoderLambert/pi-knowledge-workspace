@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P1-T16 — PARTIAL
+
+- Added schema v5 and a reusable durable job state machine with attempt count, lease owner/expiry, heartbeat, monotonically increasing fencing token, deadline, cancellation flag and bounded result/error metadata.
+- Claim/heartbeat/completion use compare-and-swap ownership/fencing predicates so stale workers cannot commit a later attempt; expired leases can be recovered for P1-T17 worker-loop reuse.
+- Added migration and scripted-database contract coverage; real `better-sqlite3`, concurrency/process-restart and repository static/build/test gates remain OPEN verification debt.
+
 ### P1-T15 — PARTIAL
 
 - Added a host-authoritative Source / Evidence Viewer spanning PI WEB paired-backend operations, Workspace-scoped Source lists/details, SourceVersion history, ParsedArtifact rendering and UTF-8 byte-accurate Evidence highlights.

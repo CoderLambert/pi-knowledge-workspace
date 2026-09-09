@@ -183,6 +183,22 @@ CREATE VIRTUAL TABLE chunk_fts USING fts5(
 );
 `,
   },
+  {
+    version: 5,
+    name: "durable-job-lease-state-machine",
+    sql: `
+ALTER TABLE jobs ADD COLUMN attempt INTEGER NOT NULL DEFAULT 0 CHECK (attempt >= 0);
+ALTER TABLE jobs ADD COLUMN lease_owner TEXT;
+ALTER TABLE jobs ADD COLUMN lease_expires_at TEXT;
+ALTER TABLE jobs ADD COLUMN heartbeat_at TEXT;
+ALTER TABLE jobs ADD COLUMN fencing_token INTEGER NOT NULL DEFAULT 0 CHECK (fencing_token >= 0);
+ALTER TABLE jobs ADD COLUMN deadline_at TEXT;
+ALTER TABLE jobs ADD COLUMN error_json TEXT;
+ALTER TABLE job_attempts ADD COLUMN fencing_token INTEGER NOT NULL DEFAULT 0 CHECK (fencing_token >= 0);
+ALTER TABLE job_attempts ADD COLUMN worker_id TEXT;
+CREATE INDEX jobs_status_lease_idx ON jobs(status, lease_expires_at);
+`,
+  },
 ];
 
 function readUserVersion(db: MigrationDatabase): number {

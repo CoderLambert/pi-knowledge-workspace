@@ -1,0 +1,52 @@
+name: P2 Existing Product Evidence
+
+on:
+  pull_request:
+    branches:
+      - research/p2-existing-product-comparison
+    paths:
+      - ".github/workflows/p2-existing-product-evidence.yml"
+      - "scripts/p2-prepare-existing-product-hands-on.mjs"
+      - "docs/development/reports/P2-T11-existing-product-evidence-harness.md"
+      - "docs/development/verification/P2-T11-existing-product-evidence-harness.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Freeze product versions and API contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint contract probe
+        run: npx eslint scripts/p2-prepare-existing-product-hands-on.mjs
+
+      - name: Syntax check
+        run: node --check scripts/p2-prepare-existing-product-hands-on.mjs
+
+      - name: Resolve exact upstream contracts
+        env:
+          P2_T11_EVIDENCE_OUT_DIR: /tmp/pi-knowledge-p2-evidence/p2-t11
+        run: node scripts/p2-prepare-existing-product-hands-on.mjs --contracts-only
+
+      - name: Upload contract proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-t11-existing-product-contracts
+          path: /tmp/pi-knowledge-p2-evidence/p2-t11
+          if-no-files-found: error
+          retention-days: 14

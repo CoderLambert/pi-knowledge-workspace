@@ -180,7 +180,7 @@ describe("Knowledge service client", () => {
   it("propagates caller cancellation through the fetch signal", async () => {
     const fetchImpl: TestFetch = (_input, init) => {
       const signal = init?.signal;
-      if (signal === undefined || signal === null) throw new Error("expected fetch AbortSignal");
+      if (signal === undefined) throw new Error("expected fetch AbortSignal");
       return new Promise<UndiciResponse>((_resolve, reject) => {
         signal.addEventListener("abort", () => {
           const reason: unknown = signal.reason;
@@ -204,7 +204,7 @@ describe("Knowledge service client", () => {
   it("maps the adapter deadline when the complete service call does not settle in time", async () => {
     const fetchImpl: TestFetch = (_input, init) => {
       const signal = init?.signal;
-      if (signal === undefined || signal === null) throw new Error("expected fetch AbortSignal");
+      if (signal === undefined) throw new Error("expected fetch AbortSignal");
       return new Promise<UndiciResponse>((_resolve, reject) => {
         signal.addEventListener("abort", () => {
           const reason: unknown = signal.reason;

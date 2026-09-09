@@ -26,6 +26,7 @@ export interface DirectFilePiObservation {
   latencyMs: number;
   insufficientEvidence: boolean;
   citations: readonly DirectFilePiCitation[];
+  unmappedCitationCount: number;
 }
 
 export interface DirectFilePiBaselineReport {
@@ -89,7 +90,9 @@ export function evaluateDirectFilePiBaseline(
   const labelsByQuery = new Map<string, GoldenEvidenceLabel[]>();
   for (const query of queries) labelsByQuery.set(query.id, []);
   for (const label of dataset.labels) {
-    if (queryById.has(label.queryId)) labelsByQuery.get(label.queryId)!.push(label);
+    if (!queryById.has(label.queryId)) continue;
+    const labels = labelsByQuery.get(label.queryId);
+    if (labels !== undefined) labels.push(label);
   }
 
   const observationById = new Map<string, DirectFilePiObservation>();
@@ -102,6 +105,9 @@ export function evaluateDirectFilePiBaseline(
     }
     if (!Number.isFinite(observation.latencyMs) || observation.latencyMs < 0) {
       throw new TypeError(`Direct-file latency must be non-negative: ${observation.queryId}`);
+    }
+    if (!Number.isSafeInteger(observation.unmappedCitationCount) || observation.unmappedCitationCount < 0) {
+      throw new TypeError(`Direct-file unmapped citation count must be a non-negative integer: ${observation.queryId}`);
     }
     for (const citation of observation.citations) validateCitation(citation);
     observationById.set(observation.queryId, observation);
@@ -121,13 +127,22 @@ export function evaluateDirectFilePiBaseline(
   let totalCitations = 0;
 
   for (const query of queries) {
-    const observation = observationById.get(query.id)!;
+    const observation = observationById.get(query.id);
+    if (observation === undefined) {
+      throw new Error(`Direct-file observations must cover every ${split} query; missing ${query.id}`);
+    }
     const labels = labelsByQuery.get(query.id) ?? [];
     const required = labels.filter((label) => label.importance === "required");
 
     if (query.categories.includes("no-answer")) {
       noAnswerQueries += 1;
-      if (observation.insufficientEvidence && observation.citations.length === 0) correctAbstentions += 1;
+      if (
+        observation.insufficientEvidence
+        && observation.citations.length === 0
+        && observation.unmappedCitationCount === 0
+      ) {
+        correctAbstentions += 1;
+      }
     } else {
       answerableQueries += 1;
       if (required.some((label) => observation.citations.some((citation) => citationOverlapsLabel(citation, label)))) {
@@ -138,7 +153,7 @@ export function evaluateDirectFilePiBaseline(
       }
     }
 
-    totalCitations += observation.citations.length;
+    totalCitations += observation.citations.length + observation.unmappedCitationCount;
     for (const citation of observation.citations) {
       if (labels.some((label) => citationOverlapsLabel(citation, label))) relevantCitations += 1;
     }

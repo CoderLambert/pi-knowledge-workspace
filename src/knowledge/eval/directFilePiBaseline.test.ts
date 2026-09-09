@@ -133,9 +133,9 @@ describe("direct-file Pi baseline", () => {
 
     expect(tasks).toHaveLength(2);
     expect(tasks.map((task) => task.queryId)).toEqual(["dev-answerable", "dev-no-answer"]);
-    expect(tasks[0]!.files.map((file) => file.relativePath)).toEqual(["corpus/a.md", "corpus/b.md"]);
-    expect(tasks[1]!.files).toEqual(tasks[0]!.files);
-    expect(Object.keys(tasks[0]!)).toEqual(["queryId", "query", "split", "files"]);
+    expect(tasks[0]?.files.map((file) => file.relativePath)).toEqual(["corpus/a.md", "corpus/b.md"]);
+    expect(tasks[1]?.files).toEqual(tasks[0]?.files);
+    expect(Object.keys(tasks[0] ?? {})).toEqual(["queryId", "query", "split", "files"]);
   });
 
   it("scores required Evidence coverage, citation precision and no-answer abstention deterministically", () => {
@@ -149,12 +149,14 @@ describe("direct-file Pi baseline", () => {
           citation("sv-b", "artifact-b", 29, 41),
           citation("sv-a", "artifact-a", 70, 80),
         ],
+        unmappedCitationCount: 0,
       },
       {
         queryId: "dev-no-answer",
         latencyMs: 10,
         insufficientEvidence: true,
         citations: [],
+        unmappedCitationCount: 0,
       },
     ];
 
@@ -183,17 +185,41 @@ describe("direct-file Pi baseline", () => {
         latencyMs: 1,
         insufficientEvidence: false,
         citations: [citation("sv-a", "artifact-a", 10, 20)],
+        unmappedCitationCount: 0,
       },
       {
         queryId: "dev-no-answer",
         latencyMs: 1,
         insufficientEvidence: false,
         citations: [],
+        unmappedCitationCount: 0,
       },
     ]);
 
     expect(report.anyRequiredEvidenceCoverage).toBe(1);
     expect(report.allRequiredEvidenceCoverage).toBe(0);
+    expect(report.noAnswerCorrectAbstentionRate).toBe(0);
+  });
+
+  it("penalizes unmapped citations in precision and no-answer abstention", () => {
+    const report = evaluateDirectFilePiBaseline(dataset(), "development", [
+      {
+        queryId: "dev-answerable",
+        latencyMs: 1,
+        insufficientEvidence: false,
+        citations: [citation("sv-a", "artifact-a", 10, 20)],
+        unmappedCitationCount: 1,
+      },
+      {
+        queryId: "dev-no-answer",
+        latencyMs: 1,
+        insufficientEvidence: true,
+        citations: [],
+        unmappedCitationCount: 1,
+      },
+    ]);
+
+    expect(report.citationPrecision).toBe(1 / 3);
     expect(report.noAnswerCorrectAbstentionRate).toBe(0);
   });
 
@@ -204,6 +230,7 @@ describe("direct-file Pi baseline", () => {
         latencyMs: 1,
         insufficientEvidence: false,
         citations: [],
+        unmappedCitationCount: 0,
       }]);
     }).toThrow("unknown query: holdout-answerable");
 
@@ -212,6 +239,7 @@ describe("direct-file Pi baseline", () => {
       latencyMs: 1,
       insufficientEvidence: false,
       citations: [],
+      unmappedCitationCount: 0,
     };
     expect(() => {
       evaluateDirectFilePiBaseline(dataset(), "development", [duplicate, duplicate]);

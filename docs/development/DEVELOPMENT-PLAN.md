@@ -269,7 +269,7 @@ Required records:
 
 ## P0-T04 — Thin server-plugin → pi-knowledge adapter
 
-**Status:** TODO
+**Status:** PARTIAL
 
 ### Objective
 
@@ -309,6 +309,19 @@ It must not:
 ### Security
 
 Browser `input` cannot override host Project/Workspace identity.
+
+### Current state
+
+Implementation is present on `feat/p0-thin-knowledge-adapter` / PR #6. `knowledge.status` now derives Project / Workspace / Path only from host-owned `PairedPluginRequestContext`, sends a fixed authenticated loopback `workspace.echo` request to `pi-knowledge`, propagates host cancellation plus a bounded adapter deadline, bounds request/streamed-response bytes, validates protocol/request-id correlation, and accepts the service result only when it exactly matches host-authoritative scope. Browser code receives no service host, port, token, operation authority, or scope authority.
+
+Focused tests are written for the adapter and client, including a real client → P0-T03 Fastify service call on a random loopback port. Required executable focused/static/build/full-suite and real local server-plugin→service evidence is not yet available in the autonomous execution environment and is recorded as OPEN verification debt in `docs/development/VERIFICATION-DEBT.md`.
+
+Required records:
+
+- report: `docs/development/reports/P0-T04-thin-server-plugin-adapter.md`
+- verification: `docs/development/verification/P0-T04-thin-server-plugin-adapter.md`
+
+Under the autonomous-development policy P0-T05 implementation may proceed on a separate stacked branch while P0-T04 remains PARTIAL. P0-T04 cannot become PASS until its recorded verification debt is resolved.
 
 ---
 
@@ -1754,11 +1767,12 @@ As of 2026-09-09:
 | P0-T01 | PASS | Integration seams documented and validated by source review. |
 | P0-T02 | PASS | Knowledge paired-plugin skeleton accepted locally; authoritative scope, Workspace switching and worktree path verified. |
 | P0-T03 | PASS | Standalone authenticated loopback service accepted: focused 14/14; strict static/build/package gates PASS; full suite 3752 passed / 1 inherited failed / 2 skipped; real process lifecycle/HTTP/limits PASS. |
+| P0-T04 | PARTIAL | Thin server-plugin adapter and focused tests are implemented on PR #6; executable/static/build and real local adapter acceptance remain OPEN verification debt. |
 
 Execution mode: **deferred human verification is allowed for development progression**. Tasks with environment-only acceptance still outstanding remain PARTIAL with explicit verification debt, while later tasks may proceed when dependency-safe. Phase/release PASS still requires all mandatory debt for that gate to be cleared.
 
 Current next task:
 
-# **P0-T04 — Thin server-plugin → pi-knowledge adapter**
+# **P0-T05 — Local integration E2E**
 
-P0-T04 remains TODO until started as its own task/branch. Do not begin P1 until the P0 Gate is satisfied.
+P0-T05 may proceed as a separate stacked branch against the documented P0-T04 contract while P0-T04 remains PARTIAL. Do not begin P1 until the P0 Gate is satisfied.

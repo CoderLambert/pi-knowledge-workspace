@@ -6,7 +6,13 @@ import type {
   PiWebServerPlugin,
   ServerPluginActivation,
   ServerPluginActivationContext,
+  ServerPluginHealth,
 } from "@jmfederico/pi-web/server-plugin-api";
+import {
+  createKnowledgeServiceClientFromEnvironment,
+  KnowledgeServiceClientError,
+  type KnowledgeServiceClient,
+} from "./service-client.js";
 
 const KNOWLEDGE_PLUGIN_ID = "knowledge";
 export const KNOWLEDGE_STATUS_OPERATION = "knowledge.status";
@@ -28,20 +34,26 @@ function activateKnowledgePlugin(context: ServerPluginActivationContext): Server
     );
   }
 
+  const serviceClient = createKnowledgeServiceClientFromEnvironment();
   return Object.freeze({
-    pairedBackend: createKnowledgeBackend(),
-    health: () => Object.freeze({ status: "healthy" as const }),
+    pairedBackend: createKnowledgeBackend(serviceClient),
+    health: (signal: AbortSignal) => knowledgePluginHealth(serviceClient, signal),
   });
 }
 
-export function createKnowledgeBackend(): PairedPluginBackendV1 {
+export function createKnowledgeBackend(
+  serviceClient: KnowledgeServiceClient = createKnowledgeServiceClientFromEnvironment(),
+): PairedPluginBackendV1 {
   return Object.freeze({
     version: 1,
-    request: (context: PairedPluginRequestContext) => knowledgeRequest(context),
+    request: (context: PairedPluginRequestContext) => knowledgeRequest(serviceClient, context),
   });
 }
 
-function knowledgeRequest(context: PairedPluginRequestContext): JsonValue {
+async function knowledgeRequest(
+  serviceClient: KnowledgeServiceClient,
+  context: PairedPluginRequestContext,
+): Promise<JsonValue> {
   throwIfAborted(context.signal);
 
   if (context.operation !== KNOWLEDGE_STATUS_OPERATION) {
@@ -49,12 +61,34 @@ function knowledgeRequest(context: PairedPluginRequestContext): JsonValue {
   }
 
   requireEmptyInput(context.input, context.operation);
+  const scope = knowledgeScope(context);
+  const echoedScope = await serviceClient.dispatch("workspace.echo", scope, context.signal);
+  requireMatchingServiceScope(echoedScope, scope);
 
   return {
     version: 1,
     status: "ready",
-    scope: knowledgeScope(context),
+    scope,
   };
+}
+
+async function knowledgePluginHealth(
+  serviceClient: KnowledgeServiceClient,
+  signal: AbortSignal,
+): Promise<ServerPluginHealth> {
+  try {
+    await serviceClient.health(signal);
+    return { status: "healthy" };
+  } catch (error) {
+    if (signal.aborted) throw abortReason(signal);
+    return {
+      status: "unhealthy",
+      message: healthErrorMessage(error),
+      details: error instanceof KnowledgeServiceClientError
+        ? { adapterErrorCode: error.code, remoteCode: error.remoteCode ?? null }
+        : { adapterErrorCode: "UNKNOWN" },
+    };
+  }
 }
 
 function knowledgeScope(
@@ -72,16 +106,58 @@ function knowledgeScope(
   };
 }
 
+function requireMatchingServiceScope(
+  actual: Record<string, unknown>,
+  expected: JsonObject,
+): void {
+  if (
+    actual["projectId"] !== expected["projectId"]
+    || actual["workspaceId"] !== expected["workspaceId"]
+    || actual["workspacePath"] !== expected["workspacePath"]
+    || actual["workspaceLabel"] !== expected["workspaceLabel"]
+    || Object.keys(actual).some((key) => ![
+      "projectId",
+      "workspaceId",
+      "workspacePath",
+      "workspaceLabel",
+    ].includes(key))
+  ) {
+    throw new Error("pi-knowledge returned workspace scope that does not match the host-authoritative scope");
+  }
+}
+
 function requireEmptyInput(value: JsonValue, operation: string): void {
   if (value === null) return;
   if (typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0) return;
   throw new Error(`${operation} input must be null or an empty object`);
 }
 
+function healthErrorMessage(error: unknown): string {
+  if (!(error instanceof KnowledgeServiceClientError)) return "pi-knowledge health check failed";
+  switch (error.code) {
+    case "CONFIG_INVALID":
+      return "pi-knowledge adapter configuration is invalid";
+    case "SERVICE_UNAVAILABLE":
+      return "pi-knowledge service is unavailable";
+    case "SERVICE_TIMEOUT":
+      return "pi-knowledge service health check timed out";
+    case "SERVICE_REJECTED":
+      return "pi-knowledge service rejected the health check";
+    case "REQUEST_TOO_LARGE":
+    case "RESPONSE_TOO_LARGE":
+    case "PROTOCOL_INVALID":
+      return "pi-knowledge service health response is invalid";
+  }
+}
+
 function throwIfAborted(signal: AbortSignal): void {
   if (!signal.aborted) return;
+  throw abortReason(signal);
+}
+
+function abortReason(signal: AbortSignal): Error {
   const reason: unknown = signal.reason;
-  throw reason instanceof Error
+  return reason instanceof Error
     ? reason
     : new Error("Knowledge operation was cancelled", { cause: reason });
 }

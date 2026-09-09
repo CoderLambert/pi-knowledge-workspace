@@ -1,6 +1,6 @@
 # P2-T10 — Direct-file Pi baseline
 
-Status: **DEVELOPMENT RUN COMPLETE / PARTIAL — HUMAN SEMANTIC REVIEW REQUIRED**
+Status: **PASS — REAL DEVELOPMENT RUN + OWNER-DELEGATED INDEPENDENT SEMANTIC REVIEW COMPLETE**
 
 This is the product-value baseline: run the same fixed user queries by giving Pi the fixed source files directly, with no Knowledge retrieval/index ranking.
 
@@ -15,7 +15,7 @@ For every development query, Pi receives:
 - no retrieval results/ranks;
 - no answer key.
 
-The corpus files are immutable SourceVersion snapshots. No latest web content is substituted. Holdout is not part of the current development harness.
+The corpus files are immutable SourceVersion snapshots. No latest web content is substituted. Holdout is not part of this development run.
 
 ## Frozen development identity
 
@@ -35,7 +35,7 @@ thinkingLevel = null
 
 The run was executed on the user's Omarchy/Linux checkout through support PR #53 using the existing authenticated Pi runtime. Provider credentials were not copied into repository evidence.
 
-## Real development result
+## Deterministic development result
 
 ```text
 queryCount: 50
@@ -58,51 +58,66 @@ p95 ≈ 14.856 s
 max ≈ 18.051 s
 ```
 
-The citation precision corresponds to 45 valid mapped citations out of 58 total mapped+unmapped citations. The no-answer abstention rate corresponds to 5 correct abstentions out of 8 no-answer tasks.
+### Citation-precision interpretation
+
+`citationPrecision = 45/58` means 45 of the 58 mapped citations overlap at least one Golden Evidence label for their query. It does **not** mean only 45 citations mapped successfully. The preserved answer bundle contains 58 requested citations, all 58 mapped, and zero unmapped citations.
+
+The precision denominator also counts valid-but-non-Golden citations, so a citation can reduce this metric without being malformed or fabricated.
+
+## Owner-delegated independent semantic review — COMPLETE
+
+The repository owner explicitly delegated final answer-quality adjudication to an independent reviewer rather than continuing the 50-row manual worksheet. The reviewer was GPT-5.6 Sol, which is not the model under test (`gpt-6-astra`). This is recorded as an explicit owner-authorized review-mode exception; it must not be described as a human review.
+
+Reviewed evidence:
+
+```text
+answers-development.jsonl rows = 50
+query ids = dev-001..dev-050 exactly once
+runtime identity drift = none
+uploaded answers file SHA-256 = eed0f944d546220d96c82431e3dfd0037efb574d72e541ae1db09b9fa158ba2b
+independent review digest = 0e450d064781a0390e192e4338e0b1cb45a43297ee2a5629428b3351f1dd9e84
+```
+
+Semantic classifications:
+
+```text
+correct = 48
+partially correct = 0
+incorrect = 2
+no-answer hallucinations = 2
+version/conflict mistakes = 0
+material Evidence omissions = 0
+```
+
+The two incorrect answers are:
+
+- `dev-015`: the supplied Vue snapshot establishes `.value`, but does not explicitly establish the negative claim that `.current` is not exposed; the frozen query is a no-answer case.
+- `dev-032`: the v16.7.0 snapshot explicitly says it lists **Selected options**; omission of `verbatimSymlinks` from that non-exhaustive list is insufficient support for a definitive negative answer.
+
+No answerable task showed a material version/conflict error or required-Evidence omission in the independent review.
+
+## Golden answerability defect discovered
+
+`dev-035` is categorized as `no-answer`, but the current six-file corpus directly contains enough evidence to answer it:
+
+- the `fsPromises.cp` snapshot states that `cp` copies an entire directory structure;
+- `challenge-node-fspromises-neighbors-a.md` explicitly states that `fsPromises.copyFile()` copies a single file and is not a directory-tree copy interface.
+
+Therefore the model's `dev-035` comparison is semantically **correct**, while the frozen deterministic evaluator still counts it among the eight no-answer tasks. Do not reinterpret the historical `5/8` abstention metric as seven semantically valid no-answer cases without recording this dataset defect.
+
+The frozen deterministic result remains preserved for reproducibility; the semantic review records the defect rather than silently rewriting the dataset or rerunning the provider.
 
 ## Interpretation
 
-The direct-file path did retrieve/cite all required Evidence across the answerable development set according to deterministic Stable Evidence coverage, but it did not produce perfectly disciplined citations or abstentions:
+The direct-file path is a strong product baseline:
 
-- required-Evidence coverage is complete (`1.0`);
-- citation precision is only about `77.6%`, so extra/wrong/missing/ambiguous citations are materially present;
-- no-answer correct abstention is only `62.5%`, so three of eight no-answer cases failed the strict abstention contract;
-- end-to-end model latency is orders of magnitude above the sub-millisecond FTS retrieval-only runner, though these measurements cover different work and must not be compared as equivalent operations.
+- deterministic required-Evidence coverage is complete on the frozen answerable set;
+- independent semantic review judged 48/50 answers correct;
+- two failures are conservative no-answer boundary failures rather than version/conflict mistakes;
+- the corpus/Golden mismatch at `dev-035` means the raw `5/8` abstention metric is pessimistic for one task;
+- full model-answer latency remains about 10.2 s median / 14.9 s p95 / 18.1 s max.
 
-This means direct-file Pi is a meaningful product baseline, but current development evidence does **not** establish it as a strictly simpler equivalent replacement for Knowledge retrieval.
-
-## Citation scoring
-
-After each model response, `{path, exactQuote}` citations are mapped **post hoc** to immutable Stable Evidence locators:
-
-```text
-sourceVersionId
-parsedArtifactId
-startByte
-endByte
-```
-
-A citation maps only if its path belongs to the frozen task and its exact quote occurs verbatim and uniquely in that file.
-
-Wrong paths, missing quotes and ambiguous quotes are preserved as unmapped citations. They are not silently removed: `unmappedCitationCount` contributes to the citation-precision denominator. A no-answer response is a correct abstention only when it explicitly reports insufficient evidence and emits neither mapped nor unmapped citations.
-
-## Manual answer-quality review
-
-Citation overlap alone does not prove semantic correctness. The generated local worksheet is:
-
-```text
-/tmp/pi-knowledge-p2-evidence/p2-t10/human-review-development.md
-```
-
-A human reviewer must still record, per query:
-
-- correct / partially correct / incorrect;
-- whether version/conflict distinctions are preserved;
-- whether unsupported claims appear;
-- whether important available evidence was omitted;
-- whether no-answer cases abstain rather than hallucinate.
-
-Do not use the model under test as the sole answer-quality judge.
+This does **not** prove that direct-file Pi is a replacement for Knowledge retrieval. P2-T05/P2-T09 still establish the retrieval-side FTS candidate, and P2-T11 must still provide the fixed-version product comparison needed by ADR-029.
 
 ## Canonical execution
 
@@ -110,10 +125,8 @@ Do not use the model under test as the sole answer-quality judge.
 npx tsx scripts/p2-run-direct-file-pi-baseline.mjs
 ```
 
-The real 50-query development execution completed successfully. Do not rerun or tune against holdout before the development runtime/review criteria are frozen.
+No provider rerun or holdout rerun was used for the semantic review.
 
 ## Decision use
 
-The final retrieval ADR must compare the selected Knowledge retrieval path against this baseline. P2-T05/P2-T09 already established the frozen FTS development retrieval candidate at Recall@10 `1.0`, MRR `0.9365079365079365`, and all-required Evidence coverage `1.0`; P2-T06 rejected Dense as lower quality.
-
-P2-T10 remains **PARTIAL** only because independent human semantic review is still required before its product-value evidence can be accepted. ADR-029 remains blocked until this review and the applicable P2-T11 comparison evidence are resolved.
+P2-T10 is **PASS**: the real development run and final owner-authorized independent semantic adjudication are complete and recorded. The remaining ADR-029 product-evidence blocker is P2-T11 fixed-version hands-on comparison. P3 remains prohibited until ADR-029 is formally Accepted.

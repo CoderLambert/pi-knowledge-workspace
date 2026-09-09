@@ -1,14 +1,14 @@
 # P2-T10 support — Direct-file Pi evidence harness
 
-Status: **CI PREPARATION PASS / REAL LOCAL RUN + HUMAN REVIEW REQUIRED**
+Status: **REAL DEVELOPMENT RUN PASS / HUMAN SEMANTIC REVIEW REQUIRED**
 
 ## Purpose
 
 Make the P2-T10 product-value baseline executable as one local command while preserving the experiment boundary: Pi receives the same six frozen corpus files for every development query, no Knowledge retrieval ranks, and no Golden Evidence labels.
 
-## Final CI preparation evidence
+## CI preparation evidence
 
-Canonical final preparation run on the frozen P2-T10 base:
+Canonical preparation run on the frozen P2-T10 base:
 
 ```text
 GitHub Actions run = 34332760481
@@ -26,29 +26,60 @@ artifact digest = sha256:e65d56a823499760e80cbc832d06a1d6b3f789a8228aaaec1777117
 
 The CI path did not execute `pi`, contact a model provider, or consume provider credentials.
 
-## Local acceptance command
+## Real local development execution — PASS
 
-From the P2-T10 support branch on the user's authenticated Omarchy checkout:
+The user ran from the support branch on Omarchy/Linux:
 
 ```bash
 npx tsx scripts/p2-run-direct-file-pi-baseline.mjs
 ```
 
-The command uses the existing `pi` login/configuration. It does not read, print or persist provider credentials.
+All 50 development queries completed successfully.
 
-Optional explicit runtime freeze:
+Frozen runtime identity:
 
-```bash
-P2_T10_PROVIDER=<provider> \
-P2_T10_MODEL=<model> \
-npx tsx scripts/p2-run-direct-file-pi-baseline.mjs
+```text
+repoSha = db71e7c6d746709ce152269b68b020bd05bdb0dd
+datasetHash = 949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3
+Pi = 0.85.1
+provider = openai-codex
+model = gpt-6-astra
+API = openai-codex-responses
+responseModel = null
+thinkingLevel = null
 ```
 
-If provider/model are not explicitly supplied, the harness records the provider/model identity exposed by Pi's authoritative final `message_end` and requires that identity to remain identical for all 50 queries.
+Deterministic result:
+
+```text
+queryCount = 50
+answerableQueries = 42
+noAnswerQueries = 8
+anyRequiredEvidenceCoverage = 1.0
+allRequiredEvidenceCoverage = 1.0
+citationPrecision = 0.7758620689655172
+noAnswerCorrectAbstentionRate = 0.625
+latency median = 10165.077273999981 ms
+latency p95 = 14855.569325999997 ms
+latency max = 18050.93610000005 ms
+```
+
+Equivalent counts:
+
+```text
+valid mapped citations = 45 / 58 total mapped+unmapped citations
+correct no-answer abstentions = 5 / 8
+```
+
+Default evidence directory:
+
+```text
+/tmp/pi-knowledge-p2-evidence/p2-t10
+```
 
 ## Frozen input
 
-Exactly six corpus records are used:
+Exactly six corpus records were used:
 
 ```text
 vue-reactivity-core-zh
@@ -59,18 +90,11 @@ challenge-node-fspromises-neighbors-a
 challenge-node-fspromises-neighbors-b
 ```
 
-The harness requires:
-
-```text
-development queries = 50
-dataset hash = 949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3
-```
-
-This is the same frozen development dataset identity used by P2-T09. Holdout files are not loaded.
+The same frozen development dataset identity used by P2-T09 was preserved. Holdout files were not loaded.
 
 ## Pi isolation
 
-Each query runs in a fresh ephemeral Pi process with:
+Each query ran in a fresh ephemeral Pi process with:
 
 - JSON event mode;
 - no saved session;
@@ -84,32 +108,26 @@ Each query runs in a fresh ephemeral Pi process with:
 - the same fixed system prompt;
 - the same six `@eval/corpus/...` files.
 
-The model must return a strict JSON answer containing an `insufficientEvidence` flag and zero or more `{path, exactQuote}` citations.
+The first actual response froze provider/model identity and all remaining responses matched it.
 
 ## Citation accounting
 
-Citation mapping happens only after model inference.
+Citation mapping happened only after model inference.
 
-A citation maps to Stable Evidence only when:
+A citation mapped to Stable Evidence only when:
 
-1. its path is one of the frozen task files;
-2. `exactQuote` is non-empty;
-3. the quote occurs verbatim in that file;
-4. it occurs exactly once.
+1. its path was one of the frozen task files;
+2. `exactQuote` was non-empty;
+3. the quote occurred verbatim in that file;
+4. it occurred exactly once.
 
 The mapped citation records immutable `sourceVersionId`, `parsedArtifactId`, `startByte`, and `endByte`.
 
-Wrong paths, missing quotes, and ambiguous quotes are preserved as unmapped citations. They are not silently discarded: P2-T10's evaluator includes `unmappedCitationCount` in citation-precision denominator, and a no-answer response with an unmapped citation does not count as a correct abstention.
+Wrong paths, missing quotes, and ambiguous quotes were preserved as unmapped citations. They were not silently discarded: P2-T10's evaluator includes `unmappedCitationCount` in the citation-precision denominator, and a no-answer response with an unmapped citation does not count as a correct abstention.
 
 ## Output bundle
 
-Default output directory:
-
-```text
-/tmp/pi-knowledge-p2-evidence/p2-t10
-```
-
-The real run writes:
+The real run wrote:
 
 - `direct-file-pi-development.json` — deterministic report plus runtime provenance;
 - `observations-development.json` — evaluator observations;
@@ -119,23 +137,13 @@ The real run writes:
 - `task-manifest-development.json` — frozen model-facing task manifest;
 - `human-review-development.md` — independent semantic-review worksheet.
 
-## Human review boundary
+## Remaining boundary
 
-Machine scoring does not establish semantic answer correctness. The model under test cannot be its own judge.
+The harness execution itself is now **PASS**. Machine scoring does not establish semantic answer correctness, so P2-T10 still requires a human reviewer to complete `human-review-development.md`.
 
-A human reviewer must classify every development answer as `correct`, `partially correct`, or `incorrect` and separately record unsupported claims, version/conflict mistakes, no-answer hallucinations and important omitted evidence.
+The reviewer must classify every answer as `correct`, `partially correct`, or `incorrect` and record unsupported claims, version/conflict mistakes, no-answer hallucinations and important omitted evidence.
 
-P2-T10 remains PARTIAL until both the real model run and this human review are complete.
-
-## CI boundary
-
-GitHub Actions runs only:
-
-```bash
-npx tsx scripts/p2-run-direct-file-pi-baseline.mjs --prepare-only
-```
-
-That path validates the frozen corpus/query count, dataset hash, task construction, focused evaluator tests and focused lint without invoking Pi or any provider. CI must never fabricate provider/model observations.
+The model under test cannot be its own sole judge.
 
 ## Scope
 

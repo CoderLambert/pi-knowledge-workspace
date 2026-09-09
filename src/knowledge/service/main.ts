@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { runBackupCli } from "./backupCli.js";
+import { runRestoreCli } from "./restoreCli.js";
 import { buildKnowledgeApp } from "./app.js";
 import { loadKnowledgeServiceConfig } from "./config.js";
 
@@ -8,6 +9,11 @@ try {
     const manifest = await runBackupCli(process.argv.slice(3));
     console.log(
       `Knowledge backup created: schema=${String(manifest.schemaVersion)} blobs=${String(manifest.blobs.length)} artifacts=${String(manifest.artifacts.length)}`,
+    );
+  } else if (process.argv[2] === "restore") {
+    const result = await runRestoreCli(process.argv.slice(3));
+    console.log(
+      `Knowledge restore created: schema=${String(result.schemaVersion)} blobs=${String(result.blobCount)} artifacts=${String(result.artifactCount)} evidence=${String(result.evidenceCount)} target=${result.targetDirectory}`,
     );
   } else {
     const config = loadKnowledgeServiceConfig();

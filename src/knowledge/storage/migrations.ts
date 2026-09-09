@@ -106,6 +106,18 @@ CREATE INDEX evidence_workspace_idx ON evidence(knowledge_workspace_id);
 CREATE INDEX jobs_workspace_status_idx ON jobs(knowledge_workspace_id, status);
 `,
   },
+  {
+    version: 2,
+    name: "durable-import-job-minimum",
+    sql: `
+ALTER TABLE jobs ADD COLUMN idempotency_key TEXT;
+ALTER TABLE jobs ADD COLUMN cancel_requested INTEGER NOT NULL DEFAULT 0 CHECK (cancel_requested IN (0, 1));
+ALTER TABLE jobs ADD COLUMN result_json TEXT;
+CREATE UNIQUE INDEX jobs_workspace_kind_idempotency_idx
+  ON jobs(knowledge_workspace_id, kind, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+`,
+  },
 ];
 
 function readUserVersion(db: MigrationDatabase): number {

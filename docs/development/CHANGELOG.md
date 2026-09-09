@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P1-T07 — PARTIAL
+
+- Added schema v2 and a durable MD/TXT import-job path with Workspace-scoped idempotency keys, Source binding, attempt records, explicit retry, queued/in-flight cancellation, result persistence and restart recovery of interrupted jobs.
+- Import execution consumes P1-T06 captured bytes directly and verifies the resulting P1-T05 SourceVersion hash/length matches that capture; it never reopens a validated path or trusts a caller-provided absolute Workspace root.
+- Added schema-upgrade/rollback coverage and six import-job contract scenarios; native SQLite, process-restart and executable/static/build evidence remains OPEN verification debt. P1-T08 may parse immutable SourceVersion content only.
+
 ### P1-T06 — PARTIAL
 
 - Added a safe Workspace file reader that accepts only explicit relative paths, canonicalizes root/target paths, rejects lexical and symlink escapes, blocks sensitive dotenv/SSH/private-key patterns, enforces a byte limit, and returns exact captured bytes plus SHA-256.

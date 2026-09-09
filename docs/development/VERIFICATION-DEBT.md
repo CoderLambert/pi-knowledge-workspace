@@ -201,6 +201,30 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
 - **Dependent tasks:** P1-T07 and any later Workspace-file reimport/update flow
 - **Resolution:** pending executable/target-filesystem verification; later implementation may proceed against the captured-byte contract.
 
+### P1-T07 — Durable MD/TXT import-job acceptance
+
+- **Task status:** PARTIAL
+- **Branch:** `feat/p1-md-txt-import-job`
+- **PR:** #17
+- **Debt status:** OPEN
+- **Why deferred:** the GitHub-only automation environment cannot execute repository dependencies, native `better-sqlite3`, real process restart/crash injection, or target filesystem acceptance; the PR has no trusted CI evidence yet.
+- **Required verification:**
+  1. Run `npm test -- src/knowledge/storage/database.test.ts src/knowledge/storage/importJobs.test.ts` and confirm the migration suite plus 6/6 import-job cases pass.
+  2. Rerun P1-T04/P1-T05/P1-T06 dependency focused suites, then `npm run typecheck`, `npm run lint`, `npm run knip`, `npm run build`, `npm run pack:dry`, and full `npm test`.
+  3. Run `git diff --check origin/feat/p1-safe-workspace-file-reader...HEAD` and confirm the direct-base diff contains only P1-T07 migration/import/test/docs/plan/changelog/debt scope.
+  4. Open a real schema-v1 fixture and confirm migration to schema v2 preserves data, creates the idempotency index, and rollback preserves schema v1 if migration 2 fails.
+  5. Submit an MD/TXT import twice with one idempotency key; confirm exactly one job and one Source are created.
+  6. Execute the import and confirm the SourceVersion id/hash/length recorded in `result_json` exactly matches P1-T06 captured bytes and P1-T04/P1-T05 persistence.
+  7. Inject failure then retry; confirm durable attempt history and no duplicate SourceVersion for identical bytes.
+  8. Verify queued cancellation and running cancellation before persistence create no SourceVersion.
+  9. Kill/restart with an import marked `running`; run recovery, confirm unfinished attempt becomes failed and job becomes queued, then replay successfully.
+  10. Reproduce a crash after SourceVersion persistence but before success metadata if practical; replay and confirm SourceVersion uniqueness converges rather than duplicating content.
+  11. Confirm only `.md`, `.markdown`, `.txt` are accepted and the persisted job payload contains a relative path/source id, never caller authority over an absolute Workspace root.
+- **Expected PASS evidence:** focused/static/build/package/full-suite gates show no new P1-T07-attributable failure; schema v1→v2 works on real SQLite; idempotency, retry, cancellation and crash recovery behave as documented; imported content identity exactly matches the safe captured bytes.
+- **Assumptions used for continued development:** P1-T06 safe capture remains the sole mutable-filesystem trust boundary; P1-T05 `(source_id, content_sha256)` uniqueness makes post-persistence replay idempotent; P1-T16/T17 will later generalize leases/heartbeats/fencing/worker claiming without changing successful SourceVersion identity; P1-T08 must parse immutable SourceVersion content rather than reopen Workspace paths.
+- **Dependent tasks:** P1-T08 and later parser/index pipeline; P1-T16/P1-T17 will generalize the job engine.
+- **Resolution:** pending executable/native-SQLite/restart acceptance; later implementation may proceed against the immutable SourceVersion result contract.
+
 P0-T03 is already fully accepted and remains PASS.
 
 ## Entry template

@@ -20,6 +20,26 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ---
 
+## 2026-09-10
+
+### P3-T00 — PASS
+
+- Rebaselined the authoritative development plan and phase gates after ADR-029 acceptance; the stale pre-ADR Ask→separate-Notes task order is superseded.
+- P3 now proceeds through P3-T01 baseline closure, Slice A production Knowledge closure, then Slice B first Derived Resource using shared canonical lineage/revision contracts.
+- `VERIFICATION-DEBT.md` was intentionally left unchanged: the inherited Knowledge TypeScript failures are autonomous implementation debt owned by P3-T01, not deferred user-only verification debt.
+
+### P2-T12 — PASS
+
+- ADR-029 is Accepted: Pi owns canonical Knowledge truth and long-lived lineage; files/parsers/indexes/models/external RAG systems are replaceable inputs, projections or adapters.
+- V1 retrieval remains SQLite FTS5 / `unicode61` / baseline lexical profile / `quoted-literal-or`; Dense/Hybrid/Qdrant remain outside V1 without new frozen evidence.
+- Accepted contracts include captured-vs-published Source state, immutable ParsedArtifact interpretation identity, frozen GenerationRun scope, DeliveredEvidence, historical retention closure, business-commit fencing and DerivedArtifact immutable revisions.
+
+### P2-T11 — PASS
+
+- Existing-product comparison is decision-sufficient: AnythingLLM fixed-version evidence established mature generic local RAG viability and the tested historical-citation durability path.
+- The full Open WebUI long benchmark was intentionally de-scoped after the architecture question split into Pi-owned canonical Knowledge semantics vs replaceable retrieval/RAG infrastructure; partial diagnostics remain preserved and untuned.
+- Final stack hygiene was repaired with ordinary merge commits only; #54 and #44 both contain the latest #43 ancestry while retaining their exact task-owned scopes.
+
 ## 2026-09-09
 
 ### P1-T20 — PARTIAL

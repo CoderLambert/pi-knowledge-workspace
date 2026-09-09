@@ -1,186 +1,262 @@
 # ADR-029 — V1 Retrieval Strategy
 
-Status: **BLOCKED ON EVIDENCE**  
+Status: **BLOCKED ON FINAL PRODUCT EVIDENCE**  
 Date opened: **2026-09-09**
 
 ## Context
 
 P2 exists to choose the V1 retrieval stack from measured evidence rather than architecture preference.
 
-The valid final outcome may remain deliberately simple:
+The intended candidate set was deliberately narrow:
 
 ```text
 FTS only
 ```
 
-or, if real evidence justifies the added runtime cost:
+or, only if real evidence justified the added runtime cost:
 
 ```text
 FTS + Dense + RRF
 ```
 
-P3 must not begin until this ADR contains an accepted retrieval decision because P3 ScopeManifests and AnswerRuns freeze retrieval configuration/revision into durable answer provenance.
+P3 must not begin until this ADR is Accepted because P3 ScopeManifests and AnswerRuns freeze retrieval configuration/revision into durable answer provenance.
 
-## Decision status
+## Current evidence state
 
-**No retrieval strategy is selected yet.**
+The retrieval-quality portion of P2 is now substantially resolved.
 
-The current automation environment has implemented the evaluation contracts but cannot produce the missing real retrieval/model/product measurements. Selecting FTS, Dense, sqlite-vec or Hybrid now would be fabricated evidence and would violate the P2 plan.
+### P2-T04 — expanded FTS baseline
 
-## Candidate decision set
+Real corrected-ancestry execution over 38 chunks / 35 challenge chunks / Top-K 10:
 
-The V1 decision is intentionally restricted to the smallest evidence-backed choices:
+```text
+80 queries
+68 answerable
+12 no-answer
+query errors: 0
+Recall@10: 1.0
+MRR: 0.928921568627451
+all-required Evidence coverage: 1.0
+rank aggregate: 59 R1 / 7 R2 / 2 R3 / 0 miss
+category failures: none
+FTS dbstat allocation: 49152 bytes
+```
 
-1. `FTS only` — current P1 FTS5 baseline, optionally with the least-complex P2-T05 lexical normalization that proves useful;
-2. `FTS + Dense + RRF` — only if one fixed Dense profile proves materially useful and Hybrid produces enough incremental benefit to justify its operational cost.
-
-`Dense only` is not the target default because the lexical baseline remains necessary for exact code/version/error behavior unless benchmark evidence explicitly forces reconsideration in a future ADR.
-
-A reranker is **not** a P2 candidate. sqlite-vec is a deployment option for Dense storage, not a retrieval-quality strategy by itself.
-
-## Mandatory evidence before decision
-
-### P2-T04 — FTS baseline
-
-Required:
-
-- real fixed-development Recall@10;
-- MRR;
-- all-required-Evidence coverage;
-- failures by category;
-- latency;
-- memory/index size;
-- representative missed queries.
+GitHub-runner latency/RSS evidence is runner-specific and is not treated as Omarchy target-machine performance.
 
 ### P2-T05 — lexical normalization
 
-Required:
+Four fixed development profiles were evaluated. The least-complex materially-improving rule selected **plain baseline**:
 
-- all four fixed profiles run on development data;
-- least-complex winner or explicit `baseline/no material improvement` conclusion;
-- one-shot holdout only after profile freeze.
+| Profile | Recall@10 | MRR | Coverage |
+| --- | ---: | ---: | ---: |
+| baseline | 1.0 | 0.9365079365079365 | 1.0 |
+| code-derived | 1.0 | 0.9365079365079365 | 1.0 |
+| code-cjk-bigram | 1.0 | 0.9134920634920635 | 1.0 |
+| code-cjk-bigram-trigram | 1.0 | 0.9293650793650793 | 1.0 |
 
-### P2-T06 — Dense profile, only if Dense remains a candidate
+`code-derived` produced no aggregate gain and increased complexity/cost. Both CJK n-gram profiles regressed MRR.
 
-Required:
+Winner: **`baseline`**.
 
-- one or at most two fixed multilingual profiles with exact model/revision/dimensions/preprocessing;
-- real development retrieval metrics and resource cost;
-- one frozen profile or explicit `Dense not proven useful` conclusion.
+One-shot post-freeze FTS holdout acceptance remained strong:
 
-If Dense is not proven useful, P2-T08 becomes unnecessary for the final V1 choice and this ADR should prefer the selected lexical/FTS path unless another mandatory baseline contradicts it.
+```text
+30 queries / 26 answerable
+Recall@10: 1.0
+MRR: 0.9166666666666666
+all-required Evidence coverage: 1.0
+22 R1 / 3 R2 / 1 R3 / 0 miss
+```
 
-### P2-T07 — sqlite-vec deployment, only if needed for the chosen Dense path
+No holdout per-query diagnostics were used for tuning.
 
-Required before adopting sqlite-vec:
+### P2-T06 — Dense retrieval
 
-- target extension load/reload after restart;
-- runtime `vec_version()`;
-- scoped filtering inside KNN before Top-K;
-- concurrency smoke;
-- p95/RSS/DB/vector-size measurements;
-- explicit adopt/do-not-adopt conclusion.
+Two fixed multilingual profiles were executed before any Dense selection:
 
-Dense-quality evidence does not require sqlite-vec; the P2-T06 in-memory evaluation index is sufficient for quality comparison.
+| Profile | Recall@10 | MRR | Coverage |
+| --- | ---: | ---: | ---: |
+| multilingual E5 small | 0.9523809523809523 | 0.8462301587301588 | 0.9523809523809523 |
+| multilingual MiniLM | 0.9285714285714286 | 0.7633219954648526 | 0.9285714285714286 |
 
-### P2-T08 — Hybrid + RRF, only after Dense is proven useful
+Frozen FTS development comparator:
 
-Required:
+```text
+Recall@10: 1.0
+MRR: 0.9365079365079365
+coverage: 1.0
+```
 
-- FTS vs Dense vs Hybrid on the same development labels;
-- Recall@10/MRR/all-required coverage/category failures;
-- end-to-end latency/resource overhead;
-- frozen `rrfK` and retrieval configurations;
-- explicit proof that Hybrid materially beats the simpler candidate.
+Both Dense candidates regress required quality. Predeclared eligibility required no Recall/coverage regression plus material MRR improvement. Neither qualified.
 
-### P2-T09 — reproducible benchmark report
+Conclusion:
 
-Required:
+```text
+selectedDenseProfile = null
+denseWorthCarryingForward = false
+```
 
-- generated development report from complete observations;
-- repository/dataset/config/model revisions recorded;
-- no development/holdout mixing.
+### P2-T07 — sqlite-vec
+
+**NOT APPLICABLE for V1 selection.**
+
+sqlite-vec was only a possible Dense deployment mechanism. Because Dense failed the quality gate, target sqlite-vec deployment is not required to decide the V1 retrieval strategy.
+
+### P2-T08 — Hybrid + RRF
+
+**NOT APPLICABLE for V1 selection.**
+
+Hybrid/RRF was conditional on Dense first proving useful. Running Hybrid merely to preserve historical task order would violate the complexity/evidence rule.
+
+### P2-T09 — reproducible benchmark
+
+Generated benchmark PASS on the frozen FTS configuration:
+
+```text
+retriever: sqlite-fts5
+tokenizer: unicode61
+lexical profile: baseline
+natural-language compiler: quoted-literal-or
+Top-K: 10
+38 chunks / 35 challenge chunks
+50 development queries / 42 answerable / 8 no-answer
+Recall@10: 1.0
+MRR: 0.9365079365079365
+all-required Evidence coverage: 1.0
+category failures: none
+FTS dbstat allocation: 49152 bytes
+```
+
+No Dense/Hybrid row was fabricated after Dense was rejected.
 
 ### P2-T10 — direct-file Pi product baseline
 
-Required:
+Real Omarchy/Pi development execution completed all 50 fixed queries without Knowledge retrieval.
 
-- same development user tasks with fixed files directly supplied to Pi;
-- no Golden-label leakage;
-- citation mapping and deterministic Evidence coverage/abstention metrics;
-- independent human answer correctness/unsupported-claim review;
-- runtime/latency/operational observations.
+Frozen runtime:
 
-Retrieval complexity must demonstrate product value over this simpler path.
+```text
+Pi: 0.85.1
+provider: openai-codex
+model: gpt-6-astra
+API: openai-codex-responses
+```
+
+Deterministic result:
+
+```text
+50 queries
+42 answerable
+8 no-answer
+any-required Evidence coverage: 1.0
+all-required Evidence coverage: 1.0
+citation precision: 0.7758620689655172  (45/58)
+no-answer correct abstention: 0.625  (5/8)
+median latency: 10165.077273999981 ms
+p95 latency: 14855.569325999997 ms
+max latency: 18050.93610000005 ms
+```
+
+This proves direct-file Pi can cover all required Evidence on the answerable development set, but citation discipline and no-answer abstention are materially imperfect.
+
+**Independent human semantic review remains OPEN**, so P2-T10 is still PARTIAL.
 
 ### P2-T11 — mature local-product comparison
 
-Required:
+AnythingLLM and Open WebUI Knowledge public documentation has been reviewed. Both are credible local document-chat/RAG product substitutes, but public material does not prove this repository's immutable historical Evidence invariant.
 
-- fixed-version AnythingLLM and Open WebUI hands-on runs;
-- same fixed corpus/development queries;
-- historical citation durability after source update/restart;
-- Chinese/code/conflict quality;
-- operational cost.
+Still OPEN:
 
-Public documentation research is useful context but is not sufficient acceptance evidence.
+- fixed-version hands-on quality on the same corpus/development queries;
+- source version A → citation → update to B → restart → reopen old citation;
+- Chinese/code/version/conflict/no-answer behavior;
+- target operational cost and workflow fit.
+
+## Candidate decision set after measured retrieval evidence
+
+The quality experiments reduce the practical V1 retrieval candidate set to:
+
+```text
+FTS only
+```
+
+with the exact frozen lexical configuration:
+
+```text
+SQLite FTS5
+unicode61
+lexicalProfile = baseline
+naturalLanguageCompiler = quoted-literal-or
+Top-K = 10
+```
+
+`FTS + Dense + RRF` is no longer an evidence-backed V1 candidate because Dense failed the prerequisite quality gate.
+
+This is **not yet the final Accepted architecture decision**. The remaining product-value evidence can still determine whether the Knowledge retrieval product itself is sufficiently justified versus direct-file Pi / mature local alternatives.
 
 ## Decision criteria
 
-Evaluate candidates in this order:
+Evaluate the remaining decision in this order:
 
-1. **Evidence correctness and recall** — especially all-required-Evidence coverage and conflict/multi-source cases;
-2. **exact lexical behavior** — code symbols, versions/error codes, Chinese/mixed queries;
-3. **historical Evidence integrity** — retrieval must return locators that resolve against immutable SourceVersion/ParsedArtifact history;
-4. **product value vs direct files** — retrieval must solve a real scale/scope/reuse problem rather than add infrastructure with no measured gain;
-5. **simplicity and maintainability** — prefer fewer models/native extensions/indexes when quality is materially equivalent;
-6. **latency/resource cost** — local p95/RSS/index growth must remain appropriate for a single-user desktop product;
-7. **deployment reliability** — native-extension or model dependencies must install/restart/backup predictably.
+1. **Evidence correctness and coverage**;
+2. **Chinese/code/version/conflict behavior**;
+3. **immutable historical Evidence integrity**;
+4. **product value vs direct-file Pi and mature local substitutes**;
+5. **simplicity and maintainability**;
+6. **latency/resource cost**;
+7. **deployment/restart/backup reliability**.
 
-## Default decision bias
+## Evidence table
 
-When quality is materially equivalent:
-
-```text
-FTS only > FTS + Dense + RRF
-```
-
-This is a complexity preference, **not** a preselected outcome.
-
-Dense/Hybrid must earn adoption with measured benefit. Conversely, FTS must not be retained merely because it is simpler if it materially fails required Evidence coverage on the fixed dataset.
-
-## Decision table
-
-| Evidence | FTS / selected lexical | Dense | Hybrid RRF | Direct-file Pi | External products |
+| Evidence | FTS baseline | Dense | Hybrid RRF | Direct-file Pi | External products |
 | --- | --- | --- | --- | --- | --- |
-| development quality | UNRUN | UNRUN | UNRUN | UNRUN | HANDS-ON UNRUN |
-| holdout quality | UNRUN | UNRUN | UNRUN | UNRUN | optional / UNRUN |
-| Chinese/code/version | UNRUN | UNRUN | UNRUN | UNRUN | HANDS-ON UNRUN |
-| multi-source/conflict | UNRUN | UNRUN | UNRUN | UNRUN | HANDS-ON UNRUN |
-| p95 / resource cost | UNRUN | UNRUN | UNRUN | UNRUN | HANDS-ON UNRUN |
-| deployment/restart | FTS native SQLite partly proven; final package gates OPEN | model runtime UNRUN | depends on components | Pi runtime UNRUN | HANDS-ON UNRUN |
-| historical Evidence semantics | repository contract implemented; P1 acceptance debt remains | locator contract only | locator contract only | post-run citation mapping only | NOT PROVEN publicly |
+| development quality | **PASS** — R@10 1.0, MRR 0.9365079365, coverage 1.0 | **REJECTED** — quality regression | **N/A** — Dense prerequisite failed | deterministic run complete; semantic review OPEN | hands-on OPEN |
+| holdout quality | **PASS aggregate** — R@10 1.0, MRR 0.9166666667, coverage 1.0 | not run after rejection | N/A | not run; no tuning use | optional / unrun |
+| Chinese/code/version | no category misses in frozen FTS benchmark | regressed overall | N/A | deterministic citation coverage complete; human correctness OPEN | hands-on OPEN |
+| multi-source/conflict | all-required coverage 1.0 in frozen FTS benchmark | regressed overall | N/A | coverage 1.0; human semantic correctness OPEN | hands-on OPEN |
+| citation discipline | Stable Evidence locators are retrieval-native | locator-compatible eval only | N/A | precision 0.7758620689655172 | hands-on OPEN |
+| no-answer behavior | lexical hits are not answerability; answer layer not measured here | N/A | N/A | correct abstention 0.625 | hands-on OPEN |
+| resource/deployment complexity | SQLite FTS5 only; 49152-byte FTS dbstat in benchmark | model runtime adds substantial memory/complexity | N/A | existing Pi model runtime; ~10.2 s median full-answer latency | hands-on OPEN |
+| historical Evidence semantics | repository contract is designed around immutable SourceVersion/ParsedArtifact | same locator contract possible | N/A | post-run quote mapping only | **NOT PROVEN publicly / hands-on OPEN** |
 
-## Decision
+## Provisional architecture direction
 
-**BLOCKED — no V1 retrieval choice is made in this ADR yet.**
+Measured retrieval evidence strongly favors **FTS only** and provides no justification for Dense, sqlite-vec, or Hybrid/RRF in V1.
 
-Do not replace this section with a preference until the mandatory rows above contain real, reproducible evidence.
+However, ADR-029 remains blocked because P2 is not only a retrieval leaderboard. Before final acceptance we still need to establish whether the overall Knowledge product has enough differentiated value and correctness versus:
+
+1. direct-file Pi, using the completed deterministic run plus independent human answer review;
+2. AnythingLLM and Open WebUI Knowledge, using fixed-version hands-on historical-citation/quality/operational observations.
+
+## Final Decision
+
+**BLOCKED — no final V1 architecture acceptance yet.**
+
+The retrieval candidate is now evidence-narrowed to FTS only, but the product-value gate is incomplete.
+
+## Remaining blockers
+
+Only these decision-critical blockers remain:
+
+1. **P2-T10 human semantic review** of all 50 direct-file development answers;
+2. **P2-T11 fixed-version hands-on comparison** for AnythingLLM and Open WebUI Knowledge.
+
+P2-T07 sqlite-vec and P2-T08 Hybrid/RRF are explicitly not blockers unless Dense is intentionally reopened with new evidence.
 
 ## Consequence while blocked
 
-- P2 implementation contracts may exist as PARTIAL stacked PRs.
-- No P2 benchmark result is represented as PASS without execution.
-- P3-T01 and later P3 implementation must **not** proceed because P3 durable Answer/ScopeManifest schemas require a retrieval configuration/revision that this ADR has not selected.
+- ADR-029 stays `BLOCKED ON FINAL PRODUCT EVIDENCE`.
+- P3-T01 and later P3 implementation must **not** proceed.
+- No placeholder retrieval revision may be frozen into durable Answer/ScopeManifest schemas.
 - Existing P0/P1 verification debt remains independently tracked and is not waived by this ADR.
 
 ## Unblocking procedure
 
-1. close or intentionally fail/not-applicable each applicable P2-T04..T11 verification row;
-2. generate the P2-T09 development comparison from real observations;
-3. freeze the chosen retrieval configuration;
-4. run holdout according to the established no-retuning discipline;
-5. fill this ADR's decision table with dated evidence references;
-6. select the least-complex candidate that satisfies required quality/product-value constraints;
-7. update the architecture baseline and P2 task status;
-8. only then branch P3-T01.
+1. complete and record the P2-T10 independent human semantic review;
+2. complete the P2-T11 fixed-version hands-on comparison or record an evidence-backed reason a comparison row is not applicable;
+3. update this table with the final product-value observations;
+4. confirm the frozen FTS retrieval configuration remains the least-complex acceptable strategy;
+5. change this ADR to `Accepted` only if the full P2 gate is satisfied;
+6. define the exact retrieval-config revision consumed by P3 durable provenance;
+7. stop after ADR acceptance unless explicitly authorized to begin P3.

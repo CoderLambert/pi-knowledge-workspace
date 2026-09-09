@@ -1,114 +1,158 @@
 # P2-T11 — Existing local Knowledge product comparison
 
-Status: **RESEARCHED / ANYTHINGLLM HANDS-ON PARTIAL / PARTIAL**
+Status: **PASS — DECISION-SUFFICIENT EVIDENCE**
 
-Reviewed on: **2026-09-09**
+Reviewed: **2026-09-09 to 2026-09-10**
 
-Products are intentionally limited to two mature local/self-hosted Knowledge products:
+Products remain intentionally limited to:
 
 1. AnythingLLM
 2. Open WebUI Knowledge
 
-The purpose is not feature-counting. The comparison focuses on the V1 invariants that could make Pi Knowledge Workspace unnecessary or justify keeping it distinct.
+## Decision purpose
+
+The comparison is not a feature contest. It answers whether mature local products make a Pi-owned Knowledge subsystem unnecessary, and which responsibilities can reasonably be treated as reusable infrastructure.
+
+The architecture question is now explicitly split:
+
+```text
+Canonical Knowledge Domain ownership
+vs
+Retrieval / generic RAG infrastructure
+```
+
+This split is the reason a second full 50-query product run is no longer a required P2 gate.
 
 ## Evidence status legend
 
-- **DOCUMENTED** — the reviewed official source explicitly establishes the capability at a product-feature level.
-- **HANDS-ON PASS** — directly observed on the fixed local setup for the stated probe.
-- **PARTIALLY OBSERVED** — some required behavior was directly observed, but the stronger internal invariant remains unproven.
-- **NOT PROVEN** — the reviewed evidence does not establish the stronger invariant we need. This does **not** mean the product cannot do it.
-- **HANDS-ON REQUIRED** — quality, persistence or operational behavior still must be measured on a fixed local setup.
+- **DOCUMENTED** — official material establishes the product-level capability.
+- **HANDS-ON PASS** — directly observed on the fixed local setup.
+- **FORMAL RUN** — fixed local development run with raw evidence preserved.
+- **PARTIAL / DIAGNOSTIC** — useful observation, not promoted to a formal score.
+- **NOT PROVEN** — evidence does not establish Pi's stronger invariant; this does not mean the product cannot support it.
+- **DE-SCOPED** — further testing intentionally stopped because it is no longer decision-critical.
 
 ## Comparison matrix
 
-| Criterion | AnythingLLM | Open WebUI Knowledge | Pi Knowledge Workspace requirement |
+| Criterion | AnythingLLM v1.16.1 | Open WebUI v0.11.3 | Pi requirement / conclusion |
 | --- | --- | --- | --- |
-| local/self-hosted use | **DOCUMENTED + HANDS-ON** — v1.16.1 ran locally on the target Omarchy machine | **DOCUMENTED** — self-hosted/offline platform; Docker/Python installation documented | single-user local-first desktop/workspace path |
-| reusable document Knowledge | **DOCUMENTED + HANDS-ON** — fixed six-file P2 corpus loaded into a dedicated workspace | **DOCUMENTED** — reusable Knowledge bases, files/collections and model attachment | Workspace-scoped Sources/SourceVersions |
-| retrieval | **DOCUMENTED + HANDS-ON PARTIAL** — Query mode over LanceDB + Ollama embedding worked on canary queries | **DOCUMENTED** — Focused Retrieval, BM25 + vector hybrid, reranking, agentic Knowledge tools | evidence-selected FTS or FTS+Dense+RRF |
-| full-file context alternative | public materials reviewed here do not establish an equivalent fixed comparison mode | **DOCUMENTED** — Full Context injects the complete document, no chunking/search | P2-T10 direct-file Pi baseline covers this product question independently |
-| source citations | **DOCUMENTED + HANDS-ON** — answer sources were shown and historical source content could be reopened in the durability probe | **DOCUMENTED** — RAG citations and source filename/file id behavior documented | citation must resolve to immutable historical Evidence |
-| immutable fixed SourceVersion identity | **PARTIALLY OBSERVED** — historical Version A content remained reopenable after replacement/restart, but raw-byte-addressed immutable identity is not proven | **NOT PROVEN** | mandatory raw-byte SourceVersion identity |
-| historical citation survives later source update | **HANDS-ON PASS (single v1.16.1 probe)** — old ORCHID citation reopened Version A after same-name replacement with COBALT and restart | **NOT PROVEN / HANDS-ON REQUIRED** | mandatory: citation opens historical SourceVersion/ParsedArtifact, not latest |
-| update/sync behavior | **HANDS-ON PARTIAL** — same-name manual replacement advanced current retrieval to Version B while old chat citation retained Version A | **DOCUMENTED** incremental directory sync for new/modified/deleted files; historical-version retention remains **NOT PROVEN** | update creates new immutable SourceVersion; old Evidence remains resolvable |
-| Chinese retrieval quality on fixed corpus | **HANDS-ON PARTIAL** — canary succeeded on direct Chinese/version questions; formal isolated 50-query run pending | **HANDS-ON REQUIRED** | measured Golden Dataset Chinese/mixed failures |
-| code-symbol/version/error retrieval | **HANDS-ON PARTIAL** — canary succeeded on `UnwrapRef<T>` and version-conflict questions; formal run pending | **HANDS-ON REQUIRED** | measured code/version/error categories |
-| conflict/multi-version questions | **HANDS-ON PARTIAL** — v16.7 vs v22.3 stability canary distinguished both versions; formal run pending | **HANDS-ON REQUIRED** | explicit multi-SourceVersion labels and conflict cases |
-| no-answer behavior | **HANDS-ON CONCERN** — canary `dev-032` and `dev-050` made unsupported negative inferences from incomplete/selected option lists | **HANDS-ON REQUIRED** | abstain when Stable Evidence is insufficient |
-| notes/reuse | **DOCUMENTED adjacent capability** — workspaces and managed memories; Saved-Note-with-Evidence semantics **NOT PROVEN** | **DOCUMENTED adjacent capability** — Knowledge docs explicitly contrast Knowledge with Notes; stable Note→historical Evidence semantics **NOT PROVEN** | durable Saved Note revisions with stable Evidence refs |
-| Pi workflow integration | **DOCUMENTED adjacent capability** — MCP compatibility and developer API exist; Pi-specific integration **NOT PROVEN** | Knowledge/API/tool integration documented; Pi-specific integration **NOT PROVEN** | native PI WEB Workspace + restricted Pi runtime |
-| API/export | Developer API documented; API-based formal runner remains to be executed | Knowledge export/API documented | local process API plus backup/restore |
-| target operational cost | **HANDS-ON PARTIAL** — install/model/network path established; formal idle/query RSS, latency and persistent-byte measurements pending | **HANDS-ON REQUIRED** | compare install complexity, idle/RAG RSS, disk growth, startup/update/backup |
+| local/self-hosted | **DOCUMENTED + HANDS-ON** | **DOCUMENTED + fixed-version contract/smoke evidence** | compatible with local-first direction |
+| reusable Knowledge | **DOCUMENTED + HANDS-ON** | **DOCUMENTED** | mature products already cover generic document RAG |
+| fixed-corpus answerable quality | **FORMAL RUN** — 39/39 successful answerable responses semantically correct | **DE-SCOPED** as a full quality benchmark | a second full run is not needed to prove mature RAG viability |
+| first-attempt runtime reliability | **47/50 success**; 3 preserved runtime/API failures | partial long-run diagnostics only; no formal score | operational behavior remains product-specific |
+| no-answer discipline | **CONCERN** — unsupported negative/generalized claims in several frozen no-answer cases | no formal score | generation/grounding policy is distinct from retrieval backend choice |
+| returned-source coverage | **39/39 successful answerable queries contained all required Golden documents in returned top-4** | no formal score | mature retrieval can supply the required documents |
+| historical citation after replacement/restart | **HANDS-ON PASS** — old ORCHID citation reopened Version A after COBALT replacement and restart | not required as a P2 completion gate after de-scope | historical citation is not a unique justification for custom generic RAG |
+| immutable Pi SourceVersion / byte-span Evidence | **NOT PROVEN** | **NOT PROVEN** | remains Pi canonical-domain responsibility |
+| frozen multi-step generation scope | **NOT PROVEN** | **NOT PROVEN** | Pi must own generation-scope semantics if required by product |
+| DerivedArtifact revision/provenance lifecycle | **NOT PROVEN** | **NOT PROVEN** | Pi product/domain concern, not a generic retrieval capability |
+| Pi host-authoritative Workspace/worktree scope | Pi-specific integration not proven | Pi-specific integration not proven | remains Pi-owned integration boundary |
+| optional external-provider potential | plausible through API, but adapter/scope/identity contract not yet accepted | plausible in principle, targeted probes may be run later | future option, not canonical store decision |
 
-## AnythingLLM fixed hands-on setup
+## AnythingLLM fixed formal evidence
 
 ```text
 product: AnythingLLM v1.16.1
-LLM provider: Ollama
-LLM model: qwen3.5:9b-q8_0
+commit: 35c58d89907e675a8c4fb10544c19be0f050f611
+LLM: qwen3.5:9b-q8_0
 LLM digest: 441ec31e4d2aedceb97dd834b036db104d943fbe3dbc1e5c8ac95eeaa9141c77
-embedding provider: Ollama
-embedding model: bge-m3:latest
+embedding: bge-m3:latest
 embedding digest: 7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab
 vector DB: LanceDB
 chat mode: Query
-corpus: same six fixed P2 Markdown corpus files used by P2-T10
+corpus: same six frozen P2 Markdown files
+dataset hash: 949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3
 ```
 
-### Canary observations
+Formal run:
 
-A six-query UI canary exercised Chinese, code-symbol, version/conflict and no-answer behavior. Four answers matched the frozen evidence expectations. `dev-032` and `dev-050` failed the frozen no-answer rubric by turning absence from a selected/incomplete option list into a negative conclusion. These canaries were not executed as fully isolated API sessions, so they are diagnostic evidence only, not the formal 50-query result.
+```text
+records: 50
+success: 47
+failure: 3
+failure IDs: dev-011, dev-040, dev-041
+JSONL SHA-256: d62197426809c28636c8d04d609a901c613237c9be1a448364775c487c4b1cb9
+```
 
-### Historical citation durability probe
+Independent semantic adjudication:
 
-A dedicated source contained `ALPHA-741 -> ORCHID` and `This statement is Source Version A.` A first thread answered ORCHID and exposed a source citation. The same-named source was then replaced by Version B containing `ALPHA-741 -> COBALT`; a new thread answered COBALT, proving current retrieval had advanced. After restarting AnythingLLM, the original ORCHID thread's original source citation was reopened and the source panel still displayed the Version A text.
+```text
+correct: 41
+partial: 2
+incorrect: 4
+execution failure: 3
+successful answerable: 39/39 correct
+version/conflict mistakes among successful responses: 0
+material required-Evidence omissions among successful answerable responses: 0
+```
 
-Observed classification: **A — historical citation reopened Version A after source replacement and restart.**
+The weak area is no-answer / negative-evidence discipline. That finding does not imply that a denser retrieval stack is required.
 
-This directly disproves the provisional assumption that AnythingLLM necessarily lacks historical citation durability. It does not by itself prove Pi's stronger byte-addressed SourceVersion identity, retention across every delete/sync/export path, or a stable public identifier suitable for Pi Evidence references.
+Returned-source metrics:
 
-## What the documentation already tells us
+```text
+47 successful responses x 4 sources = 188 source objects
+all required Golden documents returned for successful answerable queries: 39/39
+required doc top-1: 37/39
+required-document MRR: 0.9743589743589743
+```
 
-### AnythingLLM
+Raw successful answers contained `<think>...</think>` tags, so any Pi-facing adapter would require an explicit reasoning-output sanitization/separation contract.
 
-Official material establishes a broad local document-chat product rather than a narrow retrieval library. Its repository describes local-by-default operation, Desktop support, document ingestion, workspaces, source citations, agents, MCP compatibility, memories, multiple embedding providers and vector databases.
+## Historical citation durability
 
-Hands-on v1.16.1 evidence now additionally establishes one successful historical citation durability path.
+Observed fixed-version sequence:
 
-### Open WebUI Knowledge
+```text
+A: ALPHA-741 -> ORCHID
+old thread answers ORCHID
+same-named source replaced with B: COBALT
+new thread answers COBALT
+service restart
+reopen original thread/citation
+old citation still displays Version A / ORCHID
+```
 
-Official documentation describes reusable Knowledge bases, Focused Retrieval and Full Context modes, BM25 + vector hybrid search with reranking, citations, agentic Knowledge tools, nested directories, incremental directory sync, export/API, and Notes as a separate full-content reuse concept.
+Classification: **HANDS-ON PASS for the tested AnythingLLM path.**
 
-The reviewed docs do not establish that a citation to an older file revision remains bound to immutable historical content after sync/update/delete; this still requires the equivalent hands-on probe.
+This establishes product-level historical citation durability for one path. It does not establish Pi's stronger canonical contract for immutable raw SourceVersion, ParsedArtifact identity, byte/span Evidence, retention closure, backup/restore, or DerivedArtifact lineage.
 
-## Sources reviewed
+## Open WebUI de-scope decision
 
-### AnythingLLM
+Open WebUI remains a useful second mature-product reference, but the full 50-query benchmark is explicitly **DE-SCOPED**.
 
-- Official documentation home: https://docs.anythingllm.com/
-- Official repository README: https://github.com/Mintplex-Labs/anything-llm/blob/master/README.md
-- Fixed hands-on release: v1.16.1
+A fixed-version long run was started and produced partial diagnostics. Those partial records are retained but are not scored, retried, or tuned.
 
-### Open WebUI
+Reason:
 
-- Knowledge: https://docs.openwebui.com/features/workspace/knowledge/
-- RAG / citations: https://docs.openwebui.com/features/chat-conversations/rag/
-- Quick Start: https://docs.openwebui.com/getting-started/quick-start/
-- Performance / resource guidance: https://docs.openwebui.com/troubleshooting/performance/
+AnythingLLM already supplies the decision-critical mature-product evidence needed to show that generic local RAG/retrieval and historical citation behavior can be strong. The remaining architectural question is not whether a second product can also answer the frozen corpus; it is which canonical semantics Pi must own independently of retrieval implementation.
 
-## Remaining hands-on comparison
+If Pi later considers a production external-RAG adapter, targeted Open WebUI tests may be reopened for the exact adapter contract: source/span mapping, scope isolation, update/restart behavior, export/backup, and operating cost.
 
-P2-T11 is not complete. Remaining required evidence includes:
+## Final product-comparison conclusion
 
-1. formal isolated 50-query AnythingLLM development run with raw answers, raw sources and latency;
-2. fixed-version Open WebUI run on the same corpus, LLM and embedder;
-3. Open WebUI historical citation durability probe after source replacement and restart;
-4. formal multi-version/conflict/no-answer adjudication;
-5. nearest Notes/reuse flow for each product;
-6. idle RSS/CPU, query median/p95 and peak RSS, persistent bytes, restart/update cost and backup/export friction.
+P2-T11 is **PASS on evidence sufficiency**.
 
-## Preliminary conclusion
+The comparison supports the following architecture boundary:
 
-AnythingLLM now has direct evidence for the strongest product-level challenge examined so far: the tested v1.16.1 UI preserved and reopened historical Version A citation content after a same-name Version B replacement and process restart. That materially weakens “historical citation support” as a unique justification for a custom Pi Knowledge subsystem unless Pi's stricter immutable identity, host-authoritative scope, integration, or operational requirements remain differentiating in the full comparison.
+```text
+Pi should not reimplement generic retrieval/RAG merely to differentiate itself.
 
-P2-T11 remains **PARTIAL**. No ADR selection or P3 work is justified until the remaining AnythingLLM and Open WebUI evidence is complete.
+Pi should own canonical Knowledge semantics that mature-product evidence does not establish:
+- host-authoritative Workspace scope
+- Source / immutable SourceVersion
+- versioned ParsedArtifact / canonical content
+- Stable Evidence and historical reopening
+- frozen generation scope / delivered Evidence
+- DerivedArtifact revisions / provenance / lifecycle
+
+Retrieval remains replaceable infrastructure.
+```
+
+The full Open WebUI benchmark is not required to close this product question because it no longer has a plausible path to changing the canonical-domain decision.
+
+## P2-T12 consequence
+
+ADR-029 must no longer be blocked on “complete both product benchmarks.” It must instead finalize the canonical Knowledge boundary and the evidence-backed V1 retrieval strategy.
+
+P3 remains prohibited until ADR-029 is formally Accepted.

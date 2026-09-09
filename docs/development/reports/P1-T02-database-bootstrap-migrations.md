@@ -13,7 +13,8 @@ Implements the first Knowledge persistence boundary:
 - foreign keys, core uniqueness constraints and lookup indexes;
 - reusable `withTransaction` helper;
 - `openKnowledgeDatabase` bootstrap with foreign keys and WAL for file databases;
-- contract tests for schema coverage, idempotency, future-schema rejection, migration rollback, commit and rollback semantics.
+- ADR-selected `better-sqlite3` 13.x declared as a production dependency through npm-generated package + lock metadata;
+- seven focused tests, including a real SQLite / FK / FTS5 smoke through `openKnowledgeDatabase`.
 
 ## Direct base
 
@@ -21,27 +22,44 @@ Implements the first Knowledge persistence boundary:
 
 P1-T01 selected `better-sqlite3` 13.x. P1-T02 follows that ADR and does not introduce a database abstraction framework or a second driver.
 
-## Important dependency state
+## Dependency integration
 
-The GitHub-only autonomous environment cannot safely regenerate the repository's large `package-lock.json`. Adding `better-sqlite3` only to `package.json` would deliberately make `npm ci` inconsistent, so this branch does **not** perform a partial dependency-manifest edit.
+Commit `926e1ae1` closes the earlier manifest/lockfile defect. `npm install better-sqlite3@13.0.3` updated `package.json` and `package-lock.json` together, and a subsequent clean `npm ci` reproduced the dependency as `better-sqlite3@13.0.3`.
 
-`database.ts` therefore loads the ADR-selected package through a narrow runtime seam and fails explicitly if dependencies have not yet been installed. Before P1-T02 can become PASS, `better-sqlite3@^13.0.3` must be added through npm so both `package.json` and `package-lock.json` are generated together, followed by the executable checks in the verification guide.
+The runtime still loads the selected package through the narrow database seam and fails explicitly if dependencies are absent; no fallback driver was added.
 
-This is verification/integration debt, not a reason to substitute `node:sqlite` contrary to ADR-028.
+## Local verification evidence — 2026-09-09
 
-## Verification performed autonomously
+Verified on the user's Omarchy/Linux checkout with Node 26.7.0:
 
-Static review of the migration algorithm and task-only branch construction was performed. No executable repository checkout or dependency tree is available in this environment, so no test/typecheck/lint/build result is claimed.
+- clean `npm ci`: PASS;
+- `npm ls better-sqlite3`: `13.0.3`;
+- direct native load: PASS;
+- SQLite version observed: `3.53.4`;
+- real FTS5 virtual table create/insert/MATCH query: PASS;
+- `src/knowledge/storage/database.test.ts`: **7/7 PASS**;
+- real `openKnowledgeDatabase(":memory:")`: PASS;
+- `PRAGMA user_version`: expected schema version;
+- `PRAGMA foreign_keys`: `1`;
+- `npm run typecheck`: PASS;
+- `npm run knip`: PASS (`Excellent, Knip found no issues`; one non-failing redundant-entry configuration hint remains);
+- `npm run build`: PASS;
+- `npm run pack:dry`: PASS, including `dist/knowledge/storage/database.js` and migration/service outputs;
+- pre-commit `npm run verify:staged`: PASS for cached typecheck, Knip, staged ESLint and related Vitest;
+- `git diff --check`: PASS.
+
+Earlier local verification on the later P1 stack additionally demonstrated real file-backed migrations, WAL, FTS5, transaction rollback, backup/reopen and schema-version behavior. Those results reduce driver risk but do not replace this task's remaining package-install/full-gate acceptance.
+
+## Remaining verification debt
+
+P1-T02 remains PARTIAL. Required closure still includes:
+
+1. `npm pack` followed by installation into a clean isolated directory and loading packaged `openKnowledgeDatabase()` through the installed package/native dependency;
+2. repository-wide lint/full-suite classification required by the verification guide, without patching inherited PI WEB failures merely for green;
+3. final direct-base scope review after all P1-T02 bookkeeping changes.
+
+P1-T01 separately retains extension-loading feasibility and any remaining driver-level packaging acceptance not owned by this task.
 
 ## Deferred assumptions consumed by later tasks
 
-Later P1 tasks may assume:
-
-1. schema version 1 is the initial Evidence Core schema;
-2. a database with `user_version > 1` is rejected;
-3. migrations are atomic;
-4. foreign keys are enabled on opened Knowledge databases;
-5. file-backed databases use WAL;
-6. P1-T03 may populate installation/workspace identity using the tables created here.
-
-The native driver/install and real-SQLite execution remain unverified and must not be cited as PASS evidence.
+Later P1/P2 tasks may now rely on locally proven `better-sqlite3` 13.0.3 + FTS5 availability on the target machine, while still treating package-install and unresolved phase-gate debt as PARTIAL rather than PASS.

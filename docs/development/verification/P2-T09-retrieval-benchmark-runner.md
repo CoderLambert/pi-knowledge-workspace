@@ -1,23 +1,22 @@
 # P2-T09 verification — Retrieval benchmark runner
 
-Status: **PARTIAL — REAL DEVELOPMENT BENCHMARK PASS / STYLE CLEANUP OPEN**
+Status: **PASS**
 
 ## Focused runner and ancestry evidence
 
-GitHub Actions run `34329322920` executed:
-
-```text
-Golden Dataset
-representative corpus
-query annotations
-retrieval challenge corpus
-FTS baseline evaluator
-P2-T09 benchmark runner
-SearchQuery
-FTS5 index
-```
+Initial complete evidence run `34329322920` executed the Golden Dataset, representative corpus, query annotations, retrieval challenge corpus, FTS evaluator, P2-T09 runner, SearchQuery and FTS5 index suites.
 
 Result: **8 files / 29 tests PASS**.
+
+After cleaning the four P2-T09-owned style findings, canonical final revalidation run `34330083378` repeated the same focused suite and real development benchmark.
+
+Final result:
+
+```text
+focused suite = 8 files / 29 tests PASS
+retrievalBenchmarkRunner.ts lint findings = 0
+retrievalBenchmarkRunner.test.ts lint findings = 0
+```
 
 Runtime probe:
 
@@ -31,7 +30,7 @@ FTS5 PASS
 
 ## Real development report
 
-Support PR #52 executes the frozen FTS retrieval path and records one real observation for every development query. It loads development query/label files only; holdout is not loaded.
+Support PR #52 executes the frozen FTS production path and records one real observation for every development query. It loads development query/label files only; holdout is not loaded.
 
 Production path:
 
@@ -58,7 +57,7 @@ corpusChunks = 38
 challengeChunks = 35
 ```
 
-Generated metrics:
+Quality metrics reproduced exactly in the final run:
 
 ```text
 queryCount = 50
@@ -69,56 +68,50 @@ Recall@10 = 1
 MRR = 0.9365079365079365
 allRequiredEvidenceCoverage = 1
 categoryFailureCounts = {}
-median = 0.794373 ms
-p95 = 1.334205 ms
-max = 3.400616 ms
-peakRssBytes = 105443328
 indexBytes = 49152
 ```
 
-Artifact:
+Initial evidence artifact:
 
 ```text
 run = 34329322920
 artifact id = 10095148994
 digest = sha256:079dc6b4a46c90136e274395d76ba63219e5c43e2ccb913135d5561364ca3672
-development dataset hash = 949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3
 ```
 
-Artifact contents include generated Markdown, provenance/report JSON and all 50 development observations.
+Final revalidation artifact:
 
-`eval/reports/retrieval-benchmark.md` has been replaced by the generated Markdown rather than manually transcribed metrics.
+```text
+run = 34330083378
+artifact id = 10095437462
+digest = sha256:bf01d27361280a9f1de92b176ead5919cb1c05555a146597fd46f64f8e3d93d1
+```
+
+Deterministic development dataset hash in both runs:
+
+`949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3`
+
+Latency and RSS varied between GitHub runners as expected; quality and persistent FTS allocation reproduced exactly. GitHub runner performance is not an Omarchy target-machine performance claim.
 
 ## Applicable variants
 
-P2-T05 selected plain FTS. P2-T06 real development evidence rejected both fixed Dense profiles. Therefore no Dense or Hybrid benchmark row is required or valid for the final candidate set; do not fabricate observations merely to fill a matrix.
+P2-T05 selected plain FTS. P2-T06 real development evidence rejected both fixed Dense profiles. Therefore the valid P2-T09 candidate set contains **FTS baseline only**. Dense/Hybrid observations are not fabricated merely to fill a comparison matrix.
 
 ## Holdout discipline
 
-No holdout query or label is loaded by the P2-T09 development harness. P2-T05 already performed the allowed one-shot post-freeze FTS holdout acceptance. Do not rerun holdout for tuning.
+No holdout query or label is loaded by the P2-T09 development harness. P2-T05 already performed the allowed one-shot post-freeze FTS holdout acceptance. Holdout is not rerun for tuning.
 
 ## Repository gate classification
 
-Repository-wide typecheck/lint/knip diagnostics still expose inherited ancestry debt. Do not patch those failures inside P2-T09 merely for green CI.
+The final broad lint still reports inherited/concurrent repository errors, but none are in either P2-T09-owned TypeScript file. Typecheck and knip likewise expose pre-existing ancestry debt outside this task.
 
-P2-T09-owned lint findings remain:
-
-```text
-src/knowledge/eval/retrievalBenchmarkRunner.test.ts
-  three forbidden non-null assertions
-src/knowledge/eval/retrievalBenchmarkRunner.ts
-  one no-unnecessary-condition finding
-```
-
-These are style-only task cleanup debt. They keep the task formally PARTIAL but do not invalidate the real generated benchmark.
-
-If cleaned, rerun targeted lint and `retrievalBenchmarkRunner.test.ts`. A full retrieval evidence rerun is unnecessary for semantics-preserving style-only edits unless the runner behavior changes.
+Those repository-wide findings do not invalidate P2-T09 and are not patched here merely to obtain global green CI.
 
 ## Corrected direct-base scope
 
-Canonical #41 is now based directly on P2-T06 / #38, bypassing rejected P2-T07/P2-T08 adoption paths.
+Canonical #41 is based directly on P2-T06 / #38, bypassing rejected P2-T07/P2-T08 adoption paths.
 
-Expected direct-base task scope remains:
+Expected direct-base task scope remains exactly:
 
 ```text
 src/knowledge/eval/retrievalBenchmarkRunner.ts
@@ -130,8 +123,6 @@ docs/development/verification/P2-T09-retrieval-benchmark-runner.md
 
 No retriever implementation, provider/model code, product comparison or P3 work belongs here.
 
-## Evidence-complete condition
+## Acceptance
 
-The evidence requirement needed for ADR-029 is now complete for P2-T09: at least one complete real development report was generated reproducibly using the actual runner.
-
-Formal task PASS still requires the four task-owned lint findings to be cleaned or intentionally waived by repository policy. That cleanup is not an ADR blocker.
+**PASS.** P2-T09 has a reproducible real development report, complete provenance, no holdout contamination, focused tests green, and zero task-owned lint findings. Its evidence requirement for ADR-029 is complete.

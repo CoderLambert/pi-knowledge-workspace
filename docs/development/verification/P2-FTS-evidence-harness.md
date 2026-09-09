@@ -5,7 +5,9 @@ Status: **OPEN / PARTIAL**
 Branch: `chore/p2-fts-evidence-harness`  
 Direct base: `experiment/p2-fts-baseline-report`
 
-## One-shot execution
+## Execution paths
+
+### Local / target environment
 
 From a current checkout of this branch:
 
@@ -20,23 +22,33 @@ P2_EVIDENCE_OUT_DIR=/path/to/evidence \
   bash scripts/p2-run-fts-evidence.sh
 ```
 
-The default bundle is written to:
+Default bundle:
 
 ```text
 /tmp/pi-knowledge-p2-evidence/p2-t04
 ```
 
-## What the wrapper must prove before benchmarking
+### GitHub Actions
 
-It must successfully:
+`.github/workflows/p2-fts-evidence.yml` runs the same command on `ubuntu-latest` / Node 24 and uploads:
+
+```text
+p2-t04-expanded-fts-evidence
+```
+
+CI evidence may close retrieval correctness / SQLite FTS / metric reproducibility gates. CI latency and RSS must be labeled as runner-specific and do not replace target Omarchy resource acceptance.
+
+## What must pass before benchmarking
+
+The harness must successfully:
 
 1. run `npm ci`;
 2. resolve or temporarily install exactly `better-sqlite3@13.0.3` without modifying package/lock files;
 3. open real SQLite;
 4. create/query an FTS5 virtual table;
-5. pass the corrected-ancestry focused tests covering Golden Dataset, representative corpus, P2-T03A challenge corpus, SearchQuery natural-language compilation, FTS5 index, and P2-T04 evaluator.
+5. pass corrected-ancestry focused tests covering Golden Dataset, representative corpus, P2-T03A challenge corpus, SearchQuery natural-language compilation, FTS5 index, and P2-T04 evaluator.
 
-If any of these fail, do not treat subsequent numbers as valid P2-T04 evidence.
+If any prerequisite fails, do not treat subsequent numbers as valid P2-T04 evidence.
 
 ## Expanded benchmark acceptance
 
@@ -54,7 +66,7 @@ topK = 10
 errorCount = 0
 ```
 
-The exact chunk count is produced by production `canonicalizeParsedArtifact -> chunkParsedArtifact`; do not replace it with a heading-count estimate in final evidence.
+The exact chunk count must come from production `canonicalizeParsedArtifact -> chunkParsedArtifact`. Source inspection predicts 35 challenge chunks from the current heading-delimited fixed material, but that prediction is not the final evidence.
 
 The result must also contain:
 
@@ -100,6 +112,7 @@ git diff --name-status origin/experiment/p2-fts-baseline-report...HEAD
 
 Expected support-only files:
 
+- `.github/workflows/p2-fts-evidence.yml`
 - `scripts/p2-run-fts-baseline.mjs`
 - `scripts/p2-run-fts-evidence.sh`
 - `docs/development/reports/P2-FTS-evidence-harness.md`
@@ -109,4 +122,6 @@ No production Knowledge code, Golden Dataset content, retrieval implementation, 
 
 ## PASS condition
 
-This support task is PASS only when the one-shot command completes on a supported real environment, produces a valid expanded benchmark bundle, and the harness itself has no task-attributable gate/scope failure. P2-T04 acceptance remains separately governed by PR #36 and its own verification requirements.
+This support task is PASS only when at least one supported real execution completes the focused tests and produces a valid expanded benchmark bundle, and the harness itself has no task-attributable gate/scope failure.
+
+P2-T04 acceptance remains separately governed by PR #36. GitHub Actions can provide quality/reproducibility evidence; target Omarchy remains the authority for machine-specific resource measurements when those matter to ADR-029.

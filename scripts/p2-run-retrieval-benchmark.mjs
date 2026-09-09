@@ -134,7 +134,11 @@ try {
       canonical.canonicalTextSha256,
       FIXED_NOW,
     );
-    indexedArtifacts.push({ record, canonical });
+    indexedArtifacts.push({
+      corpusName: CORPUS_RECORDS[index],
+      record,
+      canonical,
+    });
   }
 
   const publisher = new IndexBuildPublisher(db, {
@@ -148,11 +152,11 @@ try {
   let totalChunks = 0;
   let challengeChunks = 0;
   const chunksByRecord = {};
-  for (const { record, canonical } of indexedArtifacts) {
+  for (const { corpusName, record, canonical } of indexedArtifacts) {
     const chunks = chunkParsedArtifact(canonical);
     chunksByRecord[record.id] = chunks.length;
     totalChunks += chunks.length;
-    if (record.id.startsWith("challenge-")) challengeChunks += chunks.length;
+    if (CHALLENGE_RECORDS.includes(corpusName)) challengeChunks += chunks.length;
     fts.replaceArtifactChunks({
       knowledgeWorkspaceId: WORKSPACE_ID,
       indexBuildId: BUILD_ID,

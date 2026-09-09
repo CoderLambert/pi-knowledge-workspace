@@ -14,8 +14,8 @@ describe("SourceEvidenceViewer UTF-8 preview", () => {
     const text = "# 指南\n正文";
     const bytes = new TextEncoder().encode(text);
     const db = {
-      exec() {},
-      close() {},
+      exec() { return undefined; },
+      close() { return undefined; },
       pragma() { return undefined; },
       prepare(sql: string): SqliteStatement {
         return {

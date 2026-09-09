@@ -28,8 +28,8 @@ interface VersionRow {
 class SourceDatabase implements KnowledgeDatabase {
   readonly sources: SourceRow[] = [];
   readonly versions: VersionRow[] = [];
-  exec(): void {}
-  close(): void {}
+  exec(): void { /* no-op test database */ }
+  close(): void { /* no-op test database */ }
   pragma(): unknown { return undefined; }
 
   prepare(sql: string): SqliteStatement {
@@ -124,7 +124,7 @@ async function fixture() {
   let id = 0;
   let time = 0;
   const domain = new SourceDomain(db, new ContentAddressedBlobStore(root), {
-    createId: () => `id-${++id}`,
+    createId: () => `id-${String(++id)}`,
     now: () => new Date(Date.UTC(2026, 8, 9, 0, 0, time++)),
   });
   return { db, domain };

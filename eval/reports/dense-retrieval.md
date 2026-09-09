@@ -35,13 +35,13 @@ Runtime on the final verification run: GitHub Ubuntu 24.04, Python 3.12.14, `sen
 
 ## Real development evidence
 
-Canonical final verification: GitHub Actions `P2 Dense Evidence` run **34328138559**, task head `348b099bf65b1db71dfe1dd7af2137386a71f883`, artifact **10094742493**, artifact digest `sha256:74aa523dc5189e7a9054782f07eb4703e0924ae176a0b253aaccd827eab985bf`.
+Canonical final revalidation: GitHub Actions `P2 Dense Evidence` run **34328197349**, artifact **10094752313**, artifact digest `sha256:d730bcc8ea55dc1647a5312ab38d2a10ba74e28d09daabffeb2322cd338ae0ff`.
 
 | Variant | Recall@10 | MRR | Coverage | Rank distribution | median / p95 / max query ms | Peak RSS | Document vector bytes |
 | --- | ---: | ---: | ---: | --- | --- | ---: | ---: |
 | FTS baseline | 1.0 | 0.9365079365079365 | 1.0 | 37 R1 / 4 R2 / 1 R3 / 0 miss | 0.774 / 1.318 / 2.833 | 83,435,520 B | n/a |
-| E5 small | 0.9523809523809523 | 0.8462301587301588 | 0.9523809523809523 | 33 R1 / 3 R2 / 2 R3 / 2 R4-10 / 2 miss | 12.869 / 14.462 / 14.471 | 1,656,815,616 B | 58,368 B |
-| Multilingual MiniLM | 0.9285714285714286 | 0.7633219954648526 | 0.9285714285714286 | 28 R1 / 5 R2 / 3 R3 / 3 R4-10 / 3 miss | 13.021 / 14.410 / 14.675 | 1,850,695,680 B | 58,368 B |
+| E5 small | 0.9523809523809523 | 0.8462301587301588 | 0.9523809523809523 | 33 R1 / 3 R2 / 2 R3 / 2 R4-10 / 2 miss | 22.745 / 25.012 / 25.421 | 1,628,319,744 B | 58,368 B |
+| Multilingual MiniLM | 0.9285714285714286 | 0.7633219954648526 | 0.9285714285714286 | 28 R1 / 5 R2 / 3 R3 / 3 R4-10 / 3 miss | 21.626 / 24.345 / 24.901 | 1,838,788,608 B | 58,368 B |
 
 E5 deltas vs FTS:
 
@@ -59,20 +59,15 @@ MRR:       -0.17318594104308394
 coverage:  -0.0714285714285714
 ```
 
-E5 load/build costs on the final run:
+Latest runner-specific embedding costs:
 
 ```text
-model load: 8786.436 ms
-warmup: 29.680 ms
-document embedding/build: 561.974 ms
-```
-
-MiniLM:
-
-```text
-model load: 7374.032 ms
-warmup: 16.570 ms
-document embedding/build: 465.700 ms
+E5 model load: 4146.523 ms
+E5 warmup: 50.177 ms
+E5 document embedding/build: 1097.615 ms
+MiniLM model load: 3733.165 ms
+MiniLM warmup: 25.750 ms
+MiniLM document embedding/build: 909.240 ms
 ```
 
 These latency/RSS measurements are GitHub-runner-specific and are not Omarchy target-machine claims. Target-machine Dense performance does not block the decision because Dense already fails the quality gate.
@@ -122,9 +117,10 @@ Final run:
 ```text
 focused contract + ancestry tests: 6 files PASS / 19 tests PASS
 P2-T06 task-owned lint errors: 0
+broad lint: 278 inherited errors
 ```
 
-The earlier run exposed three P2-T06-owned lint findings; they were repaired with semantics-preserving changes and the full model evidence was rerun. The final lint output contains 278 inherited errors and **no `denseRetrievalAdapter*` failures**.
+The earlier evidence run exposed three P2-T06-owned lint findings; they were repaired with semantics-preserving changes and the full model evidence was rerun. The final lint output contains **no `denseRetrievalAdapter*` failures**.
 
 Repository typecheck/build/pack remain blocked by inherited `viewerDispatch` / storage baseline errors; knip also reports inherited findings. They were not modified for green CI.
 

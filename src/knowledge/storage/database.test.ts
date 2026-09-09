@@ -28,7 +28,7 @@ class FakeDatabase implements MigrationDatabase {
 }
 
 describe("Knowledge database migrations", () => {
-  it("creates Evidence Core and advances through the durable-job schema", () => {
+  it("creates Evidence Core and advances through atomic IndexBuild publication", () => {
     const db = new FakeDatabase();
     applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);
 
@@ -76,6 +76,14 @@ describe("Knowledge database migrations", () => {
     expect(jobMigration).toContain("deadline_at");
     expect(jobMigration).toContain("error_json");
     expect(jobMigration).toContain("jobs_status_lease_idx");
+
+    const publicationMigration = db.execLog.find((sql) => sql.includes("index_publication_migration_guard")) ?? "";
+    expect(publicationMigration).toContain("active_index_build_id");
+    expect(publicationMigration).toContain("index_generation");
+    expect(publicationMigration).toContain("base_generation");
+    expect(publicationMigration).toContain("base_active_build_id");
+    expect(publicationMigration).toContain("validated_at");
+    expect(publicationMigration).toContain("published_at");
     expect(db.execLog.at(-1)).toBe("COMMIT");
   });
 
@@ -89,6 +97,7 @@ describe("Knowledge database migrations", () => {
     expect(db.execLog.some((sql) => sql.includes("evidence_migration_guard"))).toBe(true);
     expect(db.execLog.some((sql) => sql.includes("chunks_migration_guard"))).toBe(true);
     expect(db.execLog.some((sql) => sql.includes("lease_expires_at"))).toBe(true);
+    expect(db.execLog.some((sql) => sql.includes("index_publication_migration_guard"))).toBe(true);
   });
 
   it("is idempotent when the database is already current", () => {
@@ -134,6 +143,12 @@ describe("Knowledge database migrations", () => {
     jobFailure.failOn = "lease_expires_at";
     expect(() => applyMigrations(jobFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 5/);
     expect(jobFailure.userVersion).toBe(4);
+
+    const publicationFailure = new FakeDatabase();
+    publicationFailure.userVersion = 5;
+    publicationFailure.failOn = "index_publication_migration_guard";
+    expect(() => applyMigrations(publicationFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 6/);
+    expect(publicationFailure.userVersion).toBe(5);
   });
 });
 

@@ -1,6 +1,6 @@
 # P2 FTS evidence harness
 
-Status: **IMPLEMENTED / EXECUTION IN CI OR TARGET ENVIRONMENT**
+Status: **EXECUTED / CI EVIDENCE RECORDED / TARGET PERFORMANCE OPEN**
 
 Branch: `chore/p2-fts-evidence-harness`  
 Direct base: `experiment/p2-fts-baseline-report` (P2-T04 / PR #36)
@@ -45,7 +45,7 @@ The benchmark composes the real code path:
 
 It verifies corpus hashes/parser fingerprints, requires at least 10 chunks per challenge artifact and 30 challenge chunks total, uses the propagated natural-language FTS compiler, and preserves active IndexBuild lease semantics through the normal `SearchQueryApi` implementation.
 
-A source-level audit of the current production chunker confirms that heading-delimited sections become separate chunks when each section is below the 2,400-byte target. The fixed challenge material has 13 / 11 / 11 sections, so its expected production shape is 35 challenge chunks. This is only an audit prediction; the generated evidence must record the actual runtime chunk count.
+A source-level audit of the current production chunker confirms that heading-delimited sections become separate chunks when each section is below the 2,400-byte target. The fixed challenge material has 13 / 11 / 11 sections, so its expected production shape is 35 challenge chunks. This prediction was confirmed by the real CI run below.
 
 ## Evidence outputs
 
@@ -66,7 +66,7 @@ Primary files:
 
 The JSON contains exact repository/runtime provenance, chunk counts, query-error counts, FTS metrics, rank distribution, development non-rank-1 diagnostics, split-level no-answer hit counts, and SQLite `dbstat` allocation.
 
-Holdout per-query identities/hit lists are deliberately not emitted, reducing accidental tuning leakage. Holdout remains aggregate acceptance evidence.
+Holdout per-query identities/hit lists are deliberately not emitted. The already-produced aggregate holdout values are acceptance-only evidence and must not be used to select P2-T05/P2-T06/P2-T08 configuration. Development diagnostics are the only tuning input.
 
 ## Dependency handling
 
@@ -81,19 +81,86 @@ This changes only the execution environment's `node_modules` and does not claim 
 
 ## GitHub Actions evidence
 
-`.github/workflows/p2-fts-evidence.yml` runs the same one-shot harness on `ubuntu-latest` with Node 24 and uploads the full evidence directory as `p2-t04-expanded-fts-evidence` even when a later repository gate fails.
+Successful evidence run: GitHub Actions run `34320914371`, job `102367113008`, artifact `10091833384` (`p2-t04-expanded-fts-evidence`).
 
-Linux CI evidence is valid for retrieval correctness, real SQLite/FTS behavior, chunk pressure, metric math, and reproducibility on the tested runner. Its latency/RSS values are **CI-runner measurements**, not target Omarchy performance acceptance.
+PR head when triggered: `813a009d51acd7340818b7f88279a681c02c131f`. GitHub checked out the PR merge ref, so the benchmark's recorded repository SHA is merge commit `24798b26c72ff6f67ed7ee3fe79dcf129b084a57`.
 
-## Gate behavior
+Runtime:
 
-Focused corrected-ancestry tests are mandatory before the benchmark. Repository-wide gates run afterwards and each exit code/log is preserved even if inherited PI WEB failures remain. The harness does not repair unrelated failures merely to obtain green.
+- Ubuntu 24.04 GitHub-hosted runner;
+- Node `v24.20.0`;
+- `better-sqlite3@13.0.3`;
+- SQLite `3.53.4`;
+- FTS5 probe: PASS.
 
-## Verification state
+Focused corrected-ancestry tests: **25/25 PASS across 7 files**.
 
-The script sources were syntax-checked when authored:
+Real expanded corpus:
 
-- benchmark source `node --check`: PASS;
-- wrapper source `bash -n`: PASS.
+- original artifacts: 3;
+- challenge artifacts: 3;
+- original chunks: 3;
+- challenge chunks: 35 (`13 / 11 / 11`);
+- total chunks: 38;
+- fixed queries executed: 80;
+- query errors: 0.
 
-The original automation container cannot resolve `github.com`, so it cannot itself install dependencies. The dedicated GitHub Actions workflow is the autonomous execution path; a target-machine run remains separately useful for Omarchy-specific resource evidence.
+Measured overall acceptance metrics from this frozen baseline run:
+
+- Recall@10: **1.0**;
+- MRR: **0.928921568627451**;
+- all-required Evidence coverage: **1.0**;
+- category failures: **none**;
+- answerable queries: 68;
+- no-answer queries: 12;
+- no-answer queries returning at least one lexical hit: 12;
+- rank distribution: 59 rank-1, 7 rank-2, 2 rank-3, 0 rank-4..10, 0 misses.
+
+Development-only rank diagnostics:
+
+- answerable development queries: 42;
+- rank-1: 37;
+- rank-2: 4;
+- rank-3: 1;
+- miss: 0;
+- non-rank-1 query ids: `dev-026`, `dev-028`, `dev-034`, `dev-040`, `dev-042`.
+
+Runner-specific resource evidence:
+
+- latency median: **0.777354 ms**;
+- latency p95: **1.697253 ms**;
+- latency max: **11.47536 ms**;
+- peak RSS: **106,168,320 bytes**;
+- SQLite `dbstat` FTS allocation: **49,152 bytes**.
+
+`dbstat` allocation breakdown:
+
+- `chunk_fts_config`: 4,096 bytes;
+- `chunk_fts_content`: 20,480 bytes;
+- `chunk_fts_data`: 16,384 bytes;
+- `chunk_fts_docsize`: 4,096 bytes;
+- `chunk_fts_idx`: 4,096 bytes.
+
+Linux CI evidence is valid for retrieval correctness, real SQLite/FTS behavior, challenge chunk pressure, metric math, query-compiler execution path, lease-preserving `SearchQueryApi` behavior, and reproducibility on the tested runner. These latency/RSS figures are **not** relabeled as target Omarchy performance acceptance.
+
+## Gate behavior and inherited failures
+
+The dedicated evidence workflow intentionally skipped duplicate repository-wide gates and delegated them to the normal CI run on the same PR.
+
+Normal CI run `34320914339` failed first at inherited TypeScript errors outside this support PR's five-file scope, including `viewerDispatch.ts`, `chunker.test.ts`, `evidence.test.ts`, and `sourceEvidenceViewer.test.ts`. Build/package steps were therefore skipped by the normal CI workflow. These failures are not attributable to the evidence-harness diff and are not patched here merely to obtain green.
+
+The support PR's direct-base diff remains exactly five evidence-only files; no production Knowledge code, Golden Dataset query/label content, retrieval profile, Dense/vector/RRF code, ADR, or P3 implementation is changed.
+
+## Current verification classification
+
+**CI retrieval evidence: PASS.**
+
+**Repository-wide normal CI: inherited baseline failure, not P2-T04-attributable.**
+
+**Target Omarchy resource acceptance: OPEN.** The same one-shot command remains the reproducible target-machine path:
+
+```bash
+bash scripts/p2-run-fts-evidence.sh
+```
+
+The target run is needed only for target-specific resource/operational evidence; it is no longer needed to prove the deterministic FTS retrieval-quality rows already established by GitHub Actions.

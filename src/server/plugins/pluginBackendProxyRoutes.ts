@@ -24,6 +24,12 @@ export function registerPluginBackendProxyRoutes(app: FastifyInstance, daemon: S
 /** Browser-facing package-paired route; package and workspace authority stay in sessiond. */
 export function registerPairedPluginBackendProxyRoutes(app: FastifyInstance, daemon: SessionDaemonRequestClient): void {
   registerPluginBackendProxyRoutesAt(app, daemon, PAIRED_PLUGIN_BACKEND_REQUEST_ROUTE_PATH, "paired-plugin-backends");
+  registerPluginBackendProxyRoutesAt(
+    app,
+    daemon,
+    `/machines/local${PAIRED_PLUGIN_BACKEND_REQUEST_ROUTE_PATH}`,
+    "paired-plugin-backends",
+  );
 }
 
 function registerPluginBackendProxyRoutesAt(

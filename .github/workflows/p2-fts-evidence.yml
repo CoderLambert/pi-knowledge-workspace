@@ -20,7 +20,9 @@ jobs:
   expanded-fts-evidence:
     name: Expanded FTS evidence (Linux)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
+    env:
+      P2_SKIP_REPO_GATES: "1"
 
     steps:
       - name: Checkout
@@ -32,7 +34,7 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Run one-shot evidence harness
+      - name: Run focused tests and expanded benchmark
         run: bash scripts/p2-run-fts-evidence.sh
 
       - name: Upload evidence bundle

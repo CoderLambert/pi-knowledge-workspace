@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/p2-direct-file-pi-evidence.yml"
       - "scripts/p2-run-direct-file-pi-baseline.mjs"
+      - "scripts/p2-review-direct-file-pi-baseline.mjs"
       - "src/knowledge/eval/directFilePiBaseline.ts"
       - "src/knowledge/eval/directFilePiBaseline.test.ts"
       - "eval/corpus/**"
@@ -39,7 +40,10 @@ jobs:
         run: npm test -- src/knowledge/eval/directFilePiBaseline.test.ts
 
       - name: Focused P2-T10 lint
-        run: npx eslint src/knowledge/eval/directFilePiBaseline.ts src/knowledge/eval/directFilePiBaseline.test.ts
+        run: npx eslint src/knowledge/eval/directFilePiBaseline.ts src/knowledge/eval/directFilePiBaseline.test.ts scripts/p2-review-direct-file-pi-baseline.mjs
+
+      - name: Review helper syntax check
+        run: node --check scripts/p2-review-direct-file-pi-baseline.mjs
 
       - name: Prepare frozen tasks without provider access
         env:

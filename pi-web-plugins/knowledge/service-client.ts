@@ -96,7 +96,7 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
     options.maxResponseBytes ?? KNOWLEDGE_SERVICE_DEFAULT_MAX_RESPONSE_BYTES,
     "maxResponseBytes",
   );
-  const fetchImpl = options.fetchImpl ?? undiciFetch;
+  const fetchImpl = options.fetchImpl ?? (undiciFetch as FetchLike);
   const baseUrl = `http://${formatHost(host)}:${String(port)}`;
 
   return Object.freeze({
@@ -135,9 +135,16 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
           deadlineSignal,
         );
         const responseBody = await readBoundedJsonBody(response, maxResponseBytes);
-        requireCorrelatedRequestId(response, requestId);
         const envelope = requireRecord(responseBody, "pi-knowledge dispatch response");
         requireProtocolVersion(envelope);
+
+        if (envelope["ok"] === false) {
+          const responseRequestId = requireBoundedRequestId(envelope["requestId"]);
+          requireCorrelatedRequestId(response, responseRequestId);
+          throwRemoteError(envelope);
+        }
+
+        requireCorrelatedRequestId(response, requestId);
         if (envelope["requestId"] !== requestId) {
           throw new KnowledgeServiceClientError(
             "PROTOCOL_INVALID",
@@ -145,7 +152,6 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
           );
         }
 
-        if (envelope["ok"] === false) throwRemoteError(envelope);
         if (!response.ok) {
           throw new KnowledgeServiceClientError(
             "PROTOCOL_INVALID",

@@ -35,8 +35,12 @@ describe("UTF-8 stable byte ranges", () => {
     const range = { startByte: 1, endByte: 5 };
 
     expect(extractExactQuote(input, range)).toBe("😀");
-    expect(() => assertValidUtf8Range(input, { startByte: 2, endByte: 5 })).toThrow(InvalidUtf8RangeError);
-    expect(() => assertValidUtf8Range(input, { startByte: 1, endByte: 4 })).toThrow(InvalidUtf8RangeError);
+    expect(() => {
+      assertValidUtf8Range(input, { startByte: 2, endByte: 5 });
+    }).toThrow(InvalidUtf8RangeError);
+    expect(() => {
+      assertValidUtf8Range(input, { startByte: 1, endByte: 4 });
+    }).toThrow(InvalidUtf8RangeError);
   });
 
   it("preserves combining characters without grapheme or Unicode normalization", () => {
@@ -74,11 +78,17 @@ describe("UTF-8 stable byte ranges", () => {
   it("rejects invalid offsets, invalid boundaries and invalid canonical UTF-8", () => {
     const input = bytes("中文");
 
-    expect(() => assertValidUtf8Range(input, { startByte: -1, endByte: 3 })).toThrow(InvalidUtf8RangeError);
-    expect(() => assertValidUtf8Range(input, { startByte: 3, endByte: 7 })).toThrow(InvalidUtf8RangeError);
-    expect(() => assertValidUtf8Range(input, { startByte: 4, endByte: 6 })).toThrow(InvalidUtf8RangeError);
-    expect(() => assertValidUtf8Range(Uint8Array.from([0xc3, 0x28]), { startByte: 0, endByte: 2 })).toThrow(
-      InvalidUtf8RangeError,
-    );
+    expect(() => {
+      assertValidUtf8Range(input, { startByte: -1, endByte: 3 });
+    }).toThrow(InvalidUtf8RangeError);
+    expect(() => {
+      assertValidUtf8Range(input, { startByte: 3, endByte: 7 });
+    }).toThrow(InvalidUtf8RangeError);
+    expect(() => {
+      assertValidUtf8Range(input, { startByte: 4, endByte: 6 });
+    }).toThrow(InvalidUtf8RangeError);
+    expect(() => {
+      assertValidUtf8Range(Uint8Array.from([0xc3, 0x28]), { startByte: 0, endByte: 2 });
+    }).toThrow(InvalidUtf8RangeError);
   });
 });

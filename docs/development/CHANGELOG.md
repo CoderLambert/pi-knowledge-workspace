@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P1-T08 — PARTIAL
+
+- Added deterministic MD/TXT ParsedArtifact canonicalization from immutable SourceVersion/blob bytes only; mutable Workspace paths are never reopened during parsing.
+- Canonicalization validates UTF-8, strips an optional BOM, normalizes CRLF/lone CR to LF, preserves all other UTF-8 bytes, emits source mapping plus Markdown/TXT structural byte ranges, and fingerprints parser/normalization behavior.
+- Added seven focused contract scenarios covering LF/CRLF/BOM, Chinese/emoji/combining characters, duplicated text, code/headings/lists/tables, TXT semantics, invalid UTF-8, deterministic artifact identity and SourceVersion/blob integrity. Executable/static/build evidence remains OPEN verification debt; P1-T09 may proceed against the documented canonical-byte contract.
+
 ### P1-T07 — PARTIAL
 
 - Added schema v2 and a durable MD/TXT import-job path with Workspace-scoped idempotency keys, Source binding, attempt records, explicit retry, queued/in-flight cancellation, result persistence and restart recovery of interrupted jobs.

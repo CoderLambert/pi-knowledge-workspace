@@ -156,3 +156,5 @@ The full Open WebUI benchmark is not required to close this product question bec
 ADR-029 must no longer be blocked on “complete both product benchmarks.” It must instead finalize the canonical Knowledge boundary and the evidence-backed V1 retrieval strategy.
 
 P3 remains prohibited until ADR-029 is formally Accepted.
+
+Do not restart broad product benchmarking solely to satisfy the superseded comparison checklist. No automatic merge.

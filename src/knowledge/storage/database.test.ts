@@ -28,7 +28,7 @@ class FakeDatabase implements MigrationDatabase {
 }
 
 describe("Knowledge database migrations", () => {
-  it("creates the Evidence Core schema and advances through stable Evidence byte addressing", () => {
+  it("creates Evidence Core and advances through the scoped FTS5 baseline schema", () => {
     const db = new FakeDatabase();
     applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);
 
@@ -49,19 +49,24 @@ describe("Knowledge database migrations", () => {
     ]) {
       expect(schema).toContain(`CREATE TABLE ${table}`);
     }
+
     const importMigration = db.execLog.find((sql) => sql.includes("idempotency_key")) ?? "";
     expect(importMigration).toContain("cancel_requested");
     expect(importMigration).toContain("result_json");
-    expect(importMigration).toContain("jobs_workspace_kind_idempotency_idx");
 
-    const evidenceMigration = db.execLog.find((sql) => sql.includes("stable-evidence-byte-addressing")) ??
-      db.execLog.find((sql) => sql.includes("evidence_migration_guard")) ?? "";
+    const evidenceMigration = db.execLog.find((sql) => sql.includes("evidence_migration_guard")) ?? "";
     expect(evidenceMigration).toContain("parsed_artifact_id");
-    expect(evidenceMigration).toContain("start_byte");
-    expect(evidenceMigration).toContain("end_byte");
     expect(evidenceMigration).toContain("exact_quote");
     expect(evidenceMigration).toContain("quote_hash");
     expect(evidenceMigration).toContain("locator_snapshot");
+
+    const ftsMigration = db.execLog.find((sql) => sql.includes("chunks_migration_guard")) ?? "";
+    expect(ftsMigration).toContain("index_build_id");
+    expect(ftsMigration).toContain("source_version_id");
+    expect(ftsMigration).toContain("start_byte");
+    expect(ftsMigration).toContain("end_byte");
+    expect(ftsMigration).toContain("CREATE VIRTUAL TABLE chunk_fts USING fts5");
+    expect(ftsMigration).toContain("tokenize = 'unicode61'");
     expect(db.execLog.at(-1)).toBe("COMMIT");
   });
 
@@ -73,6 +78,7 @@ describe("Knowledge database migrations", () => {
     expect(db.execLog.some((sql) => sql.includes("CREATE TABLE installations"))).toBe(false);
     expect(db.execLog.some((sql) => sql.includes("idempotency_key"))).toBe(true);
     expect(db.execLog.some((sql) => sql.includes("evidence_migration_guard"))).toBe(true);
+    expect(db.execLog.some((sql) => sql.includes("chunks_migration_guard"))).toBe(true);
   });
 
   it("is idempotent when the database is already current", () => {
@@ -89,7 +95,7 @@ describe("Knowledge database migrations", () => {
     expect(db.execLog).toEqual([]);
   });
 
-  it("rolls back a failed migration and preserves the previously committed schema version", () => {
+  it("rolls back failed migrations and preserves the previously committed schema version", () => {
     const initialFailure = new FakeDatabase();
     initialFailure.failOn = "CREATE TABLE installations";
     expect(() => applyMigrations(initialFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 1/);
@@ -106,6 +112,12 @@ describe("Knowledge database migrations", () => {
     evidenceFailure.failOn = "evidence_migration_guard";
     expect(() => applyMigrations(evidenceFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 3/);
     expect(evidenceFailure.userVersion).toBe(2);
+
+    const ftsFailure = new FakeDatabase();
+    ftsFailure.userVersion = 3;
+    ftsFailure.failOn = "chunks_migration_guard";
+    expect(() => applyMigrations(ftsFailure, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 4/);
+    expect(ftsFailure.userVersion).toBe(3);
   });
 });
 

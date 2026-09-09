@@ -147,6 +147,42 @@ CREATE INDEX evidence_workspace_idx ON evidence(knowledge_workspace_id);
 CREATE INDEX evidence_artifact_range_idx ON evidence(parsed_artifact_id, start_byte, end_byte);
 `,
   },
+  {
+    version: 4,
+    name: "fts5-baseline-index",
+    sql: `
+CREATE TABLE chunks_migration_guard (
+  row_count INTEGER NOT NULL CHECK (row_count = 0)
+);
+INSERT INTO chunks_migration_guard(row_count) SELECT COUNT(*) FROM chunks;
+DROP TABLE chunks_migration_guard;
+DROP TABLE chunks;
+CREATE TABLE chunks (
+  id TEXT PRIMARY KEY,
+  index_build_id TEXT NOT NULL REFERENCES index_builds(id),
+  parsed_artifact_id TEXT NOT NULL REFERENCES parsed_artifacts(id),
+  source_version_id TEXT NOT NULL REFERENCES source_versions(id),
+  ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+  text TEXT NOT NULL,
+  start_byte INTEGER NOT NULL CHECK (start_byte >= 0),
+  end_byte INTEGER NOT NULL CHECK (end_byte > start_byte),
+  node_kinds_json TEXT NOT NULL CHECK (json_valid(node_kinds_json)),
+  created_at TEXT NOT NULL,
+  UNIQUE (index_build_id, parsed_artifact_id, ordinal)
+);
+CREATE INDEX chunks_artifact_idx ON chunks(parsed_artifact_id);
+CREATE INDEX chunks_build_source_idx ON chunks(index_build_id, source_version_id);
+CREATE VIRTUAL TABLE chunk_fts USING fts5(
+  chunk_id UNINDEXED,
+  knowledge_workspace_id UNINDEXED,
+  source_version_id UNINDEXED,
+  parsed_artifact_id UNINDEXED,
+  index_build_id UNINDEXED,
+  text,
+  tokenize = 'unicode61'
+);
+`,
+  },
 ];
 
 function readUserVersion(db: MigrationDatabase): number {

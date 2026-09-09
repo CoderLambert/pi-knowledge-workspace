@@ -1,6 +1,6 @@
 # P2-T10 — Direct-file Pi baseline
 
-Status: **PARTIAL — LOCAL REAL RUN + HUMAN REVIEW REQUIRED**
+Status: **PARTIAL — REAL DEVELOPMENT RUN COMPLETE / HUMAN SEMANTIC REVIEW REQUIRED**
 
 ## Objective
 
@@ -32,62 +32,111 @@ Direct-file Pi may cite a file/path plus an exact quote rather than native Stabl
 
 Mapping is valid only when the cited path belongs to the frozen task and the exact quote occurs verbatim and uniquely in that file.
 
-Wrong paths, missing quotes and ambiguous quotes are **not silently discarded**. The observation records `unmappedCitationCount`, which is included in citation-precision denominator. A no-answer response containing any mapped or unmapped citation cannot count as a correct abstention.
+Wrong paths, missing quotes and ambiguous quotes are **not silently discarded**. The observation records `unmappedCitationCount`, which is included in the citation-precision denominator. A no-answer response containing any mapped or unmapped citation cannot count as a correct abstention.
 
-This closes a measurement-integrity gap where dropping invalid citations could otherwise inflate precision or abstention quality.
+## Real local development evidence — 2026-09-09
 
-## Tests written
-
-`directFilePiBaseline.test.ts` covers:
-
-- identical sorted fixed corpus file set for every query;
-- no label fields in task input;
-- deterministic required-Evidence/citation/no-answer/latency scoring;
-- distinction between any-required and all-required coverage for multi-source tasks;
-- unmapped citations penalize citation precision and no-answer abstention;
-- cross-split, duplicate and incomplete observation rejection.
-
-Task-owned test non-null assertions were removed during the citation-accounting cleanup.
-
-## Real-evidence support
-
-Support PR #53 (`chore/p2-t10-direct-file-pi-evidence`) provides a one-command local evidence harness:
+The user executed the canonical support command on Omarchy/Linux:
 
 ```bash
 npx tsx scripts/p2-run-direct-file-pi-baseline.mjs
 ```
 
-The support harness freezes the same six P2 corpus files and 50 development queries, records actual Pi provider/model identity, maps citations post-inference, preserves raw JSON event streams, computes this evaluator's report, and generates a human-review worksheet.
+All 50 fixed development queries completed.
 
-GitHub Actions executes only a `--prepare-only` mode and does not call a model/provider or consume credentials.
+Frozen identity:
 
-## Answer-quality limitation
+```text
+support repo SHA: db71e7c6d746709ce152269b68b020bd05bdb0dd
+dataset hash: 949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3
+system prompt SHA-256: 8db92ab71e29b1f7228a5176e5f3de46f8eab02ad493896bc5a85e5463eddc16
+Pi version: 0.85.1
+provider: openai-codex
+model: gpt-6-astra
+API: openai-codex-responses
+responseModel: null
+thinkingLevel: null
+```
 
-Deterministic citation overlap cannot prove semantic answer correctness. The verification protocol therefore requires a separate human correctness review for claims, version/conflict handling, unsupported statements, no-answer hallucinations and important evidence omissions.
+Deterministic development metrics:
 
-The model under test must not be the sole judge of its own answers.
+```text
+queries: 50
+answerable: 42
+no-answer: 8
+any-required Evidence coverage: 1.0
+all-required Evidence coverage: 1.0
+citation precision: 0.7758620689655172
+no-answer correct abstention: 0.625
+latency median: 10165.077273999981 ms
+latency p95: 14855.569325999997 ms
+latency max: 18050.93610000005 ms
+```
 
-## Report integrity
+Equivalent citation/abstention counts:
 
-`eval/reports/direct-file-pi-baseline.md` remains `UNRUN`. No Pi/model/provider performance result is fabricated in GitHub automation.
+```text
+valid mapped citations: 45 / 58 total mapped+unmapped citations
+correct no-answer abstentions: 5 / 8
+```
 
-P2-T10 remains PARTIAL until:
+The run produced its evidence bundle at:
 
-1. the complete real 50-query development run is recorded;
-2. deterministic citation/Evidence metrics are generated;
-3. independent human semantic review is completed.
+```text
+/tmp/pi-knowledge-p2-evidence/p2-t10
+```
 
-## Dependency assumptions / risk
+including `human-review-development.md`.
 
-P2-T10 depends only on the fixed P2 corpus/query/Stable Evidence dataset and an authenticated local Pi runtime. It does not depend on Dense/sqlite-vec/Hybrid adoption.
+## Interpretation
 
-Provider credentials remain local and must not be copied into repository evidence or CI.
+The direct-file baseline has a mixed result:
+
+- it achieved complete deterministic required-Evidence coverage on answerable development tasks;
+- citation discipline is materially imperfect at about 77.6% precision;
+- three of eight no-answer tasks failed the strict abstention contract;
+- model end-to-end latency was about 10.2 s median / 14.9 s p95 / 18.1 s max.
+
+These observations are product-value evidence, not a reason to retune the fixed P2 retrieval dataset. The direct-file path is not proven equivalent to the Knowledge retrieval design merely because all required Evidence was eventually covered.
+
+P2-T05/P2-T09 remain the retrieval-side comparison point: frozen plain SQLite FTS5 reached development Recall@10 `1.0`, MRR `0.9365079365079365`, and all-required Evidence coverage `1.0`. P2-T06 rejected both Dense candidates as regressions.
+
+Retrieval-only latency and full model-answer latency are different operations and must not be compared as if they measure the same work.
+
+## Tests / deterministic preparation
+
+Support PR #53's final CI preparation run `34332760481` established:
+
+- focused evaluator suite: 1 file / 5 tests PASS;
+- focused P2-T10 lint: PASS;
+- `--prepare-only`: PASS;
+- exactly 50 development tasks / six fixed files;
+- dataset and prompt hashes frozen;
+- no provider/model call or credential use in CI.
+
+Preparation artifact: `10096440773`, digest `sha256:e65d56a823499760e80cbc832d06a1d6b3f789a8228aaaec17771174866dc88f`.
+
+## Remaining acceptance blocker
+
+Deterministic evidence is now complete for the development run, but citation overlap does not prove semantic answer correctness.
+
+The generated `human-review-development.md` must be reviewed independently for every query, recording:
+
+- correct / partially correct / incorrect;
+- unsupported claims;
+- version/conflict mistakes;
+- important evidence omissions;
+- no-answer hallucination/abstention behavior.
+
+The model under test cannot be its own sole judge.
+
+Therefore **P2-T10 remains PARTIAL** until human semantic review is complete. No holdout run is authorized for tuning.
 
 ## Out of scope
 
 - Knowledge retrieval/index calls;
 - changing Pi runtime behavior;
-- automated LLM-as-judge scoring;
+- automated same-model LLM-as-judge scoring;
 - existing-product comparison;
 - retrieval ADR decision;
 - P3 answer runtime implementation.

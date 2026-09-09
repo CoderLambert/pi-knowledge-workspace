@@ -1,7 +1,8 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import type { KnowledgeDatabase } from "./database.js";
 import { Fts5BaselineIndex, type Fts5SearchHit } from "./fts5Index.js";
+import { IndexBuildRetention, type ActiveIndexBuildLease } from "./indexBuildRetention.js";
 
 export interface SearchQueryBudget {
   maxResults: number;
@@ -52,34 +53,24 @@ export interface SearchQueryResult {
 }
 
 export interface SearchIndexBuildResolver {
-  resolve(knowledgeWorkspaceId: string): string;
+  acquire(knowledgeWorkspaceId: string): ActiveIndexBuildLease;
 }
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 100;
+const SEARCH_BUILD_LEASE_MS = 60_000;
 
-/** Resolves only the Workspace's atomically published active IndexBuild. */
+/** Atomically resolves and leases the Workspace's published active IndexBuild. */
 export class ActiveIndexBuildResolver implements SearchIndexBuildResolver {
-  constructor(private readonly db: KnowledgeDatabase) {}
+  private readonly retention: IndexBuildRetention;
 
-  resolve(knowledgeWorkspaceId: string): string {
+  constructor(db: KnowledgeDatabase, retention: IndexBuildRetention = new IndexBuildRetention(db)) {
+    this.retention = retention;
+  }
+
+  acquire(knowledgeWorkspaceId: string): ActiveIndexBuildLease {
     const workspaceId = requireNonEmpty(knowledgeWorkspaceId, "knowledgeWorkspaceId");
-    const row = this.db
-      .prepare(`
-SELECT ib.id
-FROM knowledge_workspaces kw
-JOIN index_builds ib ON ib.id = kw.active_index_build_id
-WHERE kw.id = ?
-  AND ib.knowledge_workspace_id = kw.id
-  AND ib.status = 'active'
-  AND ib.published_at IS NOT NULL
-LIMIT 1
-`)
-      .get(workspaceId) as { id?: unknown } | undefined;
-    if (!row || typeof row.id !== "string" || row.id.trim().length === 0) {
-      throw new Error(`No active IndexBuild is published for Knowledge Workspace: ${workspaceId}`);
-    }
-    return row.id;
+    return this.retention.acquireActiveLease(workspaceId, "search-query", randomUUID(), SEARCH_BUILD_LEASE_MS);
   }
 }
 
@@ -100,26 +91,28 @@ export class SearchQueryApi {
       : validateLimit(input.budget.maxResults, "budget.maxResults");
     const effectiveLimit = Math.min(requestedLimit, budgetLimit);
     const allowedSourceVersionIds = normalizeAllowedSourceVersions(input.allowedSourceVersionIds);
-    const indexBuildId = this.buildResolver.resolve(knowledgeWorkspaceId);
+    const lease = this.buildResolver.acquire(knowledgeWorkspaceId);
 
-    const queryHandle = stableHandle("query", {
-      knowledgeWorkspaceId,
-      query,
-      allowedSourceVersionIds,
-      requestedLimit,
-      budgetLimit,
-    });
-    const runHandle = stableHandle("run", { queryHandle, indexBuildId });
+    try {
+      const indexBuildId = lease.indexBuildId;
+      const queryHandle = stableHandle("query", {
+        knowledgeWorkspaceId,
+        query,
+        allowedSourceVersionIds,
+        requestedLimit,
+        budgetLimit,
+      });
+      const runHandle = stableHandle("run", { queryHandle, indexBuildId });
 
-    const lexicalHits = this.index.search({
-      knowledgeWorkspaceId,
-      indexBuildId,
-      query,
-      ...(allowedSourceVersionIds === undefined ? {} : { allowedSourceVersionIds }),
-      limit: effectiveLimit,
-    });
+      const lexicalHits = this.index.search({
+        knowledgeWorkspaceId,
+        indexBuildId,
+        query,
+        ...(allowedSourceVersionIds === undefined ? {} : { allowedSourceVersionIds }),
+        limit: effectiveLimit,
+      });
 
-    const metadataStatement = this.db.prepare(`
+      const metadataStatement = this.db.prepare(`
 SELECT
   c.id AS chunk_id,
   c.source_version_id,
@@ -141,29 +134,32 @@ WHERE c.id = ?
   AND s.knowledge_workspace_id = ?
 `);
 
-    const hits = lexicalHits.map((hit) => {
-      const row = metadataStatement.get(
-        hit.chunkId,
-        indexBuildId,
-        hit.sourceVersionId,
-        hit.parsedArtifactId,
-        knowledgeWorkspaceId,
-      );
-      return hydrateHit(hit, row);
-    });
+      const hits = lexicalHits.map((hit) => {
+        const row = metadataStatement.get(
+          hit.chunkId,
+          indexBuildId,
+          hit.sourceVersionId,
+          hit.parsedArtifactId,
+          knowledgeWorkspaceId,
+        );
+        return hydrateHit(hit, row);
+      });
 
-    return {
-      queryHandle,
-      runHandle,
-      indexBuildId,
-      hits,
-      debug: {
-        backend: "fts5",
-        requestedLimit,
-        effectiveLimit,
-        allowedSourceVersionCount: allowedSourceVersionIds?.length ?? null,
-      },
-    };
+      return {
+        queryHandle,
+        runHandle,
+        indexBuildId,
+        hits,
+        debug: {
+          backend: "fts5",
+          requestedLimit,
+          effectiveLimit,
+          allowedSourceVersionCount: allowedSourceVersionIds?.length ?? null,
+        },
+      };
+    } finally {
+      lease.release();
+    }
   }
 }
 

@@ -69,7 +69,6 @@ export function runRetrievalBenchmark(
 }
 
 export function renderRetrievalBenchmarkMarkdown(report: RetrievalBenchmarkReport): string {
-  if (report.schemaVersion !== 1) throw new Error("Unsupported retrieval benchmark report schema");
   requireTimestamp(report.generatedAt);
   const lines: string[] = [
     "# Retrieval Benchmark Report",

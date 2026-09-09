@@ -2,9 +2,11 @@
 
 Status: **BLOCKED ON ARCHITECTURE CONTRACT FINALIZATION**
 
-## Retrieval result — settled for V1
+## Current position
 
-Measured P2 evidence still narrows V1 retrieval to:
+P2 has already answered the narrow retrieval question for V1 and now needs to close the canonical Knowledge boundary before P3.
+
+Measured retrieval evidence supports:
 
 ```text
 SQLite FTS5
@@ -14,7 +16,7 @@ naturalLanguageCompiler = quoted-literal-or
 Top-K = 10
 ```
 
-The tested Dense candidates regressed the frozen FTS comparator. sqlite-vec / Hybrid / Qdrant are therefore not V1 additions under current evidence. They remain reopenable only with new frozen quality/operational evidence.
+The tested Dense candidates regressed the frozen FTS comparator. sqlite-vec / Hybrid / Qdrant are therefore not V1 additions under current evidence. They remain future options only if new frozen quality/operational evidence demonstrates material net benefit.
 
 ## P2-T10 — PASS
 
@@ -26,7 +28,7 @@ Direct-file Pi evidence remains accepted:
 no material version/conflict mistakes
 ```
 
-This also reinforces that no-answer/negative-evidence discipline is not automatically a retrieval-backend problem.
+This reinforces that no-answer / negative-evidence discipline is not automatically a retrieval-backend problem.
 
 ## P2-T11 — PASS on decision sufficiency
 
@@ -94,5 +96,7 @@ These are architecture/code questions, not reasons to resume broad mature-produc
 ADR-029 remains **BLOCKED**, not Accepted.
 
 P3 remains prohibited until ADR-029 is formally Accepted. A bounded vertical slice may be used as the ADR acceptance proof, but it must not silently expand into ordinary P3 feature work.
+
+Do not restart Open WebUI or other broad product benchmarking merely to satisfy the superseded comparison checklist.
 
 No automatic merge.

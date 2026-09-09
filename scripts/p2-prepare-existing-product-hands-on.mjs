@@ -36,10 +36,12 @@ const products = [
     commit: "2a960a59fe1dbbd35282f0556b3666d81102e781",
     image: "ghcr.io/open-webui/open-webui:v0.11.3",
     files: {
+      auths: "backend/open_webui/routers/auths.py",
       knowledge: "backend/open_webui/routers/knowledge.py",
       files: "backend/open_webui/routers/files.py",
     },
     assertions: [
+      ["auths", "@router.post('/signup'"],
       ["knowledge", "@router.post('/create'"],
       ["knowledge", "@router.post('/{id}/file/add'"],
       ["files", "@router.post('/', response_model=FileModelResponse)"],

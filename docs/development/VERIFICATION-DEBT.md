@@ -157,6 +157,28 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
 - **Dependent tasks:** P1-T05, P1-T07, P1-T20, P1-T21 and all historical-content durability work
 - **Resolution:** pending executable/filesystem verification; later tasks may proceed against the narrow content-addressed contract.
 
+### P1-T05 — Source/SourceVersion domain acceptance
+
+- **Task status:** PARTIAL
+- **Branch:** `feat/p1-source-version-domain`
+- **PR:** #15
+- **Debt status:** OPEN
+- **Why deferred:** the GitHub-only automation environment cannot execute the repository dependency tree or real `better-sqlite3` database; P1-T05 also inherits unresolved P1-T02 native SQLite and P1-T04 blob-store acceptance risk.
+- **Required verification:**
+  1. Run `npm test -- src/knowledge/storage/sourceDomain.test.ts` and confirm 5/5 tests pass.
+  2. Run `npm run typecheck`, `npm run lint`, `npm run knip`, `npm run build`, `npm run pack:dry`, and full `npm test`.
+  3. Run `git diff --check origin/feat/p1-content-addressed-blob-store...HEAD` and confirm the direct-base diff is P1-T05-only.
+  4. With a real file-backed Knowledge DB, create/list/rename/archive a Source and confirm metadata changes create no SourceVersion.
+  5. Capture byte sequence A twice and confirm the same SourceVersion id/row is reused.
+  6. Capture changed bytes B and confirm exactly one new SourceVersion with a different content hash.
+  7. Run concurrent identical captures and confirm `UNIQUE(source_id, content_sha256)` converges on one version.
+  8. Confirm archived Source history remains readable and Workspace A list results never expose Workspace B Sources.
+  9. Confirm every stored `blob_key` is the content address rather than an absolute mutable path and resolves through P1-T04 verified read.
+- **Expected PASS evidence:** focused/static/build/package/full-suite gates show no new P1-T05-attributable failure; real SQLite demonstrates byte-change-only version creation, metadata-only stability, concurrency dedupe, archive preservation and Workspace isolation; blob integrity remains valid.
+- **Assumptions used for continued development:** P1-T02 schema constraints behave as written under the selected SQLite driver; P1-T04 content-addressed publication remains immutable; P1-T06 may feed captured bytes only after performing its own containment, sensitivity, size and race checks.
+- **Dependent tasks:** P1-T06, P1-T07, P1-T08 and all historical SourceVersion consumers
+- **Resolution:** pending executable/SQLite/blob dependency verification; later tasks may proceed against the explicit Source capture contract.
+
 P0-T03 is already fully accepted and remains PASS.
 
 ## Entry template

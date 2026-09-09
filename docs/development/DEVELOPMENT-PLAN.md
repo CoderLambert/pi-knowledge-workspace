@@ -375,7 +375,7 @@ Under the autonomous-development policy P0-T06 may proceed on a separate stacked
 
 ## P0-T06 — Selected Machine / Fleet routing verification
 
-**Status:** TODO
+**Status:** PARTIAL
 
 ### Objective
 
@@ -406,11 +406,15 @@ Gateway instance
 
 Two-local-instance validation proves routing semantics only. It must not be described as real remote Fleet E2E.
 
+### Current state
+
+Repository-owned selected-Machine federation contract coverage exists on PR #8. Required executable, physical two-instance and real Fleet/multi-host evidence remains OPEN verification debt.
+
 ---
 
 ## P0-T07 — Restricted Pi Runtime probe
 
-**Status:** TODO
+**Status:** PARTIAL
 
 ### Objective
 
@@ -449,11 +453,15 @@ project extensions
 command credentials
 ```
 
+### Current state
+
+Repository-owned restricted-runtime probe exists on PR #9 with exact four-tool allowlist tests and hostile-resource discovery checks. Executable repository verification remains OPEN debt.
+
 ---
 
 ## P0-T08 — P0 Gate Review
 
-**Status:** TODO
+**Status:** PARTIAL
 
 ### PASS conditions
 
@@ -469,6 +477,10 @@ command credentials
 ### Stop condition
 
 If Knowledge requires widespread private PI WEB core patches or duplicating Machine/Workspace infrastructure, stop and review architecture before P1.
+
+### Current state
+
+Gate review is documented on PR #10. Architecture remains viable, but P0 is not PASS because P0-T04 through P0-T07 mandatory acceptance debt remains OPEN. Autonomous P1 implementation proceeds only under `AUTONOMOUS-EXECUTION.md`.
 
 ---
 
@@ -492,6 +504,8 @@ Import MD/TXT
 
 ## P1-T01 — SQLite driver decision spike
 
+**Status:** PARTIAL
+
 Compare only the realistic candidates supported by the current runtime, primarily:
 
 ```text
@@ -511,9 +525,13 @@ Evaluate:
 
 Deliver ADR; do not create a generic DB abstraction framework.
 
+Current decision: ADR-028 selects `better-sqlite3` 13.x. Target Omarchy/Linux native binding, FTS5, backup and packaging acceptance remains OPEN verification debt.
+
 ---
 
 ## P1-T02 — Database bootstrap and migrations
+
+**Status:** PARTIAL
 
 Create migration runner and initial schema.
 
@@ -540,9 +558,13 @@ Requirements:
 - incompatible future schema fails closed;
 - transaction helpers.
 
+Current implementation exists on PR #12; real native-driver execution remains unverified.
+
 ---
 
 ## P1-T03 — Knowledge installation / Workspace identity
+
+**Status:** PARTIAL
 
 Implement durable Knowledge identity separate from PI WEB routing identity:
 
@@ -555,9 +577,13 @@ canonical realpath
 
 V1 default: different worktrees are isolated Knowledge Workspaces.
 
+Current implementation exists on PR #13 with contract tests; real SQLite/native-driver execution remains deferred.
+
 ---
 
 ## P1-T04 — Content-addressed blob store
+
+**Status:** PARTIAL
 
 Implement immutable raw-byte storage:
 
@@ -573,9 +599,13 @@ Requirements:
 - verify-on-read tools;
 - partial temp cleanup.
 
+Current implementation exists on PR #14. It uses store-owned SHA-256 addressing, atomic no-overwrite same-directory hard-link publication, repeated/concurrent dedupe, verified reads/tamper failure, strict hash validation and stale store-owned temp cleanup. Six focused tests are written; executable/static/build/filesystem acceptance remains OPEN debt.
+
 ---
 
 ## P1-T05 — Source + SourceVersion domain
+
+**Status:** PARTIAL
 
 Implement:
 
@@ -591,9 +621,13 @@ Invariant:
 
 Metadata edits do not.
 
+Current implementation exists on PR #15. Source metadata operations do not create versions; byte-identical captures reuse the existing `(source_id, content_sha256)` version; changed raw bytes produce a new immutable SourceVersion backed by the P1-T04 content address. Five contract tests are written; executable and real SQLite acceptance remains OPEN debt.
+
 ---
 
 ## P1-T06 — Safe Workspace file reader
+
+**Status:** TODO
 
 Support explicitly selected Workspace files.
 
@@ -1780,13 +1814,22 @@ As of 2026-09-09:
 | P0-T01 | PASS | Integration seams documented and validated by source review. |
 | P0-T02 | PASS | Knowledge paired-plugin skeleton accepted locally; authoritative scope, Workspace switching and worktree path verified. |
 | P0-T03 | PASS | Standalone authenticated loopback service accepted: focused 14/14; strict static/build/package gates PASS; full suite 3752 passed / 1 inherited failed / 2 skipped; real process lifecycle/HTTP/limits PASS. |
-| P0-T04 | PARTIAL | Thin server-plugin adapter and focused tests are implemented on PR #6; executable/static/build and real local adapter acceptance remain OPEN verification debt. |
-| P0-T05 | PARTIAL | Cross-layer local E2E is implemented on PR #7 through the real sessiond paired route and real service; execution plus physical browser/process/failure-switching acceptance remain OPEN verification debt. |
+| P0-T04 | PARTIAL | Thin adapter exists on PR #6; executable/static/build and real local adapter acceptance remain OPEN debt. |
+| P0-T05 | PARTIAL | Cross-layer local E2E exists on PR #7; execution and physical browser/process acceptance remain OPEN debt. |
+| P0-T06 | PARTIAL | Selected-Machine routing contract exists on PR #8; executable/two-instance/Fleet acceptance remains OPEN debt. |
+| P0-T07 | PARTIAL | Restricted Pi runtime probe exists on PR #9; executable verification remains OPEN debt. |
+| P0-T08 | PARTIAL | Gate review exists on PR #10; P0 remains NOT PASS until mandatory P0 debt is resolved. |
+| P1-T01 | PARTIAL | ADR-028 selects better-sqlite3 13.x; target native runtime/FTS5/backup/package acceptance remains OPEN debt. |
+| P1-T02 | PARTIAL | Database bootstrap/migrations implemented on PR #12; real native-driver execution remains unverified. |
+| P1-T03 | PARTIAL | Durable installation/Workspace identity implemented on PR #13; real SQLite acceptance remains unverified. |
+| P1-T04 | PARTIAL | Content-addressed raw-byte blob store implemented on PR #14; executable/filesystem acceptance remains OPEN debt. |
+| P1-T05 | PARTIAL | Source/SourceVersion domain implemented on PR #15; executable/real-SQLite acceptance remains OPEN debt. |
+| P1-T06 | TODO | Next task: safe Workspace file reader. |
 
 Execution mode: **deferred human verification is allowed for development progression**. Tasks with environment-only acceptance still outstanding remain PARTIAL with explicit verification debt, while later tasks may proceed when dependency-safe. Phase/release PASS still requires all mandatory debt for that gate to be cleared.
 
 Current next task:
 
-# **P0-T06 — Selected Machine / Fleet routing verification**
+# **P1-T06 — Safe Workspace file reader**
 
-P0-T06 may proceed as a separate stacked branch against the documented P0-T04/P0-T05 contracts while both remain PARTIAL. Do not begin P1 until the P0 Gate is satisfied.
+P1-T06 may proceed as a separate stacked branch against the documented P1-T05 Source capture contract. It must enforce relative-path, realpath-containment, symlink, sensitive-file, size and file-change-race checks before bytes are eligible for SourceVersion capture.

@@ -25,7 +25,7 @@ import serverPlugin from "./server-plugin.js";
 
 const SERVICE_TOKEN = "p0-t05-local-integration-service-token";
 const KNOWLEDGE_REVISION = "knowledge-p0-t05-r1";
-const closeables: Array<() => Promise<void>> = [];
+const closeables: (() => Promise<void>)[] = [];
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -301,7 +301,7 @@ function clickIntegrationCheck(container: ParentNode): void {
 
 async function startKnowledgeService(
   token: string,
-  port: number = 0,
+  port = 0,
 ): Promise<{ port: number; close: () => Promise<void> }> {
   const app = await buildKnowledgeApp({ token });
   const address = await app.listen({ host: "127.0.0.1", port });
@@ -328,57 +328,50 @@ async function startIncompatibleProtocolService(): Promise<{
       let operation: string | undefined;
       if (raw !== "") {
         const parsed: unknown = JSON.parse(raw);
-        if (isRecord(parsed) && typeof parsed["requestId"] === "string") requestId = parsed["requestId"];
-        if (isRecord(parsed) && typeof parsed["operation"] === "string") operation = parsed["operation"];
+        if (isRecord(parsed)) {
+          const rawRequestId = parsed["requestId"];
+          const rawOperation = parsed["operation"];
+          if (typeof rawRequestId === "string") requestId = rawRequestId;
+          if (typeof rawOperation === "string") operation = rawOperation;
+        }
       }
-      response.statusCode = 200;
       response.setHeader("content-type", "application/json");
       response.setHeader("x-request-id", requestId);
-      response.end(JSON.stringify({
-        ok: true,
-        protocolVersion: 2,
-        requestId,
-        ...(operation === undefined ? { service: "pi-knowledge", status: "healthy" } : { operation, result: {} }),
-      }));
+      response.statusCode = 200;
+      response.end(JSON.stringify(operation === undefined
+        ? { protocolVersion: 999, requestId, ok: true, service: "pi-knowledge", status: "healthy" }
+        : { protocolVersion: 999, requestId, ok: true, operation, result: {} }));
     });
   });
-  const port = await listen(server);
-  let closed = false;
-  const close = async (): Promise<void> => {
-    if (closed) return;
-    closed = true;
-    await new Promise<void>((resolvePromise, rejectPromise) => {
-      server.close((error) => {
-        if (error === undefined) resolvePromise();
-        else rejectPromise(error);
-      });
+  await new Promise<void>((resolveReady, rejectReady) => {
+    server.once("error", rejectReady);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", rejectReady);
+      resolveReady();
     });
-  };
-  closeables.push(close);
-  return { port, close };
+  });
+  closeables.push(() => closeServer(server));
+  const address = server.address();
+  if (address === null || typeof address === "string") throw new Error("Expected TCP server address");
+  return { port: address.port, close: () => closeServer(server) };
 }
 
-async function listen(server: Server): Promise<number> {
-  await new Promise<void>((resolvePromise, rejectPromise) => {
-    server.once("error", rejectPromise);
-    server.listen(0, "127.0.0.1", () => {
-      server.off("error", rejectPromise);
-      resolvePromise();
+function closeServer(server: Server): Promise<void> {
+  return new Promise((resolveClose, rejectClose) => {
+    server.close((error) => {
+      if (error === undefined) resolveClose();
+      else rejectClose(error);
     });
   });
-  const address = server.address();
-  if (address === null || typeof address === "string") throw new Error("Expected TCP listener address");
-  return address.port;
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean" || typeof value === "number") return true;
+  if (Array.isArray(value)) return value.every(isJsonValue);
+  if (!isRecord(value)) return false;
+  return Object.values(value).every(isJsonValue);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isJsonValue(value: unknown): value is JsonValue {
-  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
-  if (typeof value === "number") return Number.isFinite(value);
-  if (Array.isArray(value)) return value.every((entry) => isJsonValue(entry));
-  if (isRecord(value)) return Object.values(value).every((entry) => isJsonValue(entry));
-  return false;
 }

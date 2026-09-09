@@ -8,6 +8,7 @@ on:
       - ".github/workflows/p2-direct-file-pi-evidence.yml"
       - "scripts/p2-run-direct-file-pi-baseline.mjs"
       - "scripts/p2-review-direct-file-pi-baseline.mjs"
+      - "scripts/p2-reconfirm-direct-file-pi-review.mjs"
       - "src/knowledge/eval/directFilePiBaseline.ts"
       - "src/knowledge/eval/directFilePiBaseline.test.ts"
       - "eval/corpus/**"
@@ -40,10 +41,15 @@ jobs:
         run: npm test -- src/knowledge/eval/directFilePiBaseline.test.ts
 
       - name: Focused P2-T10 lint
-        run: npx eslint src/knowledge/eval/directFilePiBaseline.ts src/knowledge/eval/directFilePiBaseline.test.ts scripts/p2-review-direct-file-pi-baseline.mjs
+        run: npx eslint src/knowledge/eval/directFilePiBaseline.ts src/knowledge/eval/directFilePiBaseline.test.ts scripts/p2-review-direct-file-pi-baseline.mjs scripts/p2-reconfirm-direct-file-pi-review.mjs
 
-      - name: Review helper syntax check
-        run: node --check scripts/p2-review-direct-file-pi-baseline.mjs
+      - name: Review helpers syntax check
+        run: |
+          node --check scripts/p2-review-direct-file-pi-baseline.mjs
+          node --check scripts/p2-reconfirm-direct-file-pi-review.mjs
+
+      - name: Query display contract check
+        run: node scripts/p2-reconfirm-direct-file-pi-review.mjs --verify-query-display
 
       - name: Prepare frozen tasks without provider access
         env:

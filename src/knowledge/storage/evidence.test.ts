@@ -138,8 +138,8 @@ describe("Stable Evidence entity", () => {
       locatorSnapshot: locator,
     });
 
-    locator.heading = "After";
-    (locator.nested as { ordinal: number }).ordinal = 9;
+    locator["heading"] = "After";
+    (locator["nested"] as { ordinal: number }).ordinal = 9;
     expect(evidence.locatorSnapshot).toEqual({ heading: "Before", nested: { ordinal: 1 } });
   });
 });

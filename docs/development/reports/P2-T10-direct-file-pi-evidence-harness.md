@@ -6,25 +6,24 @@ Status: **REAL DEVELOPMENT RUN PASS / ASSISTED HUMAN SEMANTIC REVIEW REQUIRED**
 
 Make the P2-T10 product-value baseline executable as one local command while preserving the experiment boundary: Pi receives the same six frozen corpus files for every development query, no Knowledge retrieval ranks, and no Golden Evidence labels.
 
-## CI preparation evidence
+## Canonical CI preparation + review-helper evidence
 
-Canonical preparation run on the frozen P2-T10 base:
+Latest dedicated support run:
 
 ```text
-GitHub Actions run = 34332760481
-focused evaluator suite = 1 file / 5 tests PASS
-focused P2-T10 lint = PASS
+GitHub Actions run = 34339238995
+head SHA = 4c5fd5b9c2617bbbcc11735ac98bb4bd37682832
+focused evaluator suite = PASS
+focused evaluator + assisted-review lint = PASS
+assisted-review node --check = PASS
 direct-file prepare-only = PASS
 queryCount = 50
 datasetHash = 949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3
-systemPromptSha256 = 8db92ab71e29b1f7228a5176e5f3de46f8eab02ad493896bc5a85e5463eddc16
-Node = v24.20.0
-platform = linux/x64
-artifact = 10096440773
-artifact digest = sha256:e65d56a823499760e80cbc832d06a1d6b3f789a8228aaaec17771174866dc88f
+artifact = 10099024031
+artifact digest = sha256:a1774e215ddf77af5d6d7c0858db6a40a0a844b83ee3ea687d993c52deca7245
 ```
 
-The CI path did not execute `pi`, contact a model provider, or consume provider credentials. The current support branch additionally syntax-checks and lints the assisted human-review helper; that helper gate requires revalidation after its introduction.
+The CI path did not execute `pi`, contact a model provider, or consume provider credentials.
 
 ## Real local development execution — PASS
 
@@ -139,7 +138,7 @@ The real run wrote:
 
 ## Assisted human review
 
-To avoid making the reviewer manually reconstruct all 50 rows, support now includes:
+To avoid making the reviewer manually reconstruct all 50 rows, support includes:
 
 ```bash
 node scripts/p2-review-direct-file-pi-baseline.mjs
@@ -176,7 +175,7 @@ The deterministic suggestion is only triage. The human remains the final semanti
 
 ## Remaining boundary
 
-The 50-query model harness execution is **PASS**. P2-T10 remains PARTIAL until the independent reviewer completes the assisted review and its summary/digest are recorded.
+The 50-query model harness execution and assisted-review implementation/CI gates are **PASS**. P2-T10 remains PARTIAL until the independent reviewer completes the assisted review and its summary/digest are recorded.
 
 ## Scope
 

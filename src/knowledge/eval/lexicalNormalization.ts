@@ -104,7 +104,7 @@ function addCjkNgrams(text: string, size: number, output: Set<string>): void {
   }
 
   for (const match of text.matchAll(HAN_RUN)) {
-    const characters = [...match[0]];
+    const characters = Array.from(match[0]);
     for (let index = 0; index + size <= characters.length; index += 1) {
       output.add(characters.slice(index, index + size).join(""));
     }

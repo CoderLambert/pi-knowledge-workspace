@@ -1,99 +1,114 @@
 # P2-T05 — Chinese / code lexical normalization experiment
 
-Status: **PARTIAL**
+Status: **PASS**
 
 ## Objective
 
-Evaluate the smallest deterministic lexical changes that could improve the P1/P2 FTS baseline for Chinese, code symbols and version/error-code queries without introducing a tokenizer framework or changing Stable Evidence semantics.
+Evaluate the smallest deterministic lexical changes that could improve the corrected expanded FTS baseline for Chinese, code symbols and version/error-code queries without introducing a tokenizer framework or changing Stable Evidence semantics.
 
-## Direct base
+## Stack / ancestry
 
-P2-T04 / `experiment/p2-fts-baseline-report` / PR #36.
+PR #37 is stacked on support PR #50 (`chore/p2-t05-lexical-evidence-harness`). The corrected ancestry includes the P2 challenge corpus (#46), P1-T13 natural-language FTS query compilation propagation (#47), corrected P2-T04 baseline (#36), expanded evidence harness (#48), and CI-first / branch hygiene policy (#49).
 
-This task is stacked and is not independently merge-safe before its base.
+The direct-base diff remains P2-T05-only.
 
 ## Implemented scope
 
-### Closed experiment matrix
-
-`src/knowledge/eval/lexicalNormalization.ts` defines exactly four profiles:
+Exactly four fixed profiles were evaluated:
 
 1. `baseline`;
 2. `code-derived`;
 3. `code-cjk-bigram`;
 4. `code-cjk-bigram-trigram`.
 
-The matrix is deliberately closed. There is no registry, plugin API, tokenizer lifecycle or external segmentation dependency.
+The original chunk text is always preserved. Derived aliases are retrieval-only material and do not change SourceVersion, ParsedArtifact, Stable Evidence identity, or production FTS defaults.
 
-### Code-derived fields
+## Real GitHub Actions evidence
 
-The experiment derives deterministic lowercase terms from:
+`P2 Lexical Evidence` run **34325709633** on code head `9c3437fa98de3c306ba5a739925bada959631498`:
 
-- camelCase / PascalCase (`AbortController` → `abort`, `controller`, `abortcontroller`);
-- dotted/member paths (`fsPromises.cp` → `fs`, `promises`, `cp`, joined alias);
-- snake/kebab/slash/hash-style separators;
-- uppercase error-code shapes through the same identifier splitting;
-- dotted versions with stable aliases (`v22.3.0` → `22x3x0`, `v22x3x0`).
+```text
+Ubuntu 24.04.5
+Node 24.20.0
+better-sqlite3 13.0.3
+SQLite 3.53.4
+FTS5 PASS
+38 chunks total / 35 challenge
+Top-K 10
+focused: 9 files PASS / 35 tests PASS
+```
 
-The original text is always retained. Derived terms are appended only for retrieval experiments; they never replace canonical ParsedArtifact bytes.
+The real development-set quality results were:
 
-### Chinese candidates
+| Profile | Recall@10 | MRR | Coverage | Ranks |
+| --- | ---: | ---: | ---: | --- |
+| baseline | 1.0 | 0.9365079365079365 | 1.0 | 37 R1 / 4 R2 / 1 R3 / 0 miss |
+| code-derived | 1.0 | 0.9365079365079365 | 1.0 | 38 R1 / 0 R2 / 4 R3 / 0 miss |
+| code-cjk-bigram | 1.0 | 0.9134920634920635 | 1.0 | 36 R1 / 3 R2 / 2 R3 / 1 R4-10 / 0 miss |
+| code-cjk-bigram-trigram | 1.0 | 0.9293650793650793 | 1.0 | 37 R1 / 3 R2 / 1 R3 / 1 R4-10 / 0 miss |
 
-The two CJK profiles add overlapping Han-character bigrams, then bigrams + trigrams. This intentionally tests a dependency-free lexical candidate before considering a dictionary/ML segmenter.
+Expanded all-query baseline context remains MRR `0.928921568627451`; profile selection used development evidence only.
 
-### Development-only comparison
+Baseline development non-Rank-1 targets were reproduced exactly:
 
-`lexicalNormalizationEvaluation.ts` reuses the P2-T04 evaluator but selects only `development` queries/labels. A baseline run is mandatory, duplicate profile runs are rejected and holdout observations are rejected as unknown queries.
+```text
+dev-026 R2
+dev-028 R2
+dev-034 R2
+dev-040 R3
+dev-042 R2
+```
 
-This prevents P2-T05 implementation from accidentally tuning against the fixed holdout set.
+## Decision
 
-## Tests written
+Freeze **`baseline`**.
 
-`lexicalNormalization.test.ts` covers:
+`code-derived` produced no aggregate quality gain while increasing FTS allocation from 49,152 to 57,344 bytes and increasing build/query cost. The two CJK profiles reduced development MRR and used 77,824 and 110,592 FTS bytes respectively. The least-complex materially improving rule therefore retains baseline rather than carrying lexical complexity forward.
 
-- baseline identity;
-- camelCase/dotted/snake/error-code derivation;
-- version aliases;
-- CJK bigrams;
-- bigram + trigram deterministic dedupe;
-- fixed profile order.
+No query-specific special cases were added.
 
-`lexicalNormalizationEvaluation.test.ts` covers:
+## Holdout discipline
 
-- development-only metric comparison;
-- deltas vs baseline;
-- mandatory baseline;
-- duplicate-run rejection;
-- holdout observation rejection.
+Holdout was not used to select the profile. After baseline was frozen, one aggregate-only holdout run produced:
 
-## Report integrity
+```text
+30 queries / 26 answerable
+query errors: 0
+Recall@10: 1.0
+MRR: 0.9166666666666666
+all-required coverage: 1.0
+22 R1 / 3 R2 / 1 R3 / 0 miss
+```
 
-`eval/reports/lexical-normalization.md` contains the fixed profile matrix and selection discipline but all retrieval metrics remain `UNRUN`.
+No holdout per-query tuning diagnostics were used or published.
 
-No candidate is declared a winner before a real current FTS5/SearchQuery run over the committed Golden Dataset.
+## Gate attribution
 
-## Dependency assumptions / risk
+The first independent lint diagnostic exposed 3 P2-T05-attributable lint failures. They were fixed without changing experiment semantics. The follow-up run removed all `lexicalNormalization*` files from the lint failure list.
 
-P2-T05 depends on:
+Remaining repository gate failures are inherited from the base ancestry:
 
-- P2-T03 fixed development/holdout annotations;
-- P2-T04 metric definitions and Stable Evidence overlap relevance;
-- the current P1 FTS/SearchQuery lexical baseline;
-- the target's locally proven `better-sqlite3` + FTS5 capability from the P1-T02 verification work.
+- typecheck/build/pack: existing `viewerDispatch`, `chunker`, `evidence`, and `sourceEvidenceViewer` errors;
+- lint: 278 inherited errors after the 3 P2-T05 errors were removed;
+- knip: inherited `better-sqlite3`, viewer dispatch export, and configuration findings.
 
-P1-T02 package-install/full-gate debt and P2-T04 real baseline execution remain OPEN. P2-T05 may proceed against those documented contracts but cannot cite them as PASS.
+Per CI-first policy these inherited failures were not modified for a green check.
 
-## Verification state
+## Resource evidence
 
-The GitHub automation environment cannot execute the repository dependency tree/native SQLite workload. Focused tests, typecheck/lint/knip/build/package/full-suite gates and real per-profile FTS measurements remain OPEN and are specified in the verification guide.
+Runner-specific only; not an Omarchy claim. Latest development run:
 
-## Out of scope
+```text
+baseline median/p95/max: 0.774 / 1.318 / 2.833 ms
+baseline peak RSS: 83,435,520 bytes
+baseline FTS allocation: 49,152 bytes
+baseline build: 10.342 ms
+```
 
-- changing production FTS defaults;
-- generic tokenizer/normalizer plugin framework;
-- external Chinese segmentation library adoption;
-- embeddings/vector search;
-- sqlite-vec;
-- hybrid/RRF;
-- reranking;
-- P2-T09 generic benchmark runner.
+Target-machine performance remains independent verification debt and does not block the lexical quality freeze.
+
+## Acceptance
+
+**PASS.** The four fixed profiles were executed on the real corrected retrieval path, development-only selection retained baseline, holdout was run only after freeze, task-attributable lint failures were repaired, direct-base scope remains task-only, and inherited baseline failures were not modified.
+
+P2-T06 may now consume the frozen lexical decision. No P3 work is authorized; ADR-029 remains blocked on later P2 evidence.

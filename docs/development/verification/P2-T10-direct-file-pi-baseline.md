@@ -1,14 +1,21 @@
 # P2-T10 verification — Direct-file Pi baseline
 
-Status: **OPEN / PARTIAL — LOCAL REAL RUN + HUMAN REVIEW REQUIRED**
+Status: **PARTIAL — AUTOMATED DEVELOPMENT EVIDENCE COMPLETE / HUMAN REVIEW REQUIRED**
 
-## 1. Focused protocol tests
+## 1. Focused protocol tests — PASS
 
 ```bash
 npm test -- src/knowledge/eval/directFilePiBaseline.test.ts
 ```
 
-PASS evidence requires:
+Final CI preparation evidence on support PR #53 / Actions run `34332760481`:
+
+```text
+1 file / 5 tests PASS
+focused P2-T10 lint PASS
+```
+
+Verified invariants:
 
 - every query gets the same fixed sorted corpus snapshots;
 - task/model input contains no Golden Evidence labels or retrieval ranks;
@@ -18,109 +25,94 @@ PASS evidence requires:
 - a no-answer response with any mapped or unmapped citation does not count as a correct abstention;
 - cross-split, duplicate and incomplete observations fail closed.
 
-Focused task lint:
+## 2. Repository gates — CLASSIFIED
 
-```bash
-npx eslint \
-  src/knowledge/eval/directFilePiBaseline.ts \
-  src/knowledge/eval/directFilePiBaseline.test.ts
-```
+Ordinary repository CI still reproduces inherited failures outside P2-T10-owned files. P2-T10-focused tests/lint are green. Do not repair unrelated ancestry merely to obtain a global green run.
 
-Task-owned findings must be zero before PASS.
+## 3. Frozen direct-file runtime — PASS
 
-## 2. Repository gates
-
-```bash
-npm run typecheck
-npm run lint
-npm run knip
-npm run build
-npm run pack:dry
-npm test
-```
-
-Classify inherited failures against the direct base rather than repairing unrelated code in P2-T10.
-
-## 3. Freeze the direct-file runtime
-
-Before the real baseline, record:
+Real development identity:
 
 ```text
-repository/Pi runtime revision
-actual provider/model identity
-prompt/instruction revision
-selected split
-fixed corpus revision/hash
-file/path presentation method
-runtime limits/timeouts
+support repository SHA: db71e7c6d746709ce152269b68b020bd05bdb0dd
+Pi version: 0.85.1
+provider: openai-codex
+model: gpt-6-astra
+API: openai-codex-responses
+responseModel: null
+thinkingLevel: null
+split: development
+dataset hash: 949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3
+system prompt SHA-256: 8db92ab71e29b1f7228a5176e5f3de46f8eab02ad493896bc5a85e5463eddc16
+fixed corpus files: 6
+queries: 50
 ```
 
-Do not change these during the comparison without creating a new baseline identity.
+The local harness failed closed on provider/model drift across the run. No credentials were copied into repository evidence.
 
-Support PR #53 automates this provenance collection and fails closed if provider/model identity changes across the development run.
+## 4. Development run without Knowledge retrieval — PASS
 
-## 4. Run development tasks without Knowledge retrieval
-
-Canonical support command:
+Canonical command:
 
 ```bash
 npx tsx scripts/p2-run-direct-file-pi-baseline.mjs
 ```
 
-The harness constructs tasks through:
+The user executed the command on Omarchy/Linux and all 50 development tasks completed.
 
-```text
-buildDirectFilePiTasks(dataset, "development")
-```
-
-For every task Pi receives only:
+For every task Pi received only:
 
 - original query;
 - the same six fixed corpus files;
 - frozen system instructions.
 
-Do not expose Golden labels, expected quotes, retrieval ranks/results or answer keys.
+No Golden labels, expected quotes, retrieval ranks/results or answer keys were model-facing.
 
-The support harness disables Pi tools, extensions, skills, prompt templates, themes, context files and persistent sessions for the run.
+## 5. Post-inference citation mapping — PASS
 
-## 5. Map citations after inference
+Pi returned file/path + exact quote citations. The harness mapped citations only when the path belonged to the frozen task and the quote was a unique verbatim occurrence in that file.
 
-Pi returns file/path + exact quote citations. After each model run, map each citation to:
+Wrong paths, missing quotes and ambiguous quotes were retained as unmapped and counted in `unmappedCitationCount`; they were not discarded before scoring.
 
-```text
-sourceVersionId
-parsedArtifactId
-startByte
-endByte
-```
+## 6. Deterministic scoring — PASS
 
-using the immutable corpus snapshot.
-
-Mapping succeeds only when the path is in the frozen task and the quote is a unique verbatim occurrence in that file.
-
-If a citation has a wrong path, missing quote or ambiguous quote, preserve it as unmapped and increment `unmappedCitationCount`. Never discard invalid citations before scoring.
-
-## 6. Deterministic scoring
-
-Run:
+Real development result:
 
 ```text
-evaluateDirectFilePiBaseline(dataset, "development", observations)
+queryCount: 50
+answerableQueries: 42
+noAnswerQueries: 8
+anyRequiredEvidenceCoverage: 1.0
+allRequiredEvidenceCoverage: 1.0
+citationPrecision: 0.7758620689655172
+noAnswerCorrectAbstentionRate: 0.625
+latency median: 10165.077273999981 ms
+latency p95: 14855.569325999997 ms
+latency max: 18050.93610000005 ms
 ```
 
-Publish:
+Equivalent counts:
 
-- any-required Evidence coverage;
-- all-required Evidence coverage;
-- citation precision, including unmapped citations in the denominator;
-- no-answer correct abstention rate;
-- median/p95/max end-to-end Pi latency.
+```text
+valid mapped citations: 45 / 58 total mapped+unmapped citations
+correct no-answer abstentions: 5 / 8
+```
 
-A no-answer observation is a correct abstention only if `insufficientEvidence=true`, mapped citations are empty and `unmappedCitationCount=0`.
+Evidence output directory:
 
-## 7. Human answer-quality review
+```text
+/tmp/pi-knowledge-p2-evidence/p2-t10
+```
 
-Independently review every development answer as:
+## 7. Human answer-quality review — OPEN / REQUIRED
+
+Review the generated worksheet:
+
+```text
+/tmp/pi-knowledge-p2-evidence/p2-t10/human-review-development.md
+```
+
+Independently classify every development answer as:
 
 ```text
 correct
@@ -135,15 +127,26 @@ Also record:
 - no-answer hallucinations;
 - important evidence omitted despite being present in supplied files.
 
-The model under test must not be the sole judge. Preserve reviewer disagreement if a second reviewer is used.
-
-Support PR #53 generates `human-review-development.md` from the real run.
+The model under test must not be its own sole judge. This human review is the only remaining P2-T10 acceptance blocker.
 
 ## 8. Holdout discipline
 
-Do **not** run P2-T10 holdout in the current support harness. Development instructions/runtime/review criteria must first be frozen and accepted. Holdout must never feed retuning in the same experiment cycle.
+Do **not** run P2-T10 holdout for tuning. Development runtime, instructions and review criteria must remain frozen. Any eventual holdout use must be one-shot acceptance-only after the development decision is fixed.
 
-## 9. Direct-base scope
+## 9. Comparison context
+
+Frozen Knowledge retrieval-side evidence remains:
+
+```text
+SQLite FTS5 development Recall@10: 1.0
+SQLite FTS5 development MRR: 0.9365079365079365
+SQLite FTS5 all-required Evidence coverage: 1.0
+Dense: rejected by P2-T06 development evidence
+```
+
+Do not compare FTS retrieval-only milliseconds directly against full model answer latency as equivalent operations. Product-value comparison must consider answer quality, citation discipline, abstention, historical Evidence semantics, scope/reuse and operational complexity.
+
+## 10. Direct-base scope
 
 ```bash
 git diff --check origin/feat/p2-retrieval-benchmark-runner...HEAD
@@ -164,4 +167,4 @@ No Knowledge retrieval implementation, provider secret, product comparison, ADR 
 
 ## PASS condition
 
-P2-T10 remains PARTIAL until repository/task gates are classified, the complete real 50-query Pi development observations are recorded, deterministic citation/Evidence scoring is generated, and independent human answer-quality review is completed.
+Automated P2-T10 development evidence is complete. P2-T10 remains **PARTIAL** until the independent human semantic review is completed and recorded. ADR-029 remains blocked; P3 remains prohibited.

@@ -91,6 +91,35 @@ describe("Knowledge service client", () => {
     expect(caught instanceof Error ? caught.message : "").not.toContain(wrongToken);
   });
 
+  it("maps dispatch auth rejection when authentication happens before the body requestId is parsed", async () => {
+    const port = await startService();
+    const wrongToken = "p0-t04-dispatch-wrong-token";
+    const client = createKnowledgeServiceClient({
+      host: "127.0.0.1",
+      port,
+      token: wrongToken,
+    });
+
+    let caught: unknown;
+    try {
+      await client.dispatch("workspace.echo", {
+        projectId: "project-auth",
+        workspaceId: "workspace-auth",
+        workspacePath: "/tmp/workspace-auth",
+        workspaceLabel: "auth",
+      }, new AbortController().signal);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(KnowledgeServiceClientError);
+    expect(caught).toMatchObject({
+      code: "SERVICE_REJECTED",
+      remoteCode: "AUTH_INVALID",
+    });
+    expect(caught instanceof Error ? caught.message : "").not.toContain(wrongToken);
+  });
+
   it("rejects non-loopback environment configuration before creating a client", () => {
     expect(() => createKnowledgeServiceClientFromEnvironment({
       PI_KNOWLEDGE_HOST: "0.0.0.0",

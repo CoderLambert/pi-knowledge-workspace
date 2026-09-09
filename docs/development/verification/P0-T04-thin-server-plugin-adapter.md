@@ -9,18 +9,37 @@ This guide deliberately separates P0-T04 from P0-T05:
 - P0-T04 proves the adapter contract, bounds, cancellation/deadline behavior, and a real adapter-client → standalone-service call.
 - P0-T05 proves the complete Browser → pairedBackend → selected Machine sessiond → server plugin → standalone service → UI path.
 
+## Current local evidence (2026-09-09)
+
+Local Omarchy/Linux execution established the following before the latest corrective commits:
+
+- `service-client.test.ts`: 8/9 PASS; the generated oversized-request case exposed a synchronous throw from a Promise-returning API;
+- P0-T05 happy-dom E2E: 0/4 before transport correction, with browser-style CORS preflight (`OPTIONS ... 401`) contaminating the server-only loopback adapter;
+- after binding the adapter to `undici.fetch` and making `dispatch()` / `health()` true async APIs, the combined Knowledge focused run improved to 24/25 PASS;
+- the sole remaining failure was dispatch wrong-token: the authenticated service rejected the request before body parsing and therefore used Fastify's server request id, while the adapter incorrectly compared that id to the unparsed client body request id before mapping `AUTH_INVALID`.
+
+Corrective commits on this task branch:
+
+- `18439fd` — use explicit server-side `undici.fetch`; make `dispatch()` / `health()` true async APIs;
+- `04d7ef9` — for structured pre-dispatch errors, validate header request id against the error envelope's bounded request id, while keeping successful dispatch correlation bound to the client-generated request id;
+- `8580194` — add a direct dispatch wrong-token regression test.
+
+These fixes deliberately preserve authentication in Fastify `onRequest`; unauthenticated request bodies are not parsed merely to recover the client request id.
+
+The corrected HEAD still requires rerun. This section records observed evidence and fixes, not a PASS declaration.
+
 ## PASS criteria
 
 P0-T04 can be changed from PARTIAL to PASS only when all required evidence below is actually observed:
 
 - focused adapter tests pass;
 - TypeScript passes;
-- ESLint passes;
-- knip passes;
+- ESLint passes for task-attributable code (repository-wide inherited failures must be classified, not silently patched);
+- knip passes for task-attributable dependencies, with inherited/package-stack debt classified separately;
 - production build passes;
 - package dry-run passes;
 - branch diff check passes;
-- full suite has no new P0-T04-attributable failure beyond the already classified inherited `piSessionService.promptQueue` baseline failure;
+- full suite has no new P0-T04-attributable failure beyond classified inherited baseline failures;
 - real local server-plugin adapter can authenticate to standalone `pi-knowledge` and return host-authoritative Workspace scope;
 - wrong token/service unavailable/protocol mismatch/cancellation behavior fails closed without leaking the token.
 
@@ -66,11 +85,11 @@ npm test -- \
   pi-web-plugins/knowledge/service-client.test.ts
 ```
 
-Expected:
+Expected on the corrected HEAD:
 
 ```text
 2 test files passed
-15 tests passed
+16 tests passed
 ```
 
 The focused suite must demonstrate at least:
@@ -83,12 +102,13 @@ The focused suite must demonstrate at least:
 - host cancellation is propagated;
 - wire defaults match the P0-T03 contract;
 - authenticated health and `workspace.echo` work against a real loopback P0-T03 Fastify app;
-- wrong token maps to structured rejection without exposing the token;
+- health wrong-token maps to structured rejection without exposing the token;
+- dispatch wrong-token maps a pre-body-auth `AUTH_INVALID` response without weakening request-id correlation for successful dispatches;
 - non-loopback service configuration is rejected;
 - adapter request and response byte limits are enforced;
 - adapter deadline is enforced.
 
-FAIL P0-T04 if any focused failure is fixed by weakening scope validation, loopback validation, byte limits, cancellation/deadline behavior, or token handling.
+FAIL P0-T04 if any focused failure is fixed by weakening scope validation, loopback validation, authentication ordering, byte limits, successful-dispatch request-id correlation, cancellation/deadline behavior, or token handling.
 
 ---
 
@@ -139,15 +159,14 @@ npm test
 
 Record exact file/test pass/fail/skip counts.
 
-The known inherited baseline signature is:
+Current local full-suite evidence before the latest P0 corrections was:
 
 ```text
-src/server/sessions/piSessionService.promptQueue.test.ts
-expected 1
-received 0
+5 test files failed | 386 passed
+8 tests failed | 3848 passed | 2 skipped
 ```
 
-If that remains the sole failure with the same assertion, record it as inherited. Do not modify session/auth behavior inside P0-T04 merely to make the suite all green.
+Two failures (`globalProviderPolicy.test.ts` and `piSessionService.promptQueue.test.ts`) were confirmed against the policy base with identical test and production-file SHAs and are inherited, not P0-T04 scope. Re-run after the corrective commits and classify any remaining failures by origin.
 
 Any additional failure attributable to the P0-T04 adapter must be fixed before PASS.
 
@@ -222,8 +241,10 @@ Restart PI WEB/sessiond and `pi-knowledge` with different `PI_KNOWLEDGE_TOKEN` v
 Expected:
 
 - authentication fails closed;
+- adapter maps the structured service error to `SERVICE_REJECTED` / remote `AUTH_INVALID`;
 - no `ready` response;
-- service credential value is not exposed to browser/UI.
+- service credential value is not exposed to browser/UI;
+- the service may use its own request id because authentication happens before dispatch-body parsing; header and error-envelope ids must still correlate.
 
 ### Protocol mismatch
 
@@ -295,6 +316,6 @@ Cancellation/deadline: PASS / FAIL
 Browser has no service token/host/port knowledge: PASS / FAIL
 ```
 
-P0-T04 becomes PASS only when the required rows are satisfied and any full-suite failure is confirmed to be only the inherited baseline failure.
+P0-T04 becomes PASS only when the required rows are satisfied and any full-suite failure is confirmed to be only inherited baseline failures.
 
 Until then the authoritative status remains PARTIAL and the missing rows remain OPEN in `docs/development/VERIFICATION-DEBT.md`.

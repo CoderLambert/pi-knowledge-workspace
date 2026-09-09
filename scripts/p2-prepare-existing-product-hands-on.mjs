@@ -12,6 +12,7 @@ const products = [
     rawRepo: "Mintplex-Labs/anything-llm",
     tag: "v1.16.1",
     commit: "35c58d89907e675a8c4fb10544c19be0f050f611",
+    image: "ghcr.io/mintplex-labs/anything-llm:1.16.1",
     files: {
       system: "server/endpoints/system.js",
       workspace: "server/endpoints/api/workspace/index.js",
@@ -85,17 +86,14 @@ for (const product of products) {
     return { file: fetched[fileKey].path, needle, pass };
   });
 
-  let imageDigest = null;
-  if (product.image) {
-    const inspect = execFileSync("docker", ["buildx", "imagetools", "inspect", product.image], { encoding: "utf8" });
-    imageDigest = inspect.match(/^Digest:\s+(sha256:[a-f0-9]+)$/mu)?.[1] ?? null;
-    if (imageDigest === null) throw new Error(`Could not resolve digest for ${product.image}`);
-  }
+  const inspect = execFileSync("docker", ["buildx", "imagetools", "inspect", product.image], { encoding: "utf8" });
+  const imageDigest = inspect.match(/^Digest:\s+(sha256:[a-f0-9]+)$/mu)?.[1] ?? null;
+  if (imageDigest === null) throw new Error(`Could not resolve digest for ${product.image}`);
 
   evidence.products[product.id] = {
     tag: product.tag,
     commit: product.commit,
-    image: product.image ?? null,
+    image: product.image,
     imageDigest,
     sourceFiles: Object.fromEntries(Object.entries(fetched).map(([key, value]) => [key, { path: value.path, sha256: value.sha256 }])),
     contractChecks,

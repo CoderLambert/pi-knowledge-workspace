@@ -215,7 +215,10 @@ export class SourceEvidenceViewer {
     }
 
     let windowStart = 0;
-    let windowEnd = Math.min(artifact.canonicalBytes.byteLength, maxBytes);
+    let windowEnd = utf8PrefixBoundary(
+      artifact.canonicalBytes,
+      Math.min(artifact.canonicalBytes.byteLength, maxBytes),
+    );
     let highlight: ViewerArtifactDocument["highlight"] = null;
 
     if (input.evidenceId !== undefined) {
@@ -296,6 +299,12 @@ export class SourceEvidenceViewer {
       createdAt: requireDbString(row, "created_at"),
     };
   }
+}
+
+function utf8PrefixBoundary(bytes: Uint8Array, proposedEnd: number): number {
+  let end = proposedEnd;
+  while (end > 0 && end < bytes.byteLength && (bytes[end]! & 0xc0) === 0x80) end -= 1;
+  return end;
 }
 
 function mapArtifactSummary(row: unknown): ViewerParsedArtifactSummary {

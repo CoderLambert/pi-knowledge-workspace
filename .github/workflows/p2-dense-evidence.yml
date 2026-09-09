@@ -1,0 +1,87 @@
+name: P2 Dense Evidence
+
+on:
+  pull_request:
+    paths:
+      - "src/knowledge/eval/denseRetrievalAdapter.ts"
+      - "src/knowledge/eval/denseRetrievalAdapter.test.ts"
+      - "eval/corpus/**"
+      - "eval/queries/**"
+      - "eval/labels/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dense-evidence:
+    name: Fixed multilingual dense profiles (Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      P2_DENSE_PYTHON: python
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      TOKENIZERS_PARALLELISM: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Install fixed dense runtime
+        run: python -m pip install --disable-pip-version-check "sentence-transformers==5.7.0"
+
+      - name: Diagnostic typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Diagnostic lint
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Diagnostic knip
+        continue-on-error: true
+        run: npm run knip
+
+      - name: Diagnostic build
+        continue-on-error: true
+        run: npm run build
+
+      - name: Diagnostic package dry-run
+        continue-on-error: true
+        run: npm run pack:dry
+
+      - name: Run P2-T06 focused contract and ancestry tests
+        run: |
+          npm test -- \
+            src/knowledge/eval/goldenDataset.test.ts \
+            src/knowledge/eval/representativeCorpus.test.ts \
+            src/knowledge/eval/queryAnnotations.test.ts \
+            src/knowledge/eval/retrievalChallengeCorpus.test.ts \
+            src/knowledge/eval/ftsBaselineEvaluation.test.ts \
+            src/knowledge/eval/denseRetrievalAdapter.test.ts
+
+      - name: Run fixed development dense profiles and conditional holdout
+        run: npx tsx scripts/p2-run-dense-evidence.mjs
+
+      - name: Upload P2-T06 evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-t06-dense-evidence
+          path: /tmp/pi-knowledge-p2-evidence/p2-t06
+          if-no-files-found: warn
+          retention-days: 14

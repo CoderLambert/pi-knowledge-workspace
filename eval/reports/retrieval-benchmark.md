@@ -1,37 +1,32 @@
-# P2-T09 — Retrieval benchmark runner output
+# Retrieval Benchmark Report
 
-Status: **UNRUN / PARTIAL**
+Split: **development**
+Generated: `2026-09-09T08:30:54.839Z`
+Queries: **50**
 
-This file is a placeholder for a real `runRetrievalBenchmark` + `renderRetrievalBenchmarkMarkdown` output. Do not manually populate numeric metrics from source inspection or unit-test fixtures.
+| Variant | Recall@10 | MRR | All required | p95 ms | Peak RSS bytes | Index bytes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| fts-baseline | 1.0000 | 0.9365 | 1.0000 | 1.3342 | 105443328 | 49152 |
 
-## Required run metadata
+## fts-baseline
 
-Before replacing this placeholder, record:
+### Configuration
 
-```text
-split: development | holdout
-generatedAt: ISO timestamp
-dataset revision/hash
-variant ids
-complete variant configuration records
-observation source / retrieval implementation revision
-```
+- `challengeChunks`: `35`
+- `corpusChunks`: `38`
+- `lexicalProfile`: `baseline`
+- `naturalLanguageCompiler`: `quoted-literal-or`
+- `retriever`: `sqlite-fts5`
+- `tokenizer`: `unicode61`
+- `topK`: `10`
 
-Every variant must provide one observation for every query in the selected split and no observation from another split.
+### Failure counts
 
-## Required metrics per variant
+- none
 
-The generated report includes:
+### Diagnostics
 
-- Recall@10;
-- MRR;
-- all-required-Evidence coverage;
-- failure counts by query category;
-- median / p95 / max latency;
-- peak RSS;
-- index/vector resource bytes;
-- no-answer query diagnostics.
-
-## Integrity rule
-
-The runner consumes recorded ranked hit locators and the fixed Golden Dataset. It does not run retrieval, tune a configuration, or infer missing observations. Results remain grounded in Stable Evidence SourceVersion + ParsedArtifact UTF-8 range overlap.
+- answerable queries scored: 42
+- no-answer queries: 8
+- no-answer queries with any hit: 8
+- latency median / p95 / max ms: 0.7944 / 1.3342 / 3.4006

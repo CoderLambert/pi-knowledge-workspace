@@ -12,10 +12,14 @@ import {
   createKnowledgeServiceClientFromEnvironment,
   KnowledgeServiceClientError,
   type KnowledgeServiceClient,
+  type KnowledgeServiceOperation,
 } from "./service-client.js";
 
 const KNOWLEDGE_PLUGIN_ID = "knowledge";
 export const KNOWLEDGE_STATUS_OPERATION = "knowledge.status";
+export const KNOWLEDGE_SOURCES_LIST_OPERATION = "knowledge.viewer.sources.list";
+export const KNOWLEDGE_SOURCE_GET_OPERATION = "knowledge.viewer.source.get";
+export const KNOWLEDGE_ARTIFACT_OPEN_OPERATION = "knowledge.viewer.artifact.open";
 
 const plugin: PiWebServerPlugin = {
   apiVersion: 1,
@@ -55,21 +59,54 @@ async function knowledgeRequest(
   context: PairedPluginRequestContext,
 ): Promise<JsonValue> {
   throwIfAborted(context.signal);
+  const scope = knowledgeScope(context);
 
-  if (context.operation !== KNOWLEDGE_STATUS_OPERATION) {
-    throw new Error(`Unsupported Knowledge operation: ${context.operation}`);
+  if (context.operation === KNOWLEDGE_STATUS_OPERATION) {
+    requireEmptyInput(context.input, context.operation);
+    const echoedScope = await serviceClient.dispatch("workspace.echo", scope, context.signal);
+    requireMatchingServiceScope(echoedScope, scope);
+    return { version: 1, status: "ready", scope };
   }
 
-  requireEmptyInput(context.input, context.operation);
-  const scope = knowledgeScope(context);
-  const echoedScope = await serviceClient.dispatch("workspace.echo", scope, context.signal);
-  requireMatchingServiceScope(echoedScope, scope);
+  if (context.operation === KNOWLEDGE_SOURCES_LIST_OPERATION) {
+    requireEmptyInput(context.input, context.operation);
+    return await dispatchViewer(serviceClient, "viewer.sources.list", { scope }, context.signal);
+  }
 
-  return {
-    version: 1,
-    status: "ready",
-    scope,
-  };
+  if (context.operation === KNOWLEDGE_SOURCE_GET_OPERATION) {
+    const input = requireViewerInput(context.input, context.operation, ["sourceId"]);
+    return await dispatchViewer(serviceClient, "viewer.source.get", {
+      scope,
+      sourceId: requireNonEmptyString(input, "sourceId", context.operation),
+    }, context.signal);
+  }
+
+  if (context.operation === KNOWLEDGE_ARTIFACT_OPEN_OPERATION) {
+    const input = requireViewerInput(context.input, context.operation, ["parsedArtifactId"], ["evidenceId", "maxBytes"]);
+    const evidenceId = optionalNonEmptyString(input, "evidenceId", context.operation);
+    const maxBytes = optionalPositiveInteger(input, "maxBytes", context.operation);
+    return await dispatchViewer(serviceClient, "viewer.artifact.open", {
+      scope,
+      parsedArtifactId: requireNonEmptyString(input, "parsedArtifactId", context.operation),
+      ...(evidenceId === undefined ? {} : { evidenceId }),
+      ...(maxBytes === undefined ? {} : { maxBytes }),
+    }, context.signal);
+  }
+
+  throw new Error(`Unsupported Knowledge operation: ${context.operation}`);
+}
+
+async function dispatchViewer(
+  serviceClient: KnowledgeServiceClient,
+  operation: "viewer.sources.list" | "viewer.source.get" | "viewer.artifact.open",
+  input: JsonObject,
+  signal: AbortSignal,
+): Promise<JsonObject> {
+  // KnowledgeServiceOperation predates P1 viewer operations; the wire client itself
+  // serializes JSON and the standalone service owns the operation allowlist. A successful
+  // client dispatch has already parsed and validated an object-shaped JSON result.
+  const result = await serviceClient.dispatch(operation as KnowledgeServiceOperation, input, signal);
+  return result as JsonObject;
 }
 
 async function knowledgePluginHealth(
@@ -106,20 +143,14 @@ function knowledgeScope(
   };
 }
 
-function requireMatchingServiceScope(
-  actual: Record<string, unknown>,
-  expected: JsonObject,
-): void {
+function requireMatchingServiceScope(actual: Record<string, unknown>, expected: JsonObject): void {
   if (
     actual["projectId"] !== expected["projectId"]
     || actual["workspaceId"] !== expected["workspaceId"]
     || actual["workspacePath"] !== expected["workspacePath"]
     || actual["workspaceLabel"] !== expected["workspaceLabel"]
     || Object.keys(actual).some((key) => ![
-      "projectId",
-      "workspaceId",
-      "workspacePath",
-      "workspaceLabel",
+      "projectId", "workspaceId", "workspacePath", "workspaceLabel",
     ].includes(key))
   ) {
     throw new Error("pi-knowledge returned workspace scope that does not match the host-authoritative scope");
@@ -132,21 +163,60 @@ function requireEmptyInput(value: JsonValue, operation: string): void {
   throw new Error(`${operation} input must be null or an empty object`);
 }
 
+function requireViewerInput(
+  value: JsonValue,
+  operation: string,
+  requiredFields: readonly string[],
+  optionalFields: readonly string[] = [],
+): Record<string, JsonValue> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`${operation} input must be an object`);
+  }
+  const record = value as Record<string, JsonValue>;
+  const allowed = new Set([...requiredFields, ...optionalFields]);
+  for (const key of Object.keys(record)) {
+    if (!allowed.has(key)) throw new Error(`${operation} input contains unsupported field: ${key}`);
+  }
+  for (const key of requiredFields) requireNonEmptyString(record, key, operation);
+  return record;
+}
+
+function requireNonEmptyString(record: Record<string, JsonValue>, key: string, operation: string): string {
+  const value = record[key];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`${operation} ${key} must be a non-empty string`);
+  }
+  return value;
+}
+
+function optionalNonEmptyString(record: Record<string, JsonValue>, key: string, operation: string): string | undefined {
+  const value = record[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`${operation} ${key} must be a non-empty string when supplied`);
+  }
+  return value;
+}
+
+function optionalPositiveInteger(record: Record<string, JsonValue>, key: string, operation: string): number | undefined {
+  const value = record[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${operation} ${key} must be a positive integer when supplied`);
+  }
+  return value;
+}
+
 function healthErrorMessage(error: unknown): string {
   if (!(error instanceof KnowledgeServiceClientError)) return "pi-knowledge health check failed";
   switch (error.code) {
-    case "CONFIG_INVALID":
-      return "pi-knowledge adapter configuration is invalid";
-    case "SERVICE_UNAVAILABLE":
-      return "pi-knowledge service is unavailable";
-    case "SERVICE_TIMEOUT":
-      return "pi-knowledge service health check timed out";
-    case "SERVICE_REJECTED":
-      return "pi-knowledge service rejected the health check";
+    case "CONFIG_INVALID": return "pi-knowledge adapter configuration is invalid";
+    case "SERVICE_UNAVAILABLE": return "pi-knowledge service is unavailable";
+    case "SERVICE_TIMEOUT": return "pi-knowledge service health check timed out";
+    case "SERVICE_REJECTED": return "pi-knowledge service rejected the health check";
     case "REQUEST_TOO_LARGE":
     case "RESPONSE_TOO_LARGE":
-    case "PROTOCOL_INVALID":
-      return "pi-knowledge service health response is invalid";
+    case "PROTOCOL_INVALID": return "pi-knowledge service health response is invalid";
   }
 }
 
@@ -157,7 +227,5 @@ function throwIfAborted(signal: AbortSignal): void {
 
 function abortReason(signal: AbortSignal): Error {
   const reason: unknown = signal.reason;
-  return reason instanceof Error
-    ? reason
-    : new Error("Knowledge operation was cancelled", { cause: reason });
+  return reason instanceof Error ? reason : new Error("Knowledge operation was cancelled", { cause: reason });
 }

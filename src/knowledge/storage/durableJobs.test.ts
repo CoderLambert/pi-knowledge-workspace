@@ -107,9 +107,10 @@ describe("DurableJobStore", () => {
     expect(() => store(db).heartbeat("job-1", "stale-worker", 1, 30_000)).toThrow(/stale or cancelled/);
     expect(db.sqlLog[0]).toContain("lease_owner=? AND fencing_token=?");
     expect(db.sqlLog[0]).toContain("lease_expires_at>=?");
+    expect(db.sqlLog[0]).toContain("cancel_requested=0");
   });
 
-  it("rejects a stale worker completion through compare-and-swap fencing", () => {
+  it("rejects stale or expired worker completion through lease/fencing compare-and-swap", () => {
     const db = new ScriptedDatabase();
     db.getRows = [row({
       status: "running",
@@ -121,7 +122,11 @@ describe("DurableJobStore", () => {
     })];
     db.runRows = [{ changes: 0, lastInsertRowid: 0 }];
 
-    expect(() => store(db).succeed("job-1", "worker-a", 1, { ok: true })).toThrow(/stale worker\/fencing token/);
+    expect(() => store(db).succeed("job-1", "worker-a", 1, { ok: true })).toThrow(/stale, expired, cancelled, or non-owner/);
+    const terminalSql = db.sqlLog.find((sql) => sql.includes("SET status=?")) ?? "";
+    expect(terminalSql).toContain("lease_owner=? AND fencing_token=?");
+    expect(terminalSql).toContain("lease_expires_at>=?");
+    expect(terminalSql).toContain("cancel_requested=0");
     expect(db.execLog).toEqual(["BEGIN IMMEDIATE", "ROLLBACK"]);
   });
 
@@ -140,6 +145,26 @@ describe("DurableJobStore", () => {
     const running = store(runningDb).requestCancel("job-1");
     expect(running.status).toBe("running");
     expect(running.cancelRequested).toBe(true);
+  });
+
+  it("requires an active unexpired cancelled lease for cancellation acknowledgement", () => {
+    const db = new ScriptedDatabase();
+    db.getRows = [
+      row({
+        status: "running", attempt: 1, lease_owner: "worker-a", fencing_token: 1,
+        lease_expires_at: "2026-09-09T03:00:30.000Z", cancel_requested: 1,
+      }),
+      row({ status: "cancelled", attempt: 1, fencing_token: 1, cancel_requested: 1 }),
+    ];
+    db.runRows = [
+      { changes: 1, lastInsertRowid: 0 },
+      { changes: 1, lastInsertRowid: 0 },
+    ];
+
+    expect(store(db).acknowledgeCancellation("job-1", "worker-a", 1).status).toBe("cancelled");
+    const terminalSql = db.sqlLog.find((sql) => sql.includes("SET status=?")) ?? "";
+    expect(terminalSql).toContain("lease_expires_at>=?");
+    expect(terminalSql).toContain("cancel_requested=1");
   });
 
   it("recovers an expired lease to queued while closing the fenced attempt", () => {

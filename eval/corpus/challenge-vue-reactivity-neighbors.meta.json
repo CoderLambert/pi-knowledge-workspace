@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "corpus-challenge-vue-reactivity-neighbors-20260909",
+  "relativePath": "corpus/challenge-vue-reactivity-neighbors.md",
+  "mediaType": "text/markdown",
+  "language": "zh",
+  "source": {
+    "title": "Vue 3 reactivity core neighboring APIs — development retrieval challenge",
+    "uri": "https://github.com/vuejs-translations/docs-zh-cn/blob/dda601fe33187dfd913641d58b6cefe829bf1a0d/src/api/reactivity-core.md",
+    "capturedAt": "2026-09-09T00:00:00.000Z",
+    "version": "git:dda601fe33187dfd913641d58b6cefe829bf1a0d"
+  },
+  "parsedArtifact": {
+    "parsedArtifactId": "pa-d0a9cfe91ec13d87",
+    "sourceVersionId": "sv-bbc637dc9857c9b3",
+    "parserFingerprint": "md-txt-parser-v1",
+    "normalizationFingerprint": "utf8-bom-strip+newline-lf-v1",
+    "canonicalTextSha256": "bbc637dc9857c9b3d0a9cfe91ec13d872ea99bbd7070657a93dc298c82747634"
+  }
+}

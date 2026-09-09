@@ -107,7 +107,7 @@ export class SearchQueryApi {
       const lexicalHits = this.index.search({
         knowledgeWorkspaceId,
         indexBuildId,
-        query,
+        query: compileNaturalLanguageFts5Query(query),
         ...(allowedSourceVersionIds === undefined ? {} : { allowedSourceVersionIds }),
         limit: effectiveLimit,
       });
@@ -217,6 +217,14 @@ function hydrateHit(hit: Fts5SearchHit, row: unknown): SearchQueryHit {
     rank: hit.rank,
     ordinal: Number(value.ordinal),
   };
+}
+
+function compileNaturalLanguageFts5Query(query: string): string {
+  return query
+    .split(/\s+/u)
+    .filter((term) => term.length > 0)
+    .map((term) => `"${term.replaceAll('"', '""')}"`)
+    .join(" OR ");
 }
 
 function normalizeAllowedSourceVersions(values: readonly string[] | undefined): string[] | undefined {

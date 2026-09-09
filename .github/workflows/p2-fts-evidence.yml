@@ -1,0 +1,45 @@
+name: P2 FTS Evidence
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/p2-fts-evidence.yml"
+      - "scripts/p2-run-fts-baseline.mjs"
+      - "scripts/p2-run-fts-evidence.sh"
+      - "eval/corpus/**"
+      - "eval/queries/**"
+      - "eval/labels/**"
+      - "src/knowledge/eval/**"
+      - "src/knowledge/storage/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  expanded-fts-evidence:
+    name: Expanded FTS evidence (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Run one-shot evidence harness
+        run: bash scripts/p2-run-fts-evidence.sh
+
+      - name: Upload evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-t04-expanded-fts-evidence
+          path: /tmp/pi-knowledge-p2-evidence/p2-t04
+          if-no-files-found: warn
+          retention-days: 14

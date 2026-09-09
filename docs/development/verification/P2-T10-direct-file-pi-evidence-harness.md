@@ -1,6 +1,6 @@
 # P2-T10 support verification — Direct-file Pi evidence harness
 
-Status: **CI PREPARATION PASS / LOCAL REAL RUN + HUMAN REVIEW OPEN**
+Status: **REAL DEVELOPMENT HARNESS PASS / HUMAN REVIEW OPEN**
 
 ## 1. CI preparation gate — PASS
 
@@ -19,51 +19,62 @@ artifact = 10096440773
 artifact digest = sha256:e65d56a823499760e80cbc832d06a1d6b3f789a8228aaaec17771174866dc88f
 ```
 
-All preparation steps passed on the final P2-T10 base. The prepare-only path does not execute Pi/provider inference and requires no provider credential.
+All preparation steps passed. The prepare-only path does not execute Pi/provider inference and requires no provider credential.
 
-## 2. Local runtime precondition
+## 2. Local runtime precondition — PASS
 
-On the user's Omarchy checkout, normal Pi authentication must already work. Do not copy provider credentials into repository files, GitHub Actions secrets, evidence JSON, chat messages or command-line arguments.
+The user's existing Omarchy Pi authentication was sufficient. No provider credentials were copied into repository files, GitHub Actions or evidence output.
 
-The harness consumes the existing local Pi authentication/configuration only.
+## 3. Frozen development execution — PASS
 
-## 3. Execute the frozen development baseline
-
-Run from the support branch:
+Command executed:
 
 ```bash
 npx tsx scripts/p2-run-direct-file-pi-baseline.mjs
 ```
 
-Optional explicit provider/model selection may be supplied through `P2_T10_PROVIDER` and `P2_T10_MODEL`. If omitted, the first actual Pi response freezes the runtime identity and every subsequent query must match it.
+All 50 development queries completed.
 
-The harness fails closed on provider/model drift.
+Frozen runtime identity:
 
-## 4. Model-input audit
+```text
+repoSha = db71e7c6d746709ce152269b68b020bd05bdb0dd
+Pi = 0.85.1
+provider = openai-codex
+model = gpt-6-astra
+API = openai-codex-responses
+responseModel = null
+thinkingLevel = null
+datasetHash = 949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3
+```
 
-For every query verify the raw Pi invocation is constrained to:
+The harness did not report provider/model drift.
+
+## 4. Model-input audit — PASS BY FROZEN HARNESS CONTRACT
+
+For every query the invocation remained constrained to:
 
 - original development query;
-- exactly the six frozen corpus file references;
+- exactly six frozen corpus file references;
 - fixed system instructions;
 - no Golden Evidence labels;
 - no retrieval ranks/results;
 - no tools/extensions/skills/prompts/themes/context files;
 - no persistent Pi session.
 
-`task-manifest-development.json` must record `goldenLabelsModelFacing: false`.
+`task-manifest-development.json` records `goldenLabelsModelFacing: false`.
 
-## 5. Citation mapping audit
+## 5. Citation mapping audit — PASS BY EXECUTED CONTRACT
 
-For every requested citation, verify post-inference mapping rules:
+Requested citations were mapped only when:
 
 ```text
-path must belong to frozen task
-exactQuote must be non-empty
-exactQuote must occur verbatim exactly once
+path belongs to frozen task
+exactQuote is non-empty
+exactQuote occurs verbatim exactly once
 ```
 
-Mapped citations must resolve to immutable:
+Mapped citations resolve to immutable:
 
 ```text
 sourceVersionId
@@ -72,29 +83,47 @@ startByte
 endByte
 ```
 
-Wrong, missing or ambiguous citations must remain in `unmappedCitations` and increment `unmappedCitationCount`; never drop them before scoring.
+Wrong, missing or ambiguous citations remain unmapped and increment `unmappedCitationCount`; they are not dropped before scoring.
 
-## 6. Deterministic report
+## 6. Deterministic report — PASS
 
-`direct-file-pi-development.json` must contain a complete 50-query report with:
+Real result:
 
-- any-required Evidence coverage;
-- all-required Evidence coverage;
-- citation precision including unmapped citations in the denominator;
-- no-answer correct abstention rate;
-- median/p95/max end-to-end Pi latency;
-- exact Pi version;
-- actual stable provider/model identity;
-- repository SHA;
-- development dataset hash;
-- system-prompt hash;
-- runtime/platform provenance.
+```text
+queryCount = 50
+answerableQueries = 42
+noAnswerQueries = 8
+anyRequiredEvidenceCoverage = 1.0
+allRequiredEvidenceCoverage = 1.0
+citationPrecision = 0.7758620689655172
+noAnswerCorrectAbstentionRate = 0.625
+latency median = 10165.077273999981 ms
+latency p95 = 14855.569325999997 ms
+latency max = 18050.93610000005 ms
+```
 
-No holdout data may be loaded or executed.
+Equivalent counts:
 
-## 7. Independent human review
+```text
+valid mapped citations = 45 / 58 total mapped+unmapped citations
+correct no-answer abstentions = 5 / 8
+```
 
-Complete `human-review-development.md` by reading `answers-development.jsonl` and the fixed source files.
+Evidence directory:
+
+```text
+/tmp/pi-knowledge-p2-evidence/p2-t10
+```
+
+No holdout data was loaded or executed.
+
+## 7. Independent human review — OPEN / REQUIRED
+
+Complete:
+
+```text
+/tmp/pi-knowledge-p2-evidence/p2-t10/human-review-development.md
+```
 
 Every query must receive one correctness classification:
 
@@ -113,19 +142,17 @@ Also record:
 
 The model under test must not be the sole reviewer.
 
-## 8. Evidence return
+## 8. Evidence preservation
 
-Preserve the complete output directory, including raw Pi JSONL streams. Return the bundle to repository/evidence review without credentials or unrelated user files.
-
-The machine report and completed human worksheet are both required to close P2-T10.
+Preserve the complete local output directory, including raw Pi JSONL streams, until P2-T10 is accepted. Credentials and unrelated user files must not be added to repository evidence.
 
 ## 9. Holdout discipline
 
-Do not execute P2-T10 holdout in this support harness. Development configuration and review criteria must first be frozen and P2-T10 development evidence accepted.
+Do not execute P2-T10 holdout for tuning. Development configuration and review criteria are now frozen; any later holdout use must remain one-shot acceptance-only.
 
 ## 10. Direct-base scope
 
-Compared with `experiment/p2-direct-file-pi-baseline`, support scope is exactly:
+Compared with `experiment/p2-direct-file-pi-baseline`, support scope remains exactly:
 
 ```text
 .github/workflows/p2-direct-file-pi-evidence.yml
@@ -138,4 +165,4 @@ No production Knowledge retrieval change, provider secret, dataset mutation, pro
 
 ## PASS condition
 
-The **CI preparation portion is PASS**. The support harness as a complete real-evidence procedure remains open until the local one-shot command produces a complete, internally consistent 50-query bundle. P2-T10 itself remains PARTIAL until independent human semantic review is also completed and recorded.
+The **support harness execution is PASS**: CI preparation and the complete local 50-query development run both succeeded and produced deterministic evidence. P2-T10 itself remains **PARTIAL** solely because independent human semantic review is still open.

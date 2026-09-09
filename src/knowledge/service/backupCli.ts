@@ -5,7 +5,6 @@ import {
   type KnowledgeBackupManifest,
 } from "../storage/backup.js";
 import {
-  openKnowledgeDatabase,
   openKnowledgeDatabaseReadOnly,
   type KnowledgeDatabase,
 } from "../storage/database.js";
@@ -18,7 +17,9 @@ export interface BackupCliOptions {
 
 export async function runBackupCli(argv: readonly string[]): Promise<KnowledgeBackupManifest> {
   const options = parseBackupArgs(argv);
-  const db = openKnowledgeDatabase(options.dbPath);
+  // Backup is observational: never migrate or retune the live database as a side
+  // effect of creating a snapshot. A stale schema is rejected by the readonly opener.
+  const db = openKnowledgeDatabaseReadOnly(options.dbPath);
   try {
     const backup = asBackupCapable(db);
     const creator = new KnowledgeBackupCreator(

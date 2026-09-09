@@ -38,7 +38,9 @@ describe("Stable Evidence entity", () => {
     expect(evidence.quoteHash).toBe(
       createHash("sha256").update(Buffer.from("Evidence 😀 quote", "utf8")).digest("hex"),
     );
-    expect(() => assertEvidenceMatchesArtifact(evidence, canonicalBytes)).not.toThrow();
+    expect(() => {
+      assertEvidenceMatchesArtifact(evidence, canonicalBytes);
+    }).not.toThrow();
   });
 
   it("uses byte range rather than quote text to distinguish duplicated passages", () => {
@@ -91,9 +93,9 @@ describe("Stable Evidence entity", () => {
       locatorSnapshot: {},
     });
 
-    expect(() => assertEvidenceMatchesArtifact(evidence, bytes("staple quote"))).toThrow(
-      "Evidence no longer matches authoritative ParsedArtifact bytes",
-    );
+    expect(() => {
+      assertEvidenceMatchesArtifact(evidence, bytes("staple quote"));
+    }).toThrow("Evidence no longer matches authoritative ParsedArtifact bytes");
   });
 
   it("rejects empty, mid-code-point and out-of-bounds Evidence ranges", () => {

@@ -1,10 +1,10 @@
 # P2-T10 support verification — Direct-file Pi evidence harness
 
-Status: **REAL DEVELOPMENT HARNESS PASS / HUMAN REVIEW OPEN**
+Status: **REAL DEVELOPMENT HARNESS PASS / ASSISTED HUMAN REVIEW OPEN**
 
 ## 1. CI preparation gate — PASS
 
-Canonical final run: `34332760481`.
+Canonical prior run: `34332760481`.
 
 Observed results:
 
@@ -19,7 +19,7 @@ artifact = 10096440773
 artifact digest = sha256:e65d56a823499760e80cbc832d06a1d6b3f789a8228aaaec17771174866dc88f
 ```
 
-All preparation steps passed. The prepare-only path does not execute Pi/provider inference and requires no provider credential.
+The current workflow additionally lints and syntax-checks `scripts/p2-review-direct-file-pi-baseline.mjs`; record the new canonical run after that gate completes. The prepare-only path does not execute Pi/provider inference and requires no provider credential.
 
 ## 2. Local runtime precondition — PASS
 
@@ -117,46 +117,88 @@ Evidence directory:
 
 No holdout data was loaded or executed.
 
-## 7. Independent human review — OPEN / REQUIRED
+## 7. Assisted independent human review — OPEN / REQUIRED
 
-Complete:
+Run from the updated support branch:
+
+```bash
+node scripts/p2-review-direct-file-pi-baseline.mjs
+```
+
+The helper consumes only the already-generated local evidence bundle. It must not invoke Pi/provider inference or remove/rewrite `answers-development.jsonl`, `observations-development.json`, raw Pi event streams, or the deterministic report.
+
+For each query the terminal must show:
+
+- query/categories;
+- expected answerable/no-answer state;
+- Pi answer;
+- expected required Evidence quotes and citation coverage;
+- actual model citations with mapped/unmapped state;
+- deterministic warning list;
+- rule-based starting classification.
+
+The reviewer then uses:
 
 ```text
+Enter = accept rule suggestion
+c = correct
+p = partially correct
+i = incorrect
+q = save and quit
+```
+
+For non-correct decisions, issue flags cover:
+
+```text
+u = unsupported claim
+v = version/conflict mistake
+o = important Evidence omission
+h = no-answer hallucination
+x = other
+```
+
+The helper saves progress after every reviewed query and must reject resume data belonging to a different dataset/evidence SHA.
+
+The rule suggestion is not a model-based semantic judge. It uses deterministic answerability/Evidence/citation signals only; the final classification remains the human reviewer's decision.
+
+## 8. Human-review completion evidence
+
+After all 50 decisions, require:
+
+```text
+/tmp/pi-knowledge-p2-evidence/p2-t10/human-review-development.json
 /tmp/pi-knowledge-p2-evidence/p2-t10/human-review-development.md
+/tmp/pi-knowledge-p2-evidence/p2-t10/human-review-summary.json
 ```
 
-Every query must receive one correctness classification:
+The terminal final result and `human-review-summary.json` must include:
 
-```text
-correct
-partially correct
-incorrect
-```
+- correct / partially-correct / incorrect counts;
+- unsupported-claim count;
+- version/conflict mistake count;
+- no-answer hallucination count;
+- Evidence-omission count;
+- accepted vs overridden rule-suggestion counts;
+- SHA-256 review digest bound to dataset hash + original evidence repo SHA + per-query human decisions.
 
-Also record:
+The detailed review stays local unless later audit requires it. Aggregate counts + digest are sufficient for repository status bookkeeping; no provider credentials or unrelated user files belong in GitHub.
 
-- unsupported claims;
-- version/conflict mistakes;
-- no-answer hallucinations;
-- important evidence omitted despite being present.
+## 9. Evidence preservation
 
-The model under test must not be the sole reviewer.
+Preserve the complete local output directory, including raw Pi JSONL streams and completed human-review records, until P2-T10 is accepted.
 
-## 8. Evidence preservation
+## 10. Holdout discipline
 
-Preserve the complete local output directory, including raw Pi JSONL streams, until P2-T10 is accepted. Credentials and unrelated user files must not be added to repository evidence.
+Do not execute P2-T10 holdout for tuning. Development configuration and review criteria are frozen; any later holdout use must remain one-shot acceptance-only.
 
-## 9. Holdout discipline
+## 11. Direct-base scope
 
-Do not execute P2-T10 holdout for tuning. Development configuration and review criteria are now frozen; any later holdout use must remain one-shot acceptance-only.
-
-## 10. Direct-base scope
-
-Compared with `experiment/p2-direct-file-pi-baseline`, support scope remains exactly:
+Compared with `experiment/p2-direct-file-pi-baseline`, support scope is exactly:
 
 ```text
 .github/workflows/p2-direct-file-pi-evidence.yml
 scripts/p2-run-direct-file-pi-baseline.mjs
+scripts/p2-review-direct-file-pi-baseline.mjs
 docs/development/reports/P2-T10-direct-file-pi-evidence-harness.md
 docs/development/verification/P2-T10-direct-file-pi-evidence-harness.md
 ```
@@ -165,4 +207,4 @@ No production Knowledge retrieval change, provider secret, dataset mutation, pro
 
 ## PASS condition
 
-The **support harness execution is PASS**: CI preparation and the complete local 50-query development run both succeeded and produced deterministic evidence. P2-T10 itself remains **PARTIAL** solely because independent human semantic review is still open.
+The **model evidence harness execution is PASS**. P2-T10 itself remains **PARTIAL** until the assisted independent human semantic review reaches 50/50 and its aggregate summary/digest are recorded.

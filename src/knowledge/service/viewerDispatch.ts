@@ -19,6 +19,9 @@ export interface KnowledgeViewerDispatch {
   ): Record<string, unknown>;
 }
 
+const DEFAULT_VIEWER_ARTIFACT_BYTES = 40 * 1024;
+const MAX_VIEWER_ARTIFACT_BYTES = 48 * 1024;
+
 /**
  * Resolves PI WEB's host-authoritative Workspace path into the separate durable
  * Knowledge Workspace identity before querying viewer data.
@@ -54,13 +57,17 @@ export function createKnowledgeViewerDispatch(
 
     openArtifact(scope, input) {
       const knowledgeWorkspaceId = resolveWorkspace(scope);
+      const maxBytes = input.maxBytes ?? DEFAULT_VIEWER_ARTIFACT_BYTES;
+      if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > MAX_VIEWER_ARTIFACT_BYTES) {
+        throw new TypeError(`viewer artifact maxBytes must be between 1 and ${String(MAX_VIEWER_ARTIFACT_BYTES)}`);
+      }
       return {
         version: 1,
         document: viewer.openArtifact({
           knowledgeWorkspaceId,
           parsedArtifactId: input.parsedArtifactId,
           ...(input.evidenceId === undefined ? {} : { evidenceId: input.evidenceId }),
-          ...(input.maxBytes === undefined ? {} : { maxBytes: input.maxBytes }),
+          maxBytes,
         }),
       };
     },

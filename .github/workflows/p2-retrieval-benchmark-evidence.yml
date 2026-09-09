@@ -1,0 +1,73 @@
+name: P2 Retrieval Benchmark Evidence
+
+on:
+  pull_request:
+    branches:
+      - feat/p2-retrieval-benchmark-runner
+    paths:
+      - ".github/workflows/p2-retrieval-benchmark-evidence.yml"
+      - "scripts/p2-run-retrieval-benchmark.mjs"
+      - "src/knowledge/eval/**"
+      - "src/knowledge/storage/**"
+      - "eval/**"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: Frozen FTS development benchmark (Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Diagnostic typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Diagnostic lint
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Diagnostic knip
+        continue-on-error: true
+        run: npm run knip
+
+      - name: Focused P2-T09 runner and ancestry tests
+        run: >-
+          npm test --
+          src/knowledge/eval/goldenDataset.test.ts
+          src/knowledge/eval/representativeCorpus.test.ts
+          src/knowledge/eval/queryAnnotations.test.ts
+          src/knowledge/eval/retrievalChallengeCorpus.test.ts
+          src/knowledge/eval/ftsBaselineEvaluation.test.ts
+          src/knowledge/eval/retrievalBenchmarkRunner.test.ts
+          src/knowledge/storage/searchQuery.test.ts
+          src/knowledge/storage/fts5Index.test.ts
+
+      - name: Generate real development benchmark
+        env:
+          P2_T09_EVIDENCE_OUT_DIR: /tmp/pi-knowledge-p2-evidence/p2-t09
+        run: npx tsx scripts/p2-run-retrieval-benchmark.mjs
+
+      - name: Upload P2-T09 evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-t09-retrieval-benchmark-evidence
+          path: /tmp/pi-knowledge-p2-evidence/p2-t09
+          if-no-files-found: error
+          retention-days: 14

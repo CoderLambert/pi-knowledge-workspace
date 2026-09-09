@@ -115,7 +115,7 @@ export class SearchQueryApi {
     const lexicalHits = this.index.search({
       knowledgeWorkspaceId,
       indexBuildId,
-      query,
+      query: compileNaturalLanguageFts5Query(query),
       ...(allowedSourceVersionIds === undefined ? {} : { allowedSourceVersionIds }),
       limit: effectiveLimit,
     });
@@ -222,6 +222,23 @@ function hydrateHit(hit: Fts5SearchHit, row: unknown): SearchQueryHit {
     rank: hit.rank,
     ordinal: Number(value.ordinal),
   };
+}
+
+/**
+ * Compile public natural-language input into a literal-only FTS5 expression.
+ *
+ * P1 search callers do not speak the FTS5 query language. Every whitespace-
+ * separated term is therefore quoted and OR-combined so punctuation and
+ * operators such as AND/OR/NOT cannot alter query syntax.
+ *
+ * Lexical normalization beyond this safety/usability boundary belongs to P2.
+ */
+function compileNaturalLanguageFts5Query(query: string): string {
+  return query
+    .split(/\s+/u)
+    .filter((term) => term.length > 0)
+    .map((term) => `"${term.replaceAll('"', '""')}"`)
+    .join(" OR ");
 }
 
 function normalizeAllowedSourceVersions(values: readonly string[] | undefined): string[] | undefined {

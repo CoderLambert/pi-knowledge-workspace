@@ -122,7 +122,22 @@ describe("search.query baseline", () => {
       allowedSourceVersionCount: 2,
     });
     const search = db.prepared.find((call) => call.sql.includes("FROM chunk_fts"));
-    expect(search?.alls[0]).toEqual(["needle", "workspace-1", "build-2", "version-1", "version-2", 3]);
+    expect(search?.alls[0]).toEqual(['"needle"', "workspace-1", "build-2", "version-1", "version-2", 3]);
+  });
+
+  it("compiles natural-language punctuation and FTS operators into literal OR terms", () => {
+    const db = new FakeKnowledgeDatabase();
+    const api = new SearchQueryApi(db, new Fts5BaselineIndex(db));
+
+    api.query({
+      knowledgeWorkspaceId: "workspace-1",
+      query: "Node.js `fsPromises.cp` ref's .value AND OR NOT what?",
+    });
+
+    const search = db.prepared.find((call) => call.sql.includes("FROM chunk_fts"));
+    expect(search?.alls[0]?.[0]).toBe(
+      '"Node.js" OR "`fsPromises.cp`" OR "ref\'s" OR ".value" OR "AND" OR "OR" OR "NOT" OR "what?"',
+    );
   });
 
   it("preserves an explicit empty SourceVersion scope without falling back to global search", () => {

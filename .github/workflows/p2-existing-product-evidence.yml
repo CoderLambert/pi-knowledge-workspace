@@ -1,0 +1,352 @@
+name: P2 Existing Product Evidence
+
+on:
+  pull_request:
+    branches:
+      - research/p2-existing-product-comparison
+    paths:
+      - ".github/workflows/p2-existing-product-evidence.yml"
+      - "scripts/p2-prepare-existing-product-hands-on.mjs"
+      - "docs/development/reports/P2-T11-existing-product-evidence-harness.md"
+      - "docs/development/verification/P2-T11-existing-product-evidence-harness.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    name: Freeze product versions and API contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint contract probe
+        run: npx eslint scripts/p2-prepare-existing-product-hands-on.mjs
+
+      - name: Syntax check
+        run: node --check scripts/p2-prepare-existing-product-hands-on.mjs
+
+      - name: Resolve exact upstream contracts
+        env:
+          P2_T11_EVIDENCE_OUT_DIR: /tmp/pi-knowledge-p2-evidence/p2-t11
+        run: node scripts/p2-prepare-existing-product-hands-on.mjs --contracts-only
+
+      - name: Upload contract proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-t11-existing-product-contracts
+          path: /tmp/pi-knowledge-p2-evidence/p2-t11
+          if-no-files-found: error
+          retention-days: 14
+
+  anythingllm-smoke:
+    name: AnythingLLM 1.16.1 headless smoke
+    needs: contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Start fixed AnythingLLM release
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm /tmp/p2-anythingllm-storage
+          sudo chown -R 1000:1000 /tmp/p2-anythingllm-storage
+          docker pull ghcr.io/mintplex-labs/anything-llm:1.16.1
+          docker image inspect ghcr.io/mintplex-labs/anything-llm:1.16.1 > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/image-inspect.json
+          docker run -d --name p2-anythingllm -p 3001:3001 --cap-add SYS_ADMIN \
+            -e STORAGE_DIR=/app/server/storage \
+            -e AUTH_TOKEN=p2-t11-ci-auth \
+            -e JWT_SECRET=p2-t11-ci-jwt-secret-1234567890 \
+            -e DISABLE_TELEMETRY=true \
+            -v /tmp/p2-anythingllm-storage:/app/server/storage \
+            ghcr.io/mintplex-labs/anything-llm:1.16.1
+
+      - name: Wait for AnythingLLM
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:3001/api/ping >/tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/ping.json; then
+              exit 0
+            fi
+            if ! docker inspect -f '{{.State.Running}}' p2-anythingllm 2>/dev/null | grep -qx true; then
+              docker logs p2-anythingllm
+              exit 1
+            fi
+            sleep 2
+          done
+          docker logs p2-anythingllm
+          exit 1
+
+      - name: Verify headless auth and workspace API
+        run: |
+          set -euo pipefail
+          TOKEN_RESPONSE=$(curl -fsS -X POST http://127.0.0.1:3001/api/request-token \
+            -H 'Content-Type: application/json' \
+            -d '{"password":"p2-t11-ci-auth"}')
+          TOKEN=$(printf '%s' "$TOKEN_RESPONSE" | jq -r '.token // empty')
+          test -n "$TOKEN"
+          printf '%s\n' "$TOKEN_RESPONSE" | jq 'del(.token)' > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/token-response.redacted.json
+
+          KEY_RESPONSE=$(curl -fsS -X POST http://127.0.0.1:3001/api/system/generate-api-key \
+            -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"p2-t11-ci"}')
+          API_KEY=$(printf '%s' "$KEY_RESPONSE" | jq -r '.apiKey.secret // .apiKey // .secret // empty')
+          test -n "$API_KEY"
+          printf '%s\n' "$KEY_RESPONSE" | jq 'if .apiKey.secret then .apiKey.secret="<redacted>" elif (.apiKey|type)=="string" then .apiKey="<redacted>" elif .secret then .secret="<redacted>" else . end' \
+            > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/api-key-response.redacted.json
+
+          WORKSPACE_RESPONSE=$(curl -fsS -X POST http://127.0.0.1:3001/api/v1/workspace/new \
+            -H "Authorization: Bearer $API_KEY" \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"p2-t11-smoke","chatMode":"query","topN":4}')
+          printf '%s\n' "$WORKSPACE_RESPONSE" > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/workspace-create.json
+          test "$(printf '%s' "$WORKSPACE_RESPONSE" | jq -r '.workspace.name // empty')" = "p2-t11-smoke"
+
+      - name: Record AnythingLLM runtime footprint
+        if: always()
+        run: |
+          mkdir -p /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm
+          docker stats --no-stream --format '{{json .}}' p2-anythingllm > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/docker-stats.jsonl || true
+          du -sb /tmp/p2-anythingllm-storage > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/persistent-bytes.txt || true
+          docker logs p2-anythingllm > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/container.log 2>&1 || true
+          docker stop p2-anythingllm || true
+
+      - name: Upload AnythingLLM smoke proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-t11-anythingllm-smoke
+          path: /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm
+          if-no-files-found: error
+          retention-days: 14
+
+  open-webui-smoke:
+    name: Open WebUI v0.11.3 headless smoke
+    needs: contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Start fixed Open WebUI release
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui /tmp/p2-open-webui-data
+          docker pull ghcr.io/open-webui/open-webui:v0.11.3
+          docker image inspect ghcr.io/open-webui/open-webui:v0.11.3 > /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/image-inspect.json
+          docker run -d --name p2-open-webui -p 3000:8080 \
+            -e WEBUI_AUTH=True \
+            -e ENABLE_SIGNUP=True \
+            -e ENABLE_PERSISTENT_CONFIG=False \
+            -e WEBUI_SECRET_KEY=p2-t11-ci-only-secret \
+            -v /tmp/p2-open-webui-data:/app/backend/data \
+            ghcr.io/open-webui/open-webui:v0.11.3
+
+      - name: Wait for Open WebUI
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:3000/health >/tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/health.json; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs p2-open-webui
+          exit 1
+
+      - name: Bootstrap admin and verify Knowledge runtime API
+        run: |
+          set -euo pipefail
+          SIGNUP_RESPONSE=$(curl -fsS -X POST http://127.0.0.1:3000/api/v1/auths/signup \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"P2 T11 CI","email":"p2-t11@example.invalid","password":"p2-t11-ci-password"}')
+          TOKEN=$(printf '%s' "$SIGNUP_RESPONSE" | jq -r '.token // empty')
+          test -n "$TOKEN"
+          printf '%s\n' "$SIGNUP_RESPONSE" | jq 'del(.token)' > /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/signup-response.redacted.json
+
+          HTTP_CODE=$(curl -sS -o /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/knowledge-create.json \
+            -w '%{http_code}' -X POST http://127.0.0.1:3000/api/v1/knowledge/create \
+            -H "Authorization: Bearer $TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"p2-t11-smoke","description":"fixed-version CI smoke"}')
+          printf '%s\n' "$HTTP_CODE" > /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/knowledge-create.status
+          test "$HTTP_CODE" = "200"
+          test "$(jq -r '.name // empty' /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/knowledge-create.json)" = "p2-t11-smoke"
+
+      - name: Record runtime footprint
+        if: always()
+        run: |
+          mkdir -p /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui
+          docker stats --no-stream --format '{{json .}}' p2-open-webui > /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/docker-stats.jsonl || true
+          du -sb /tmp/p2-open-webui-data > /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/persistent-bytes.txt || true
+          docker logs p2-open-webui > /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui/container.log 2>&1 || true
+          docker stop p2-open-webui || true
+
+      - name: Upload Open WebUI smoke proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-t11-open-webui-smoke
+          path: /tmp/pi-knowledge-p2-evidence/p2-t11/open-webui
+          if-no-files-found: error
+          retention-days: 14
+
+  anythingllm-history:
+    name: AnythingLLM historical citation after source replacement
+    needs: anythingllm-smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Start deterministic OpenAI-compatible stub
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm-history
+          cat >/tmp/p2-openai-stub.mjs <<'NODE'
+          import http from 'node:http';
+          const server = http.createServer(async (req, res) => {
+            const chunks = [];
+            for await (const chunk of req) chunks.push(chunk);
+            const body = chunks.length ? Buffer.concat(chunks).toString('utf8') : '';
+            res.setHeader('content-type', 'application/json');
+            if (req.method === 'GET' && req.url === '/v1/models') {
+              res.end(JSON.stringify({object:'list',data:[{id:'p2-stub',object:'model',owned_by:'p2'}]}));
+              return;
+            }
+            if (req.method === 'POST' && req.url === '/v1/chat/completions') {
+              let parsed = {};
+              try { parsed = JSON.parse(body); } catch {}
+              const context = JSON.stringify(parsed.messages ?? []);
+              const marker = context.includes('BRAVO-91D7') ? 'BRAVO-91D7' : context.includes('ALPHA-8F2C') ? 'ALPHA-8F2C' : 'NO_CONTEXT';
+              res.end(JSON.stringify({
+                id:'p2-stub-completion', object:'chat.completion', created:Math.floor(Date.now()/1000), model:'p2-stub',
+                choices:[{index:0,message:{role:'assistant',content:`P2_HISTORY_VALUE is ${marker}.`},finish_reason:'stop'}],
+                usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2}
+              }));
+              return;
+            }
+            res.statusCode = 404;
+            res.end(JSON.stringify({error:'not found'}));
+          });
+          server.listen(18080, '0.0.0.0');
+          NODE
+          node /tmp/p2-openai-stub.mjs >/tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm-history/stub.log 2>&1 &
+          echo $! >/tmp/p2-openai-stub.pid
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18080/v1/models >/dev/null && exit 0; sleep 1; done
+          exit 1
+
+      - name: Run A to B replacement and restart probe
+        run: |
+          set -euo pipefail
+          OUT=/tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm-history
+          STORAGE=/tmp/p2-anythingllm-history-storage
+          mkdir -p "$STORAGE"
+          sudo chown -R 1000:1000 "$STORAGE"
+          docker pull ghcr.io/mintplex-labs/anything-llm:1.16.1
+
+          start_container() {
+            docker run -d --name p2-anythingllm-history -p 3001:3001 --cap-add SYS_ADMIN \
+              --add-host=host.docker.internal:host-gateway \
+              -e STORAGE_DIR=/app/server/storage \
+              -e AUTH_TOKEN=p2-t11-history-auth \
+              -e JWT_SECRET=p2-t11-history-jwt-secret-1234567890 \
+              -e DISABLE_TELEMETRY=true \
+              -e LLM_PROVIDER=generic-openai \
+              -e GENERIC_OPEN_AI_BASE_PATH=http://host.docker.internal:18080/v1 \
+              -e GENERIC_OPEN_AI_MODEL_PREF=p2-stub \
+              -e GENERIC_OPEN_AI_MODEL_TOKEN_LIMIT=4096 \
+              -e GENERIC_OPEN_AI_API_KEY=p2-stub-key \
+              -e EMBEDDING_ENGINE=native \
+              -e EMBEDDING_MODEL_PREF=Xenova/all-MiniLM-L6-v2 \
+              -e VECTOR_DB=lancedb \
+              -v "$STORAGE":/app/server/storage \
+              ghcr.io/mintplex-labs/anything-llm:1.16.1 >/dev/null
+            for i in $(seq 1 120); do
+              curl -fsS http://127.0.0.1:3001/api/ping >/dev/null && return 0
+              docker inspect -f '{{.State.Running}}' p2-anythingllm-history 2>/dev/null | grep -qx true || { docker logs p2-anythingllm-history; return 1; }
+              sleep 2
+            done
+            docker logs p2-anythingllm-history
+            return 1
+          }
+
+          start_container
+          TOKEN=$(curl -fsS -X POST http://127.0.0.1:3001/api/request-token -H 'Content-Type: application/json' -d '{"password":"p2-t11-history-auth"}' | jq -r '.token')
+          KEY_RESPONSE=$(curl -fsS -X POST http://127.0.0.1:3001/api/system/generate-api-key -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"name":"p2-t11-history"}')
+          API_KEY=$(printf '%s' "$KEY_RESPONSE" | jq -r '.apiKey.secret // .apiKey // .secret // empty')
+          test -n "$API_KEY"
+          AUTH=(-H "Authorization: Bearer $API_KEY" -H 'Content-Type: application/json')
+
+          curl -fsS -X POST http://127.0.0.1:3001/api/v1/workspace/new "${AUTH[@]}" \
+            -d '{"name":"p2-t11-history","chatMode":"query","topN":4,"similarityThreshold":0}' >"$OUT/workspace.json"
+
+          A=$(curl -fsS -X POST http://127.0.0.1:3001/api/v1/document/raw-text "${AUTH[@]}" \
+            -d '{"textContent":"Historical source version A. P2_HISTORY_VALUE is ALPHA-8F2C.","addToWorkspaces":"p2-t11-history","metadata":{"title":"history-source-A.txt","description":"P2 T11 synthetic source A"}}')
+          printf '%s\n' "$A" >"$OUT/source-a-upload.json"
+          A_LOC=$(printf '%s' "$A" | jq -r '.documents[0].location // empty')
+          test -n "$A_LOC"
+
+          CHAT_A=$(curl -fsS -X POST http://127.0.0.1:3001/api/v1/workspace/p2-t11-history/chat "${AUTH[@]}" \
+            -d '{"message":"What is P2_HISTORY_VALUE?","mode":"query","sessionId":"source-a-session"}')
+          printf '%s\n' "$CHAT_A" >"$OUT/chat-a.json"
+          printf '%s' "$CHAT_A" | jq -e '.sources | length > 0' >/dev/null
+          printf '%s' "$CHAT_A" | jq -e '[.sources[] | (.text // "")] | join("\n") | contains("ALPHA-8F2C")' >/dev/null
+
+          B=$(curl -fsS -X POST http://127.0.0.1:3001/api/v1/document/raw-text "${AUTH[@]}" \
+            -d '{"textContent":"Historical source version B. P2_HISTORY_VALUE is BRAVO-91D7.","metadata":{"title":"history-source-B.txt","description":"P2 T11 synthetic source B"}}')
+          printf '%s\n' "$B" >"$OUT/source-b-upload.json"
+          B_LOC=$(printf '%s' "$B" | jq -r '.documents[0].location // empty')
+          test -n "$B_LOC"
+
+          jq -n --arg a "$A_LOC" --arg b "$B_LOC" '{adds:[$b],deletes:[$a]}' >"$OUT/replacement-request.json"
+          curl -fsS -X POST http://127.0.0.1:3001/api/v1/workspace/p2-t11-history/update-embeddings "${AUTH[@]}" \
+            -d @"$OUT/replacement-request.json" >"$OUT/replacement-response.json"
+
+          CHAT_B=$(curl -fsS -X POST http://127.0.0.1:3001/api/v1/workspace/p2-t11-history/chat "${AUTH[@]}" \
+            -d '{"message":"What is P2_HISTORY_VALUE?","mode":"query","sessionId":"source-b-session"}')
+          printf '%s\n' "$CHAT_B" >"$OUT/chat-b.json"
+          printf '%s' "$CHAT_B" | jq -e '[.sources[] | (.text // "")] | join("\n") | contains("BRAVO-91D7")' >/dev/null
+
+          curl -fsS http://127.0.0.1:3001/api/v1/workspace/p2-t11-history "${AUTH[@]}" >"$OUT/workspace-after-replacement.json"
+          curl -fsS 'http://127.0.0.1:3001/api/v1/workspace/p2-t11-history/chats?apiSessionId=source-a-session' "${AUTH[@]}" >"$OUT/history-a-before-restart.json"
+
+          docker stop p2-anythingllm-history >/dev/null
+          docker rm p2-anythingllm-history >/dev/null
+          start_container
+
+          curl -fsS 'http://127.0.0.1:3001/api/v1/workspace/p2-t11-history/chats?apiSessionId=source-a-session' "${AUTH[@]}" >"$OUT/history-a-after-restart.json"
+          jq -e '[.history[] | select(.role=="assistant") | .sources[]? | (.text // "")] | join("\n") | contains("ALPHA-8F2C")' "$OUT/history-a-after-restart.json" >/dev/null
+          curl -fsS 'http://127.0.0.1:3001/api/v1/workspace/p2-t11-history/chats?apiSessionId=source-b-session' "${AUTH[@]}" >"$OUT/history-b-after-restart.json"
+          jq -e '[.history[] | select(.role=="assistant") | .sources[]? | (.text // "")] | join("\n") | contains("BRAVO-91D7")' "$OUT/history-b-after-restart.json" >/dev/null
+
+          docker stats --no-stream --format '{{json .}}' p2-anythingllm-history >"$OUT/docker-stats-after-restart.jsonl"
+          du -sb "$STORAGE" >"$OUT/persistent-bytes-after-restart.txt"
+          docker logs p2-anythingllm-history >"$OUT/container-after-restart.log" 2>&1
+          printf '%s\n' '{"status":"PASS","historicalSourceAStillPresentAfterReplacementAndRestart":true,"activeSourceBPresent":true}' >"$OUT/summary.json"
+
+      - name: Cleanup historical probe
+        if: always()
+        run: |
+          docker rm -f p2-anythingllm-history >/dev/null 2>&1 || true
+          test ! -f /tmp/p2-openai-stub.pid || kill "$(cat /tmp/p2-openai-stub.pid)" >/dev/null 2>&1 || true
+
+      - name: Upload AnythingLLM historical proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-t11-anythingllm-history
+          path: /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm-history
+          if-no-files-found: error
+          retention-days: 14

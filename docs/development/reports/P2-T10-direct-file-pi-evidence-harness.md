@@ -1,10 +1,30 @@
 # P2-T10 support — Direct-file Pi evidence harness
 
-Status: **IMPLEMENTED / CI PREPARATION PENDING / REAL LOCAL RUN REQUIRED**
+Status: **CI PREPARATION PASS / REAL LOCAL RUN + HUMAN REVIEW REQUIRED**
 
 ## Purpose
 
 Make the P2-T10 product-value baseline executable as one local command while preserving the experiment boundary: Pi receives the same six frozen corpus files for every development query, no Knowledge retrieval ranks, and no Golden Evidence labels.
+
+## Final CI preparation evidence
+
+Canonical final preparation run on the frozen P2-T10 base:
+
+```text
+GitHub Actions run = 34332760481
+focused evaluator suite = 1 file / 5 tests PASS
+focused P2-T10 lint = PASS
+direct-file prepare-only = PASS
+queryCount = 50
+datasetHash = 949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3
+systemPromptSha256 = 8db92ab71e29b1f7228a5176e5f3de46f8eab02ad493896bc5a85e5463eddc16
+Node = v24.20.0
+platform = linux/x64
+artifact = 10096440773
+artifact digest = sha256:e65d56a823499760e80cbc832d06a1d6b3f789a8228aaaec17771174866dc88f
+```
+
+The CI path did not execute `pi`, contact a model provider, or consume provider credentials.
 
 ## Local acceptance command
 

@@ -118,9 +118,9 @@ describe("retrieval benchmark runner", () => {
       queryCount: 1,
     });
     expect(report.variants.map((item) => item.id)).toEqual(["fts", "hybrid"]);
-    expect(report.variants[0]!.metrics.recallAt10).toBe(0);
-    expect(report.variants[1]!.metrics.recallAt10).toBe(1);
-    expect(Object.keys(report.variants[0]!.configuration)).toEqual(["alpha", "zeta"]);
+    expect(report.variants[0]?.metrics.recallAt10).toBe(0);
+    expect(report.variants[1]?.metrics.recallAt10).toBe(1);
+    expect(Object.keys(report.variants[0]?.configuration ?? {})).toEqual(["alpha", "zeta"]);
   });
 
   it("fails if observations from another split are mixed into a run", () => {

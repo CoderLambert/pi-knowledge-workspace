@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-10
 
+### P3-T01 — PARTIAL
+
+- Closed the inherited 12-error TypeScript blocker; `npm run typecheck` now passes in CI and `npm run verify` advances to ESLint.
+- Bounded support slices P3-T01S1 and P3-T01S2 reduced the inherited ESLint baseline from 261 → 254 → 252 without product, ADR, retrieval or P2-evidence changes.
+- P3-T01 remains PARTIAL while the remaining inherited static/test baseline is closed in subsystem-scoped slices before Slice A.
+
 ### P3-T00 — PASS
 
 - Rebaselined the authoritative development plan and phase gates after ADR-029 acceptance; the stale pre-ADR Ask→separate-Notes task order is superseded.

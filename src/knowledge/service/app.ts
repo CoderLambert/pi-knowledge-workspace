@@ -12,12 +12,14 @@ import {
 import { createKnowledgeErrorEnvelope, parseKnowledgeDispatchRequest } from "../contracts/schemas.js";
 import { dispatchKnowledgeOperation } from "./dispatch.js";
 import { knowledgeHealth } from "./health.js";
+import type { KnowledgeViewerDispatch } from "./viewerDispatch.js";
 
 export interface KnowledgeAppOptions {
   token: string;
   maxRequestBytes?: number;
   maxResponseBytes?: number;
   logger?: FastifyServerOptions["logger"];
+  viewer?: KnowledgeViewerDispatch;
 }
 
 const MIN_RESPONSE_LIMIT = 512;
@@ -120,10 +122,12 @@ export async function buildKnowledgeApp(options: KnowledgeAppOptions): Promise<F
         );
       }
 
-      const result = dispatchKnowledgeOperation(dispatchRequest.operation, dispatchRequest.input, {
-        maxRequestBytes,
-        maxResponseBytes,
-      });
+      const result = dispatchKnowledgeOperation(
+        dispatchRequest.operation,
+        dispatchRequest.input,
+        { maxRequestBytes, maxResponseBytes },
+        options.viewer === undefined ? {} : { viewer: options.viewer },
+      );
       const payload: Record<string, unknown> = {
         ok: true,
         protocolVersion: PI_KNOWLEDGE_PROTOCOL_VERSION,

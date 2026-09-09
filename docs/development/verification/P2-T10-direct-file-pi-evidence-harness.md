@@ -2,24 +2,24 @@
 
 Status: **REAL DEVELOPMENT HARNESS PASS / ASSISTED HUMAN REVIEW OPEN**
 
-## 1. CI preparation gate — PASS
+## 1. CI preparation + review-helper gate — PASS
 
-Canonical prior run: `34332760481`.
+Canonical dedicated run: `34339238995` on head `4c5fd5b9c2617bbbcc11735ac98bb4bd37682832`.
 
 Observed results:
 
 ```text
-focused evaluator suite = 1 file / 5 tests PASS
-focused P2-T10 lint = PASS
+focused evaluator suite = PASS
+focused evaluator + assisted-review lint = PASS
+assisted-review node --check = PASS
 prepare-only harness = PASS
 queryCount = 50
 datasetHash = 949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3
-systemPromptSha256 = 8db92ab71e29b1f7228a5176e5f3de46f8eab02ad493896bc5a85e5463eddc16
-artifact = 10096440773
-artifact digest = sha256:e65d56a823499760e80cbc832d06a1d6b3f789a8228aaaec17771174866dc88f
+artifact = 10099024031
+artifact digest = sha256:a1774e215ddf77af5d6d7c0858db6a40a0a844b83ee3ea687d993c52deca7245
 ```
 
-The current workflow additionally lints and syntax-checks `scripts/p2-review-direct-file-pi-baseline.mjs`; record the new canonical run after that gate completes. The prepare-only path does not execute Pi/provider inference and requires no provider credential.
+The prepare-only path does not execute Pi/provider inference and requires no provider credential.
 
 ## 2. Local runtime precondition — PASS
 
@@ -127,7 +127,7 @@ node scripts/p2-review-direct-file-pi-baseline.mjs
 
 The helper consumes only the already-generated local evidence bundle. It must not invoke Pi/provider inference or remove/rewrite `answers-development.jsonl`, `observations-development.json`, raw Pi event streams, or the deterministic report.
 
-For each query the terminal must show:
+For each query the terminal shows:
 
 - query/categories;
 - expected answerable/no-answer state;
@@ -137,7 +137,7 @@ For each query the terminal must show:
 - deterministic warning list;
 - rule-based starting classification.
 
-The reviewer then uses:
+Reviewer controls:
 
 ```text
 Enter = accept rule suggestion
@@ -157,7 +157,7 @@ h = no-answer hallucination
 x = other
 ```
 
-The helper saves progress after every reviewed query and must reject resume data belonging to a different dataset/evidence SHA.
+The helper saves progress after every reviewed query and rejects resume data belonging to a different dataset/evidence SHA.
 
 The rule suggestion is not a model-based semantic judge. It uses deterministic answerability/Evidence/citation signals only; the final classification remains the human reviewer's decision.
 
@@ -171,7 +171,7 @@ After all 50 decisions, require:
 /tmp/pi-knowledge-p2-evidence/p2-t10/human-review-summary.json
 ```
 
-The terminal final result and `human-review-summary.json` must include:
+The terminal final result and `human-review-summary.json` include:
 
 - correct / partially-correct / incorrect counts;
 - unsupported-claim count;
@@ -207,4 +207,4 @@ No production Knowledge retrieval change, provider secret, dataset mutation, pro
 
 ## PASS condition
 
-The **model evidence harness execution is PASS**. P2-T10 itself remains **PARTIAL** until the assisted independent human semantic review reaches 50/50 and its aggregate summary/digest are recorded.
+The **model evidence harness execution and assisted-review implementation/CI gates are PASS**. P2-T10 itself remains **PARTIAL** until the assisted independent human semantic review reaches 50/50 and its aggregate summary/digest are recorded.

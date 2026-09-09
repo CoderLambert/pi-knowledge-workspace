@@ -136,8 +136,13 @@ describe("lexical normalization development evaluation", () => {
       "code-derived",
     ]);
 
-    const baseline = report.comparisons[0]!;
-    const candidate = report.comparisons[1]!;
+    const baseline = report.comparisons[0];
+    const candidate = report.comparisons[1];
+    expect(baseline).toBeDefined();
+    expect(candidate).toBeDefined();
+    if (baseline === undefined || candidate === undefined) {
+      throw new Error("expected baseline and code-derived comparison results");
+    }
     expect(baseline.report.recallAt10).toBe(0);
     expect(candidate.report.recallAt10).toBe(1);
     expect(candidate.deltaFromBaseline).toMatchObject({

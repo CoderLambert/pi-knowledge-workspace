@@ -24,11 +24,11 @@ function restrictedTool(name: (typeof RESTRICTED_KNOWLEDGE_TOOL_NAMES)[number]) 
     label: name,
     description: `P0 restricted-runtime probe tool: ${name}`,
     parameters: emptyParameters,
-    async execute() {
-      return {
+    execute() {
+      return Promise.resolve({
         content: [{ type: "text" as const, text: `${name}: probe` }],
         details: { probe: true },
-      };
+      });
     },
   });
 }

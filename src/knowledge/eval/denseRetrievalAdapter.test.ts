@@ -9,7 +9,7 @@ import {
   type DenseEmbeddingProfile,
 } from "./denseRetrievalAdapter.js";
 
-function profile(id: string = "multilingual-a"): DenseEmbeddingProfile {
+function profile(id = "multilingual-a"): DenseEmbeddingProfile {
   return {
     id,
     model: "example/multilingual-embedding",

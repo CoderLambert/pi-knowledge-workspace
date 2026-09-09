@@ -89,7 +89,12 @@ function parseHit(row: unknown): { rowid: number; distance: number } {
   }
   const rowid = row.rowid;
   const distance = row.distance;
-  if (!Number.isSafeInteger(rowid) || typeof distance !== "number" || !Number.isFinite(distance)) {
+  if (
+    typeof rowid !== "number"
+    || !Number.isSafeInteger(rowid)
+    || typeof distance !== "number"
+    || !Number.isFinite(distance)
+  ) {
     throw new Error("sqlite-vec KNN probe returned an invalid row");
   }
   return { rowid, distance };

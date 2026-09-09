@@ -4,7 +4,7 @@ Status: **PARTIAL**
 
 Branch: `feat/p1-parsed-artifact-canonicalization`  
 Direct base: `feat/p1-md-txt-import-job`  
-PR: pending creation
+PR: #18
 
 ## Scope
 

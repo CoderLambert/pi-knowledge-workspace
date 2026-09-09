@@ -51,32 +51,39 @@ echo
 echo "===== REAL EXPANDED-CORPUS FTS BENCHMARK ====="
 P2_EVIDENCE_OUT_DIR="$OUT" npx tsx scripts/p2-run-fts-baseline.mjs
 
-echo
-echo "===== REPOSITORY GATES ====="
 : > "$OUT/gates/status.tsv"
-run_gate() {
-  local name="$1"
-  shift
-  echo "--- $name ---"
-  set +e
-  "$@" >"$OUT/gates/$name.log" 2>&1
-  local rc=$?
-  set -e
-  printf '%s\t%s\n' "$name" "$rc" >> "$OUT/gates/status.tsv"
-  tail -n 30 "$OUT/gates/$name.log" || true
-  echo "[$name] exit=$rc"
-}
+if [[ "${P2_SKIP_REPO_GATES:-0}" == "1" ]]; then
+  echo
+  echo "===== REPOSITORY GATES SKIPPED IN THIS EXECUTION ====="
+  echo "Dedicated CI run skips duplicate repository gates; the normal CI workflow owns them."
+  printf 'repository-gates\tskipped\n' >> "$OUT/gates/status.tsv"
+else
+  echo
+  echo "===== REPOSITORY GATES ====="
+  run_gate() {
+    local name="$1"
+    shift
+    echo "--- $name ---"
+    set +e
+    "$@" >"$OUT/gates/$name.log" 2>&1
+    local rc=$?
+    set -e
+    printf '%s\t%s\n' "$name" "$rc" >> "$OUT/gates/status.tsv"
+    tail -n 30 "$OUT/gates/$name.log" || true
+    echo "[$name] exit=$rc"
+  }
 
-run_gate typecheck npm run typecheck
-run_gate lint npm run lint
-run_gate knip npm run knip
-run_gate build npm run build
-run_gate pack-dry npm run pack:dry
-run_gate full-test npm test
-run_gate p2-t04-diff-check git diff --check origin/chore/p2-propagate-p1-t13-natural-query...origin/experiment/p2-fts-baseline-report
-run_gate p2-t04-diff-name-status git diff --name-status origin/chore/p2-propagate-p1-t13-natural-query...origin/experiment/p2-fts-baseline-report
-run_gate harness-diff-check git diff --check origin/experiment/p2-fts-baseline-report...HEAD
-run_gate harness-diff-name-status git diff --name-status origin/experiment/p2-fts-baseline-report...HEAD
+  run_gate typecheck npm run typecheck
+  run_gate lint npm run lint
+  run_gate knip npm run knip
+  run_gate build npm run build
+  run_gate pack-dry npm run pack:dry
+  run_gate full-test npm test
+  run_gate p2-t04-diff-check git diff --check origin/chore/p2-propagate-p1-t13-natural-query...origin/experiment/p2-fts-baseline-report
+  run_gate p2-t04-diff-name-status git diff --name-status origin/chore/p2-propagate-p1-t13-natural-query...origin/experiment/p2-fts-baseline-report
+  run_gate harness-diff-check git diff --check origin/experiment/p2-fts-baseline-report...HEAD
+  run_gate harness-diff-name-status git diff --name-status origin/experiment/p2-fts-baseline-report...HEAD
+fi
 
 git status --short > "$OUT/git-status.txt"
 git log -12 --oneline --decorate > "$OUT/git-log.txt"
@@ -100,7 +107,7 @@ Repository state:
   git-status.txt
   git-log.txt
 
-A non-zero repository gate may be inherited baseline debt; classify it against the owning task before changing unrelated code.
+A non-zero repository gate may be inherited baseline debt; classify it against the owning task before changing unrelated code. When repository gates are skipped by the dedicated evidence workflow, use the normal CI run from the same PR head for gate evidence.
 TXT
 
 echo

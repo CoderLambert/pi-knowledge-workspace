@@ -61,6 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm /tmp/p2-anythingllm-storage
+          sudo chown -R 1000:1000 /tmp/p2-anythingllm-storage
           docker pull ghcr.io/mintplex-labs/anything-llm:1.16.1
           docker image inspect ghcr.io/mintplex-labs/anything-llm:1.16.1 > /tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/image-inspect.json
           docker run -d --name p2-anythingllm -p 3001:3001 --cap-add SYS_ADMIN \
@@ -77,6 +78,10 @@ jobs:
           for i in $(seq 1 120); do
             if curl -fsS http://127.0.0.1:3001/api/ping >/tmp/pi-knowledge-p2-evidence/p2-t11/anythingllm/ping.json; then
               exit 0
+            fi
+            if ! docker inspect -f '{{.State.Running}}' p2-anythingllm 2>/dev/null | grep -qx true; then
+              docker logs p2-anythingllm
+              exit 1
             fi
             sleep 2
           done

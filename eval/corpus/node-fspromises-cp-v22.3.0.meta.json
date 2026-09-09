@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "corpus-node-fspromises-cp-v22-3-0",
+  "relativePath": "corpus/node-fspromises-cp-v22.3.0.md",
+  "mediaType": "text/markdown",
+  "language": "en",
+  "source": {
+    "title": "Node.js v22.3.0 File system promises — fsPromises.cp",
+    "uri": "https://github.com/nodejs/node/blob/v22.3.0/doc/api/fs.md",
+    "capturedAt": "2026-09-09T03:40:00.000Z",
+    "version": "tag:v22.3.0"
+  },
+  "parsedArtifact": {
+    "parsedArtifactId": "pa-9a153e4c846729ac",
+    "sourceVersionId": "sv-9611c2e2b6d19135",
+    "parserFingerprint": "md-txt-parser-v1",
+    "normalizationFingerprint": "utf8-bom-strip+newline-lf-v1",
+    "canonicalTextSha256": "9611c2e2b6d191359a153e4c846729ace3147c6542371cb6d0e38f6ca61a475e"
+  }
+}

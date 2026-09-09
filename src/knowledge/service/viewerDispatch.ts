@@ -37,7 +37,7 @@ export function createKnowledgeViewerDispatch(
     externalBinding: JSON.stringify({ projectId: scope.projectId, workspaceId: scope.workspaceId }),
   }).knowledgeWorkspaceId;
 
-  return Object.freeze({
+  const dispatch: KnowledgeViewerDispatch = {
     listSources(scope) {
       const knowledgeWorkspaceId = resolveWorkspace(scope);
       return {
@@ -71,5 +71,7 @@ export function createKnowledgeViewerDispatch(
         }),
       };
     },
-  });
+  };
+
+  return Object.freeze(dispatch);
 }

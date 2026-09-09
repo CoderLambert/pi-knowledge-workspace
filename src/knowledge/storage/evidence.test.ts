@@ -8,6 +8,8 @@ function bytes(text: string): Uint8Array {
   return Buffer.from(text, "utf8");
 }
 
+const WORKSPACE_ID = "workspace-1";
+
 describe("Stable Evidence entity", () => {
   it("derives exact quote and quote hash from authoritative artifact bytes", () => {
     const canonicalBytes = bytes("前言\nEvidence 😀 quote\n后记");
@@ -15,6 +17,7 @@ describe("Stable Evidence entity", () => {
     const endByte = startByte + Buffer.byteLength("Evidence 😀 quote", "utf8");
 
     const evidence = createStableEvidence({
+      knowledgeWorkspaceId: WORKSPACE_ID,
       parsedArtifactId: "artifact-1",
       canonicalBytes,
       range: { startByte, endByte },
@@ -25,6 +28,7 @@ describe("Stable Evidence entity", () => {
 
     expect(evidence).toMatchObject({
       id: "evidence-1",
+      knowledgeWorkspaceId: WORKSPACE_ID,
       parsedArtifactId: "artifact-1",
       startByte,
       endByte,
@@ -40,12 +44,14 @@ describe("Stable Evidence entity", () => {
   it("uses byte range rather than quote text to distinguish duplicated passages", () => {
     const canonicalBytes = bytes("same / same / same");
     const first = createStableEvidence({
+      knowledgeWorkspaceId: WORKSPACE_ID,
       parsedArtifactId: "artifact-1",
       canonicalBytes,
       range: { startByte: 0, endByte: 4 },
       locatorSnapshot: { occurrence: 1 },
     });
     const second = createStableEvidence({
+      knowledgeWorkspaceId: WORKSPACE_ID,
       parsedArtifactId: "artifact-1",
       canonicalBytes,
       range: { startByte: 7, endByte: 11 },
@@ -61,6 +67,7 @@ describe("Stable Evidence entity", () => {
   it("does not accept caller-supplied authoritative quote or quote hash fields", () => {
     const canonicalBytes = bytes("server truth");
     const forgedInput = {
+      knowledgeWorkspaceId: WORKSPACE_ID,
       parsedArtifactId: "artifact-1",
       canonicalBytes,
       range: { startByte: 0, endByte: 6 },
@@ -77,6 +84,7 @@ describe("Stable Evidence entity", () => {
 
   it("fails closed when persisted evidence is checked against changed authoritative bytes", () => {
     const evidence = createStableEvidence({
+      knowledgeWorkspaceId: WORKSPACE_ID,
       parsedArtifactId: "artifact-1",
       canonicalBytes: bytes("stable quote"),
       range: { startByte: 0, endByte: 6 },
@@ -93,6 +101,7 @@ describe("Stable Evidence entity", () => {
 
     expect(() =>
       createStableEvidence({
+        knowledgeWorkspaceId: WORKSPACE_ID,
         parsedArtifactId: "artifact-1",
         canonicalBytes,
         range: { startByte: 1, endByte: 1 },
@@ -101,6 +110,7 @@ describe("Stable Evidence entity", () => {
     ).toThrow("Evidence range must address at least one UTF-8 byte");
     expect(() =>
       createStableEvidence({
+        knowledgeWorkspaceId: WORKSPACE_ID,
         parsedArtifactId: "artifact-1",
         canonicalBytes,
         range: { startByte: 2, endByte: 5 },
@@ -109,6 +119,7 @@ describe("Stable Evidence entity", () => {
     ).toThrow();
     expect(() =>
       createStableEvidence({
+        knowledgeWorkspaceId: WORKSPACE_ID,
         parsedArtifactId: "artifact-1",
         canonicalBytes,
         range: { startByte: 1, endByte: 99 },
@@ -120,6 +131,7 @@ describe("Stable Evidence entity", () => {
   it("snapshots locator metadata instead of retaining the caller's mutable object", () => {
     const locator: Record<string, unknown> = { heading: "Before", nested: { ordinal: 1 } };
     const evidence = createStableEvidence({
+      knowledgeWorkspaceId: WORKSPACE_ID,
       parsedArtifactId: "artifact-1",
       canonicalBytes: bytes("quote"),
       range: { startByte: 0, endByte: 5 },

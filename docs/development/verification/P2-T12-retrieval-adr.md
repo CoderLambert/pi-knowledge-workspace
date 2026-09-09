@@ -1,10 +1,10 @@
-# P2-T12 verification — Retrieval ADR
+# P2-T12 verification — Knowledge Domain / Retrieval Boundary ADR
 
-Status: **BLOCKED ON P2-T11 HANDS-ON PRODUCT EVIDENCE ONLY**
+Status: **BLOCKED ON ARCHITECTURE CONTRACT FINALIZATION**
 
-## Retrieval evidence — PASS
+## Retrieval evidence — PASS for V1 selection
 
-P2-T04/P2-T05/P2-T06/P2-T09 evidence narrows the V1 retrieval candidate to:
+P2-T04/P2-T05/P2-T06/P2-T09 continue to support:
 
 ```text
 SQLite FTS5
@@ -14,45 +14,91 @@ naturalLanguageCompiler = quoted-literal-or
 Top-K = 10
 ```
 
-Dense is rejected; sqlite-vec and Hybrid/RRF are N/A unless Dense is intentionally reopened with new evidence.
+The tested Dense candidates are not justified for V1. Advanced retrieval remains reopenable only with new frozen evidence demonstrating material benefit.
 
 ## P2-T10 direct-file Pi — PASS
 
-Frozen model run:
+Owner-authorized independent semantic review remains:
 
 ```text
-queries = 50
-answerable/no-answer = 42 / 8
-required Evidence coverage = 1.0 / 1.0
-citationPrecision = 0.7758620689655172
-noAnswerCorrectAbstentionRate = 0.625
-```
-
-Final owner-delegated independent semantic review:
-
-```text
-reviewer = GPT-5.6 Sol
-model under test = gpt-6-astra
 correct = 48
-partially correct = 0
+partial = 0
 incorrect = 2
 no-answer hallucinations = 2
-answers SHA-256 = eed0f944d546220d96c82431e3dfd0037efb574d72e541ae1db09b9fa158ba2b
-review digest = 0e450d064781a0390e192e4338e0b1cb45a43297ee2a5629428b3351f1dd9e84
+version/conflict mistakes = 0
+material Evidence omissions = 0
 ```
 
-This is explicitly an independent model review authorized by the repository owner, not a human review.
+## P2-T11 mature-product gate — PASS on decision sufficiency
 
-`dev-035` is separately recorded as a Golden answerability defect because the current challenge corpus directly contains the comparison evidence despite the frozen `no-answer` category.
+Decision-critical mature-product evidence is complete enough to establish:
 
-P2-T10 is no longer a blocker.
+- generic mature local RAG/retrieval can perform strongly on answerable frozen queries;
+- AnythingLLM v1.16.1 preserves one directly observed historical citation path after source replacement + restart;
+- mature-product capability does not establish Pi's stronger canonical SourceVersion/ParsedArtifact/Evidence/generation/artifact lifecycle semantics.
 
-## Remaining decision gate
+AnythingLLM formal development evidence:
 
-P2-T11 remains PARTIAL until fixed-version hands-on observations are complete for AnythingLLM and Open WebUI Knowledge, including historical citation durability after source update/restart and same-corpus/operational observations.
+```text
+50 records
+47 success
+3 first-attempt runtime/API failures
+39/39 successful answerable responses semantically correct
+JSONL SHA-256 d62197426809c28636c8d04d609a901c613237c9be1a448364775c487c4b1cb9
+```
 
-## ADR acceptance gate
+The full Open WebUI long benchmark is intentionally de-scoped and is not an ADR acceptance requirement. Partial diagnostics must not be promoted to a formal score or tuned/retried for symmetry.
 
-ADR-029 remains **BLOCKED** until P2-T11 is complete and the final product-value comparison is recorded. Do not enter P3 before ADR-029 is formally Accepted.
+## Current ADR acceptance gate
 
-No PR is automatically merged by this verification task.
+ADR-029 is no longer blocked on additional mature-product benchmarking.
+
+It remains blocked until the following contracts are frozen and reconciled with the current repository implementation:
+
+1. `Source` selection/current-version semantics, including repeated historical content A -> B -> A;
+2. immutable `SourceVersion` raw snapshot contract;
+3. immutable versioned `ParsedArtifact` carrying DocumentIR/canonical content/parser identity;
+4. Stable Evidence anchored to historical canonical content, not retrieval chunk/vector identity;
+5. frozen `GenerationRun` / `ScopeManifest` and recorded `DeliveredEvidence`;
+6. `DerivedArtifact` with immutable `ArtifactRevision` history and pinned/follow-current dependency policy;
+7. `CitationRef -> Evidence` historical reopening contract;
+8. SQLite FTS retrieval adapter/provider as a rebuildable projection;
+9. production persistence / backup / restore / retention closure;
+10. repository reality check distinguishing production-wired, partial and fixture-only implementation.
+
+## Acceptance proof
+
+A bounded end-to-end vertical slice is the preferred acceptance proof:
+
+```text
+Source A
+-> SourceVersion A
+-> ParsedArtifact A
+-> Evidence A
+-> SQLite FTS IndexBuild A
+-> frozen generation scope
+-> grounded answer
+-> Quiz/Interview ArtifactRevision A
+-> Source B update
+-> pinned history preserved / follow-current needs-review
+-> restart
+-> index GC
+-> backup / restore
+-> historical A still resolves
+```
+
+Required properties:
+
+- new-version parse/index failure does not destroy the old usable version;
+- retrieval index identity is not a long-lived citation/artifact identity;
+- source/index changes during a GenerationRun cannot silently mix generations;
+- historical Evidence and ArtifactRevision survive restart/index rebuild/retention operations;
+- canonical backup/restore is sufficient even if retrieval indexes are rebuilt.
+
+## ADR state
+
+ADR-029 remains **BLOCKED**, not Accepted.
+
+Do not enter normal P3 before formal acceptance. Do not restart Open WebUI or other broad product benchmarking merely to satisfy the superseded comparison checklist.
+
+No automatic merge.

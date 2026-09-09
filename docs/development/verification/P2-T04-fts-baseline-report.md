@@ -3,9 +3,25 @@
 Status: **OPEN / PARTIAL**
 
 Branch: `experiment/p2-fts-baseline-report`  
-Direct base: `data/p2-query-annotation`
+Direct base: `chore/p2-propagate-p1-t13-natural-query` (PR #47)  
+Upstream corrective corpus: `data/p2-retrieval-challenge-expansion` (PR #46)
 
-## 1. Focused metric semantics
+## 1. Corrected ancestry prerequisites
+
+P2-T04 acceptance now depends on both corrective layers being present in ancestry:
+
+```text
+P2-T03 / #35
+  -> P2-T03A challenge expansion / #46
+  -> P1-T13 natural-language FTS propagation / #47
+  -> P2-T04 / #36
+```
+
+Do not benchmark from the old #35-based branch state. The original 3-chunk run is preserved only as regression evidence.
+
+## 2. Focused tests
+
+Run from a current checkout of `experiment/p2-fts-baseline-report`:
 
 ```bash
 npm ci
@@ -13,41 +29,91 @@ npm test -- \
   src/knowledge/eval/goldenDataset.test.ts \
   src/knowledge/eval/representativeCorpus.test.ts \
   src/knowledge/eval/queryAnnotations.test.ts \
+  src/knowledge/eval/retrievalChallengeCorpus.test.ts \
+  src/knowledge/storage/searchQuery.test.ts \
+  src/knowledge/storage/fts5Index.test.ts \
   src/knowledge/eval/ftsBaselineEvaluation.test.ts
 ```
 
-PASS requires all P2 dataset/evaluator contract tests to pass.
+PASS evidence must establish:
 
-## 2. Real FTS baseline execution
+- original Golden Dataset integrity remains unchanged;
+- challenge artifacts have valid immutable metadata and unique lineage;
+- no development Evidence exact quote is copied into the challenge corpus;
+- challenge material omits target `ref()` / `fsPromises.cp` passages while retaining hard-negative lexical overlap;
+- production `canonicalizeParsedArtifact -> chunkParsedArtifact` yields at least 30 challenge chunks total and at least 10 per challenge artifact;
+- public natural-language punctuation/code terms are compiled into safe quoted FTS5 literals joined by `OR`;
+- SourceVersion scope, result budget, active-build lease and release semantics remain intact;
+- P2-T04 metric semantics remain correct.
 
-Use the current supported `better-sqlite3` runtime and current P1 chunk/index/search implementation.
+## 3. Real expanded-corpus FTS execution
 
-Required run:
+Use the supported real `better-sqlite3` runtime and current production Knowledge storage/search path.
 
-1. Load the three fixed P2-T02 corpus snapshots as immutable ParsedArtifacts.
-2. Build one current published FTS5 IndexBuild using the current P1 chunking/indexing path.
-3. Execute every P2-T03 query exactly once through `SearchQueryApi` with `limit = 10` and no query-specific tuning.
-4. Record each query id, wall-clock latency and returned hit `sourceVersionId + parsedArtifactId + [startByte,endByte)`.
-5. Record peak process RSS and measured FTS/index bytes.
-6. Pass the complete observations/resources to `evaluateFtsBaseline`.
-7. Replace every `UNRUN` field in `eval/reports/fts-baseline.md` with the observed values.
-8. List every missed development query with category and returned top hits. Do not use holdout misses to tune later parameters.
+Required corpus:
 
-Do not substitute a hand-written/simulated result list for the real SQLite/SearchQuery run.
+- the original three immutable P2-T02 artifacts;
+- all P2-T03A challenge artifacts from PR #46.
 
-## 3. Metric acceptance
+Required query/ground-truth set:
 
-Check that:
+- the unchanged 50 development queries;
+- the unchanged 30 holdout queries;
+- the existing Stable Evidence labels only.
 
-- Recall@10 scores answerable queries only;
-- MRR uses the first top-10 hit overlapping any required Stable Evidence;
-- all-required-Evidence coverage requires every required label for a query;
-- multi-source comparison queries therefore require both historical SourceVersions for full required-Evidence coverage;
-- category failure counts are emitted for answerable misses;
-- no-answer lexical-hit count is diagnostic only and is not misreported as no-answer accuracy;
-- resource and latency numbers are measured, not estimated.
+Execution protocol:
 
-## 4. Repository gates
+1. create/open a fresh file-backed Knowledge SQLite database;
+2. materialize all original + challenge artifacts as immutable SourceVersion/ParsedArtifact rows;
+3. canonicalize and chunk every artifact through production code;
+4. build, validate and publish one FTS5 IndexBuild;
+5. execute all 80 fixed queries through `SearchQueryApi` with `limit=10`;
+6. use the PR #47 natural-language query compiler; do not add P2 lexical normalization here;
+7. preserve the current active IndexBuild lease behavior;
+8. record every ordered hit locator and wall-clock query latency;
+9. measure peak RSS;
+10. measure FTS allocation using SQLite `dbstat`, not database file-size deltas;
+11. pass complete observations/resources to `evaluateFtsBaseline`;
+12. publish numeric results plus development failure/rank diagnostics.
+
+Do not substitute fixtures, hand-written hits, or the old 3-chunk result for this run.
+
+## 4. Development / holdout discipline
+
+During later P2 tuning:
+
+- development observations may be inspected;
+- holdout observations must not be used to select lexical profiles, embedding profiles, or RRF settings;
+- the previously observed holdout rank-2 cases remain acceptance-only evidence.
+
+The expanded FTS baseline itself may record holdout aggregate acceptance metrics, but no parameter change may be derived from them.
+
+## 5. Resource measurement
+
+Record at minimum:
+
+```text
+SQLite version
+better-sqlite3 version
+Node version
+repository HEAD SHA
+original artifact count
+challenge artifact count
+total chunk count
+query error count
+Recall@10
+MRR
+all-required Evidence coverage
+category failure counts
+no-answer queries with any hit
+latency median / p95 / max
+peak RSS bytes
+FTS dbstat bytes
+```
+
+The earlier original-corpus `20,480` FTS-byte figure is valid for that fixture only. Measure again for the expanded index.
+
+## 6. Repository gates
 
 ```bash
 npm run typecheck
@@ -56,22 +122,27 @@ npm run knip
 npm run build
 npm run pack:dry
 npm test
-git diff --check origin/data/p2-query-annotation...HEAD
-git diff --name-status origin/data/p2-query-annotation...HEAD
 ```
 
-Classify inherited failures only when their signature is unchanged; do not patch unrelated PI WEB failures in this experiment.
+Fix only P2-T04 / corrected-ancestry attributable failures. Classify unchanged inherited PI WEB failures rather than editing unrelated production code.
 
-## 5. Scope
+## 7. Direct-base scope
 
-P2-T04 direct-base diff may contain only:
+```bash
+git diff --check origin/chore/p2-propagate-p1-t13-natural-query...HEAD
+git diff --name-status origin/chore/p2-propagate-p1-t13-natural-query...HEAD
+```
 
-- narrow FTS baseline metric evaluator/tests;
+Expected P2-T04-only scope:
+
+- `src/knowledge/eval/ftsBaselineEvaluation.ts`;
+- `src/knowledge/eval/ftsBaselineEvaluation.test.ts`;
 - `eval/reports/fts-baseline.md`;
-- P2-T04 report/verification/bookkeeping.
+- P2-T04 implementation report;
+- this verification guide.
 
-No P2-T05 lexical normalization/tokenizer code, dense/vector/RRF implementation, P2-T09 generic benchmark framework, model runtime or P3 work belongs here.
+No P2-T05 lexical normalization, Dense/vector/sqlite-vec/RRF implementation, P2-T09 generic runner, model runtime, or P3 scope belongs here.
 
 ## PASS condition
 
-P2-T04 remains PARTIAL until the real fixed-dataset FTS5/SearchQuery run is executed and the numeric report plus development failure list are committed, with focused/static/build/package/full-suite and scope gates recorded.
+P2-T04 remains PARTIAL until the expanded-corpus real FTS run, numeric report/provenance, focused/static/build/package/full-suite classification, and direct-base scope proof are all recorded. The original 3-chunk run alone cannot satisfy this gate.

@@ -22,6 +22,12 @@ Only record task-level progress. Do not duplicate commit-by-commit history.
 
 ## 2026-09-09
 
+### P1-T19 — PARTIAL
+
+- Added schema v7 `index_build_pins`, finite query leases, durable future-owner pins, bounded expired-pin cleanup and retained-IndexBuild GC.
+- Search now atomically resolves the published active build and inserts a 60-second lease before retrieval, releasing it in `finally`; GC cannot delete active, live-leased or durable-pinned builds.
+- GC removes only derived FTS/chunk/IndexBuild state and never SourceVersion/ParsedArtifact/Evidence history. Real multi-connection query/publication/GC races, crash-expiry and repository executable/static/build gates remain OPEN verification debt.
+
 ### P1-T18 — PARTIAL
 
 - Added schema v6 and atomic IndexBuild publication using a Workspace-owned active-build pointer plus monotonically increasing generation and candidate base-generation/base-active snapshots.

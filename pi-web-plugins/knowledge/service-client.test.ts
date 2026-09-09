@@ -1,3 +1,4 @@
+import { Response as UndiciResponse } from "undici";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   PI_KNOWLEDGE_DEFAULT_MAX_REQUEST_BYTES,
@@ -15,10 +16,12 @@ import {
   KNOWLEDGE_SERVICE_DEFAULT_PORT,
   KNOWLEDGE_SERVICE_PROTOCOL_VERSION,
   KnowledgeServiceClientError,
+  type KnowledgeServiceClientOptions,
 } from "./service-client.js";
 
 const SERVICE_TOKEN = "p0-t04-service-client-test-token";
 const apps: Awaited<ReturnType<typeof buildKnowledgeApp>>[] = [];
+type TestFetch = NonNullable<KnowledgeServiceClientOptions["fetchImpl"]>;
 
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
@@ -137,9 +140,9 @@ describe("Knowledge service client", () => {
 
   it("rejects a generated request that exceeds the adapter request bound before fetch", async () => {
     let fetchCalls = 0;
-    const fetchImpl: typeof fetch = () => {
+    const fetchImpl: TestFetch = () => {
       fetchCalls += 1;
-      return Promise.resolve(new Response("{}"));
+      return Promise.resolve(new UndiciResponse("{}"));
     };
     const client = createKnowledgeServiceClient({
       host: "127.0.0.1",
@@ -158,7 +161,7 @@ describe("Knowledge service client", () => {
   });
 
   it("rejects an oversized response from content-length before buffering its body", async () => {
-    const fetchImpl: typeof fetch = () => Promise.resolve(new Response("{}", {
+    const fetchImpl: TestFetch = () => Promise.resolve(new UndiciResponse("{}", {
       status: 200,
       headers: { "content-length": "4096" },
     }));
@@ -175,10 +178,10 @@ describe("Knowledge service client", () => {
   });
 
   it("propagates caller cancellation through the fetch signal", async () => {
-    const fetchImpl: typeof fetch = (_input, init) => {
+    const fetchImpl: TestFetch = (_input, init) => {
       const signal = init?.signal;
       if (signal === undefined || signal === null) throw new Error("expected fetch AbortSignal");
-      return new Promise<Response>((_resolve, reject) => {
+      return new Promise<UndiciResponse>((_resolve, reject) => {
         signal.addEventListener("abort", () => {
           const reason: unknown = signal.reason;
           reject(reason instanceof Error ? reason : new Error("fetch aborted", { cause: reason }));
@@ -199,10 +202,10 @@ describe("Knowledge service client", () => {
   });
 
   it("maps the adapter deadline when the complete service call does not settle in time", async () => {
-    const fetchImpl: typeof fetch = (_input, init) => {
+    const fetchImpl: TestFetch = (_input, init) => {
       const signal = init?.signal;
       if (signal === undefined || signal === null) throw new Error("expected fetch AbortSignal");
-      return new Promise<Response>((_resolve, reject) => {
+      return new Promise<UndiciResponse>((_resolve, reject) => {
         signal.addEventListener("abort", () => {
           const reason: unknown = signal.reason;
           reject(reason instanceof Error ? reason : new Error("fetch aborted", { cause: reason }));

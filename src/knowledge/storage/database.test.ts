@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { KNOWLEDGE_SCHEMA_VERSION, withTransaction } from "./database.js";
+import { KNOWLEDGE_SCHEMA_VERSION, openKnowledgeDatabase, withTransaction } from "./database.js";
 import { applyMigrations, type MigrationDatabase } from "./migrations.js";
 
 class FakeDatabase implements MigrationDatabase {
@@ -10,9 +10,9 @@ class FakeDatabase implements MigrationDatabase {
 
   exec(sql: string): void {
     this.execLog.push(sql);
-    if (this.failOn && sql.includes(this.failOn)) throw new Error("injected failure");
+    if (this.failOn !== undefined && sql.includes(this.failOn)) throw new Error("injected failure");
     const version = /PRAGMA user_version = (\d+)/.exec(sql)?.[1];
-    if (version) this.userVersion = Number(version);
+    if (version !== undefined) this.userVersion = Number(version);
     if (sql === "ROLLBACK") this.userVersion = 0;
   }
 
@@ -24,6 +24,26 @@ class FakeDatabase implements MigrationDatabase {
     };
   }
 }
+
+describe("openKnowledgeDatabase", () => {
+  it("opens real SQLite with migrations, foreign keys, and FTS5", () => {
+    const db = openKnowledgeDatabase(":memory:");
+
+    try {
+      expect(db.pragma("user_version", { simple: true })).toBe(KNOWLEDGE_SCHEMA_VERSION);
+      expect(db.pragma("foreign_keys", { simple: true })).toBe(1);
+
+      db.exec("CREATE VIRTUAL TABLE p1_t02_fts USING fts5(content)");
+      db.prepare("INSERT INTO p1_t02_fts(content) VALUES (?)").run("pi knowledge workspace");
+
+      expect(
+        db.prepare("SELECT content FROM p1_t02_fts WHERE p1_t02_fts MATCH ?").get("knowledge"),
+      ).toEqual({ content: "pi knowledge workspace" });
+    } finally {
+      db.close();
+    }
+  });
+});
 
 describe("Knowledge database migrations", () => {
   it("creates the complete initial evidence-core schema in one ordered transaction", () => {
@@ -60,14 +80,18 @@ describe("Knowledge database migrations", () => {
   it("fails closed when a database was written by a newer schema", () => {
     const db = new FakeDatabase();
     db.userVersion = KNOWLEDGE_SCHEMA_VERSION + 1;
-    expect(() => applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/newer than supported/);
+    expect(() => {
+      applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);
+    }).toThrow(/newer than supported/);
     expect(db.execLog).toEqual([]);
   });
 
   it("rolls back a failed migration and does not advance schema version", () => {
     const db = new FakeDatabase();
     db.failOn = "CREATE TABLE installations";
-    expect(() => applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/migration 1/);
+    expect(() => {
+      applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);
+    }).toThrow(/migration 1/);
     expect(db.execLog).toContain("ROLLBACK");
     expect(db.userVersion).toBe(0);
   });

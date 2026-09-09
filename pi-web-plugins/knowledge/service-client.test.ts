@@ -18,7 +18,7 @@ import {
 } from "./service-client.js";
 
 const SERVICE_TOKEN = "p0-t04-service-client-test-token";
-const apps: Array<Awaited<ReturnType<typeof buildKnowledgeApp>>> = [];
+const apps: Awaited<ReturnType<typeof buildKnowledgeApp>>[] = [];
 
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
@@ -152,7 +152,7 @@ describe("Knowledge service client", () => {
       return new Promise<Response>((_resolve, reject) => {
         signal.addEventListener("abort", () => {
           const reason: unknown = signal.reason;
-          reject(reason);
+          reject(reason instanceof Error ? reason : new Error(String(reason)));
         }, { once: true });
       });
     };
@@ -176,7 +176,7 @@ describe("Knowledge service client", () => {
       return new Promise<Response>((_resolve, reject) => {
         signal.addEventListener("abort", () => {
           const reason: unknown = signal.reason;
-          reject(reason);
+          reject(reason instanceof Error ? reason : new Error(String(reason)));
         }, { once: true });
       });
     };

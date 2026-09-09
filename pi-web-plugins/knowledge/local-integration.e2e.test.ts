@@ -25,7 +25,7 @@ import serverPlugin from "./server-plugin.js";
 
 const SERVICE_TOKEN = "p0-t05-local-integration-service-token";
 const KNOWLEDGE_REVISION = "knowledge-p0-t05-r1";
-const closeables: Array<() => Promise<void>> = [];
+const closeables: (() => Promise<void>)[] = [];
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -301,7 +301,7 @@ function clickIntegrationCheck(container: ParentNode): void {
 
 async function startKnowledgeService(
   token: string,
-  port: number = 0,
+  port = 0,
 ): Promise<{ port: number; close: () => Promise<void> }> {
   const app = await buildKnowledgeApp({ token });
   const address = await app.listen({ host: "127.0.0.1", port });

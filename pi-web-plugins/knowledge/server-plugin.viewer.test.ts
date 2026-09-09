@@ -9,7 +9,7 @@ import {
 } from "./server-plugin.js";
 
 class RecordingClient implements KnowledgeServiceClient {
-  calls: Array<{ operation: string; input: unknown }> = [];
+  calls: { operation: string; input: unknown }[] = [];
   result: Record<string, unknown> = { version: 1, sources: [] };
 
   dispatch(operation: KnowledgeServiceOperation, input: unknown): Promise<Record<string, unknown>> {

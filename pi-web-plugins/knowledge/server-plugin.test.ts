@@ -12,11 +12,11 @@ import {
 } from "./server-plugin.js";
 
 class RecordingKnowledgeServiceClient implements KnowledgeServiceClient {
-  readonly dispatchCalls: Array<{
+  readonly dispatchCalls: {
     operation: KnowledgeServiceOperation;
     input: unknown;
     signal: AbortSignal;
-  }> = [];
+  }[] = [];
 
   dispatchResult: Record<string, unknown> = {
     projectId: "project-1",

@@ -225,6 +225,27 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
 - **Dependent tasks:** P1-T08 and later parser/index pipeline; P1-T16/P1-T17 will generalize the job engine.
 - **Resolution:** pending executable/native-SQLite/restart acceptance; later implementation may proceed against the immutable SourceVersion result contract.
 
+### P1-T08 — ParsedArtifact canonicalization acceptance
+
+- **Task status:** PARTIAL
+- **Branch:** `feat/p1-parsed-artifact-canonicalization`
+- **PR:** #18
+- **Debt status:** OPEN
+- **Why deferred:** the GitHub-only automation environment cannot execute the repository dependency tree or target filesystem/blob acceptance harness, and the PR head currently has no GitHub commit status evidence.
+- **Required verification:**
+  1. Run `npm test -- src/knowledge/storage/parsedArtifact.test.ts` and confirm 7/7 focused tests pass.
+  2. Run `npm run typecheck`, `npm run lint`, `npm run knip`, `npm run build`, `npm run pack:dry`, and full `npm test`.
+  3. Run `git diff --check origin/feat/p1-md-txt-import-job...HEAD` and `git diff --name-status origin/feat/p1-md-txt-import-job...HEAD`; confirm only P1-T08 implementation/tests/report/verification/plan/changelog/debt records are present.
+  4. Confirm LF and BOM+CRLF/CR forms of equivalent UTF-8 content produce identical canonical text and canonical-text SHA-256.
+  5. Confirm Chinese, emoji, combining characters, duplicated prose, headings, lists, tables and fenced code preserve deterministic UTF-8 byte addressing.
+  6. Confirm invalid UTF-8 fails closed rather than replacement-decoding.
+  7. Canonicalize through `ParsedArtifactCanonicalizer.fromSourceVersion()` after changing/removing the original Workspace file; confirm immutable blob content remains authoritative and no Workspace reread occurs.
+  8. Confirm mismatched SourceVersion `blobKey`/content hash, byte length, or tampered blob fails closed before an artifact is accepted.
+- **Expected PASS evidence:** focused/static/build/package/full-suite gates show no new P1-T08-attributable failure; direct-base diff is task-only; canonicalization is deterministic across newline/BOM variants; Unicode and Markdown/TXT structure use stable canonical UTF-8 byte ranges; immutable SourceVersion/blob identity is enforced.
+- **Assumptions used for continued development:** P1-T04 verified blob reads and P1-T05 SourceVersion identity remain valid while their own debt is open; P1-T09 may treat P1-T08 canonical bytes as valid UTF-8 with BOM removed and newlines normalized to LF; any parser/normalization fingerprint change requires artifact regeneration rather than reinterpretation of existing byte ranges.
+- **Dependent tasks:** P1-T09, P1-T10, P1-T11, P1-T12 and all later Evidence/retrieval consumers
+- **Resolution:** pending executable/filesystem/blob verification; later tasks may proceed against the documented canonical-byte contract.
+
 P0-T03 is already fully accepted and remains PASS.
 
 ## Entry template

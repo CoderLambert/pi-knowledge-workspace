@@ -682,7 +682,7 @@ Current implementation exists on PR #17. Schema v2 adds only the minimum import-
 
 ## P1-T08 — ParsedArtifact canonicalization
 
-**Status:** TODO
+**Status:** PARTIAL
 
 Implement Markdown/TXT parsing.
 
@@ -709,9 +709,13 @@ Test:
 - tables;
 - duplicated text.
 
+Current implementation exists on PR #18. Canonicalization consumes verified immutable SourceVersion/blob bytes only, validates UTF-8, removes an optional BOM, normalizes CRLF/lone CR to LF, preserves all other UTF-8 bytes, emits source mapping and deterministic Markdown/TXT structural byte ranges, and records separate parser/normalization fingerprints plus canonical-text/artifact hashes. Seven focused contract scenarios are written; executable/static/build/filesystem/blob acceptance remains OPEN debt. P1-T09 may proceed against the documented canonical UTF-8 byte contract without treating P1-T08 as PASS.
+
 ---
 
 ## P1-T09 — UTF-8 stable range library
+
+**Status:** TODO
 
 Implement the Evidence addressing primitive:
 
@@ -1834,12 +1838,13 @@ As of 2026-09-09:
 | P1-T05 | PARTIAL | Source/SourceVersion domain implemented on PR #15; executable/real-SQLite acceptance remains OPEN debt. |
 | P1-T06 | PARTIAL | Safe Workspace file reader implemented on PR #16; executable/target-filesystem acceptance remains OPEN debt. |
 | P1-T07 | PARTIAL | Durable MD/TXT import job implemented on PR #17; executable/native-SQLite/restart acceptance remains OPEN debt. |
-| P1-T08 | TODO | Next task: ParsedArtifact canonicalization. |
+| P1-T08 | PARTIAL | ParsedArtifact canonicalization implemented on PR #18; executable/static/build/filesystem/blob acceptance remains OPEN debt. |
+| P1-T09 | TODO | Next task: UTF-8 stable range library. |
 
 Execution mode: **deferred human verification is allowed for development progression**. Tasks with environment-only acceptance still outstanding remain PARTIAL with explicit verification debt, while later tasks may proceed when dependency-safe. Phase/release PASS still requires all mandatory debt for that gate to be cleared.
 
 Current next task:
 
-# **P1-T08 — ParsedArtifact canonicalization**
+# **P1-T09 — UTF-8 stable range library**
 
-P1-T08 may proceed as a separate stacked branch against the immutable P1-T07 SourceVersion result contract. It must parse bytes from immutable SourceVersion/blob content rather than reopen mutable Workspace files, and must make canonical UTF-8 text, source mapping, parser/normalization fingerprints and artifact hash deterministic across supported MD/TXT cases.
+P1-T09 may proceed as a separate stacked branch against P1-T08's documented canonical-byte contract. It must treat Evidence addressing as UTF-8 byte ranges `[startByte, endByte)`, reject non-boundary offsets, extract/verify exact quotes from authoritative canonical bytes, and avoid any character-index or mutable-source-path authority.

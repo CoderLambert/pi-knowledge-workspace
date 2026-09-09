@@ -1,6 +1,6 @@
 # P2-T11 support verification — existing-product evidence harness
 
-Status: **PASS — CI CONTRACT / HEADLESS / HISTORY PROBES GREEN; LOCAL QUALITY RUNNER READY**
+Status: **PASS — SUPPORT EVIDENCE COMPLETE FOR CURRENT DECISION**
 
 ## CI gate
 
@@ -12,7 +12,7 @@ head aee050c1381231a6554ecd5cc73b8f080dfa35e7
 conclusion success
 ```
 
-Required artifacts were produced:
+Artifacts:
 
 ```text
 p2-t11-existing-product-contracts
@@ -35,82 +35,82 @@ sha256:93bec875fcccbbc66eda6b2adeaf5ee7e6a774433709a2662cd243558dd64948
 ## Frozen product identities
 
 ```text
-AnythingLLM tag v1.16.1
+AnythingLLM v1.16.1
 commit 35c58d89907e675a8c4fb10544c19be0f050f611
 
-Open WebUI tag v0.11.3
+Open WebUI v0.11.3
 commit 2a960a59fe1dbbd35282f0556b3666d81102e781
 ```
 
-The contract probe must continue to fail closed on release/tag drift. No floating release may silently replace either fixed product.
+The contract probe must continue to fail closed on tag/release drift if reused later.
 
-## AnythingLLM local 50-query gate
+## AnythingLLM formal development evidence — VERIFIED
 
-The formal target-machine development run is:
-
-```bash
-node scripts/p2-run-anythingllm-development.mjs
-```
-
-The runner requires the existing frozen local setup:
+Formal target-machine run:
 
 ```text
-workspace: p2-t11-anythingllm
-chat mode: query
-exactly six frozen P2 corpus Markdown files
-LLM: qwen3.5:9b-q8_0
-LLM digest: 441ec31e4d2aedceb97dd834b036db104d943fbe3dbc1e5c8ac95eeaa9141c77
-embedding: bge-m3:latest
-embedding digest: 7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab
-AnythingLLM commit: 35c58d89907e675a8c4fb10544c19be0f050f611
+50 development records
+47 success
+3 first-attempt runtime/API failures
+failure IDs: dev-011, dev-040, dev-041
+JSONL SHA-256: d62197426809c28636c8d04d609a901c613237c9be1a448364775c487c4b1cb9
 ```
 
-The script must execute exactly 50 development queries, serially, with `mode=query` and a unique API `sessionId` per query. It records the unmodified API response, source objects and latency for independent adjudication.
+Discipline:
 
-Default output:
+- development split only;
+- serial execution;
+- unique API session per query;
+- no failed-query retry;
+- no tuning after results;
+- no holdout run;
+- raw answers/sources/errors preserved.
+
+Independent semantic adjudication:
 
 ```text
-~/p2-t11-lab/evidence/anythingllm/anythingllm-development.json
-~/p2-t11-lab/evidence/anythingllm/anythingllm-development.jsonl
+correct: 41
+partial: 2
+incorrect: 4
+execution failure: 3
+successful answerable responses: 39/39 correct
 ```
 
-A pre-existing final JSON file is a hard stop. Do not silently overwrite or rerun the formal bundle for tuning.
+Historical citation classification remains:
 
-## Historical citation evidence
+```text
+A / PASS
+old ORCHID citation reopens Version A
+after same-named COBALT replacement + restart
+```
 
-AnythingLLM has two independent positive observations:
+## Open WebUI scope decision
 
-1. CI API/storage probe: Source-A payload remains in historical chat source data after Source B becomes active and the service restarts.
-2. Omarchy UI probe: original ORCHID answer -> same-named source replaced with COBALT -> service restart -> original citation reopened and still displayed ORCHID / `This statement is Source Version A.`
+The support harness proved the fixed Open WebUI v0.11.3 contract/smoke surface. A local long-run benchmark was later started but is intentionally not required to complete this support task or P2-T11.
 
-Classification for this tested path: **A — historical citation reopens Source Version A after replacement and restart.**
+Reason:
 
-Do not over-generalize this to raw-byte-addressed immutable SourceVersion identity, delete/sync/export/restore paths, or Pi-native Evidence IDs without additional evidence.
+The mature-product comparison no longer decides whether Pi should delegate its entire Knowledge domain. The architecture is now split between Pi-owned canonical Knowledge semantics and replaceable retrieval/RAG infrastructure. AnythingLLM already supplies enough direct mature-product evidence for generic RAG viability and one strong historical-citation path.
 
-## Safety / reproducibility
+Therefore:
 
-- no holdout data is loaded by this support task;
-- no product code is vendored into this repository;
-- model/provider revisions are frozen before formal scoring;
-- query concurrency is one;
-- raw answers/sources are preserved for independent review;
-- no P3 implementation is allowed;
-- no automatic merge.
+- incomplete Open WebUI long-run evidence is diagnostic only;
+- do not publish a partial quality score;
+- do not retry/tune it;
+- do not complete it solely for symmetry;
+- future targeted Open WebUI probes require a concrete adapter/integration question.
 
-## Remaining runtime hands-on gate
+## PASS condition
 
-P2-T11 itself remains PARTIAL until:
+This support task passes when it provides enough reproducible product evidence to support the current architecture decision without creating unnecessary benchmark debt.
 
-- AnythingLLM 50-query development evidence is complete and independently adjudicated;
-- Open WebUI v0.11.3 uses the same six corpus files and the same frozen Ollama LLM/embedder;
-- Open WebUI historical citation durability is directly observed;
-- multi-version/conflict behavior and citation reopen semantics are recorded;
-- target-machine RSS/latency/persistent bytes/restart/update cost is measured;
-- nearest native note/reuse semantics are exercised.
+That condition is met.
+
+The support task does **not** establish that AnythingLLM or Open WebUI can own Pi canonical SourceVersion/Evidence/DerivedArtifact semantics. It establishes that generic mature-product RAG capabilities are sufficiently real that Pi should not justify custom domain ownership by claiming generic RAG is unavailable elsewhere.
 
 ## Direct-base scope
 
-Support-only. Expected direct-base scope is exactly five files:
+Support-only scope remains the existing five files:
 
 ```text
 .github/workflows/p2-existing-product-evidence.yml
@@ -120,4 +120,4 @@ docs/development/reports/P2-T11-existing-product-evidence-harness.md
 docs/development/verification/P2-T11-existing-product-evidence-harness.md
 ```
 
-No automatic merge.
+No production Knowledge code, ADR acceptance, P3 implementation, branch deletion, or automatic merge belongs in this PR.

@@ -38,9 +38,11 @@ review digest = 044f7a1bb1d150dc027e728d29e53a5b48e31208719da0e144a14e1916b8fc08
 
 This defect does not affect the model run, deterministic citation/Evidence metrics, or raw evidence. It affects only the independent semantic-review acceptance gate because the reviewer did not see the actual query text.
 
+The defective helper has been removed from the support branch so it cannot be reused accidentally.
+
 ## Repair
 
-A dedicated reconfirmation helper reads the existing model evidence and previous human decisions:
+The corrected helper reads the existing model evidence and previous human decisions:
 
 ```bash
 node scripts/p2-reconfirm-direct-file-pi-review.mjs
@@ -75,13 +77,15 @@ Output:
 
 ## Regression gate
 
-CI now runs:
+CI runs:
 
 ```bash
+node --check scripts/p2-reconfirm-direct-file-pi-review.mjs
+npx eslint scripts/p2-reconfirm-direct-file-pi-review.mjs
 node scripts/p2-reconfirm-direct-file-pi-review.mjs --verify-query-display
 ```
 
-This fails if the 50 development rows do not expose non-empty `text` fields and records a query-text digest. CI also lints and syntax-checks both review helpers and reruns the frozen prepare-only contract without provider access.
+The query-display check fails if the 50 development rows do not expose non-empty `text` fields and records a query-text digest. CI also reruns the focused evaluator tests/lint and frozen prepare-only contract without provider access.
 
 ## Acceptance boundary
 
@@ -89,12 +93,11 @@ P2-T10 remains **PARTIAL** until the corrected query-text reconfirmation reaches
 
 ## Support scope
 
-Support-only files on PR #53 now include:
+PR #53 remains support-only with exactly five direct-base files:
 
 ```text
 .github/workflows/p2-direct-file-pi-evidence.yml
 scripts/p2-run-direct-file-pi-baseline.mjs
-scripts/p2-review-direct-file-pi-baseline.mjs
 scripts/p2-reconfirm-direct-file-pi-review.mjs
 docs/development/reports/P2-T10-direct-file-pi-evidence-harness.md
 docs/development/verification/P2-T10-direct-file-pi-evidence-harness.md

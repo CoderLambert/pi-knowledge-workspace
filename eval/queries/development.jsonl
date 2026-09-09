@@ -1,0 +1,50 @@
+{"schemaVersion":1,"id":"dev-001","text":"What kind of object does Vue `ref()` return?","split":"development","categories":["exact-api","english"]}
+{"schemaVersion":1,"id":"dev-002","text":"Vue 的 `ref()` 通过哪个属性暴露内部值？","split":"development","categories":["exact-api","chinese"]}
+{"schemaVersion":1,"id":"dev-003","text":"What is the generic TypeScript signature of `ref()`?","split":"development","categories":["exact-api","code-symbol","english"]}
+{"schemaVersion":1,"id":"dev-004","text":"`ref<T>(value: T)` 的返回类型是什么？","split":"development","categories":["exact-api","code-symbol","chinese-english-mixed"]}
+{"schemaVersion":1,"id":"dev-005","text":"Are reads from a ref's `.value` tracked reactively?","split":"development","categories":["semantic","english"]}
+{"schemaVersion":1,"id":"dev-006","text":"写入 Vue ref 的 `.value` 会发生什么？","split":"development","categories":["semantic","chinese"]}
+{"schemaVersion":1,"id":"dev-007","text":"What happens when an object is assigned to a Vue ref?","split":"development","categories":["semantic","english"]}
+{"schemaVersion":1,"id":"dev-008","text":"Which Vue API should be used when deep conversion of a ref value is unwanted?","split":"development","categories":["exact-api","english"]}
+{"schemaVersion":1,"id":"dev-009","text":"Vue `ref` 和 `reactive()` 在对象值上是什么关系？","split":"development","categories":["semantic","chinese-english-mixed"]}
+{"schemaVersion":1,"id":"dev-010","text":"Why would `shallowRef()` be chosen instead of `ref()` here?","split":"development","categories":["semantic","code-symbol","english"]}
+{"schemaVersion":1,"id":"dev-011","text":"Vue 文档中的 ref 对象本身可以修改吗？","split":"development","categories":["chinese","semantic"]}
+{"schemaVersion":1,"id":"dev-012","text":"读取和写入 `.value` 的响应式行为分别是什么？","split":"development","categories":["chinese","semantic"]}
+{"schemaVersion":1,"id":"dev-013","text":"Vue ref 的 `.value` 有什么 reactive tracking behavior?","split":"development","categories":["chinese-english-mixed","semantic"]}
+{"schemaVersion":1,"id":"dev-014","text":"Does the `ref()` type signature use `UnwrapRef<T>`?","split":"development","categories":["code-symbol","english"]}
+{"schemaVersion":1,"id":"dev-015","text":"Does Vue `ref()` expose its value through a `.current` property?","split":"development","categories":["no-answer","english"]}
+{"schemaVersion":1,"id":"dev-016","text":"Is `.value` the property used to access the internal value of a Vue ref?","split":"development","categories":["exact-api","english"]}
+{"schemaVersion":1,"id":"dev-017","text":"文档是否建议用 `shallowRef()` 避免深层转换？","split":"development","categories":["exact-api","chinese-english-mixed"]}
+{"schemaVersion":1,"id":"dev-018","text":"这个快照是否说明了对象中的嵌套 ref 会怎样被解包？","split":"development","categories":["no-answer","chinese"]}
+{"schemaVersion":1,"id":"dev-019","text":"Show the `ref<T>` declaration that mentions `UnwrapRef`.","split":"development","categories":["code-symbol","english"]}
+{"schemaVersion":1,"id":"dev-020","text":"Which API performs deep reactive conversion when an object is assigned to `ref()`?","split":"development","categories":["exact-api","code-symbol","english"]}
+{"schemaVersion":1,"id":"dev-021","text":"In which Node.js version was `fsPromises.cp` added?","split":"development","categories":["version-error-code","exact-api","english"]}
+{"schemaVersion":1,"id":"dev-022","text":"What stability status did `fsPromises.cp` have in Node.js v16.7.0?","split":"development","categories":["version-error-code","english"]}
+{"schemaVersion":1,"id":"dev-023","text":"What does the Node.js v22.3.0 change history say about `fsPromises.cp` stability?","split":"development","categories":["version-error-code","english"]}
+{"schemaVersion":1,"id":"dev-024","text":"How did `fsPromises.cp` stability change between Node.js v16.7.0 and v22.3.0?","split":"development","categories":["conflict","multi-source","version-error-code","english"]}
+{"schemaVersion":1,"id":"dev-025","text":"What is the default value of the `recursive` option for `fsPromises.cp`?","split":"development","categories":["exact-api","code-symbol","english"]}
+{"schemaVersion":1,"id":"dev-026","text":"In Node.js v16.7.0, is recursive directory copying enabled by default for `fsPromises.cp`?","split":"development","categories":["version-error-code","english"]}
+{"schemaVersion":1,"id":"dev-027","text":"In Node.js v22.3.0, what is the default for `recursive` in `fsPromises.cp`?","split":"development","categories":["version-error-code","exact-api","english"]}
+{"schemaVersion":1,"id":"dev-028","text":"What is the default `force` value in the Node.js v16.7.0 `fsPromises.cp` snapshot?","split":"development","categories":["exact-api","english"]}
+{"schemaVersion":1,"id":"dev-029","text":"What return types may the v16.7.0 `fsPromises.cp` filter use?","split":"development","categories":["exact-api","code-symbol","english"]}
+{"schemaVersion":1,"id":"dev-030","text":"What is the default value of `mode` in the v22.3.0 `fsPromises.cp` options?","split":"development","categories":["exact-api","code-symbol","english"]}
+{"schemaVersion":1,"id":"dev-031","text":"What does `verbatimSymlinks` do in the Node.js v22.3.0 snapshot?","split":"development","categories":["semantic","code-symbol","english"]}
+{"schemaVersion":1,"id":"dev-032","text":"Does the Node.js v16.7.0 snapshot document a `verbatimSymlinks` option?","split":"development","categories":["no-answer","version-error-code","english"]}
+{"schemaVersion":1,"id":"dev-033","text":"What does `fsPromises.cp` copy according to the v16.7.0 snapshot?","split":"development","categories":["semantic","english"]}
+{"schemaVersion":1,"id":"dev-034","text":"According to v22.3.0, can `fsPromises.cp` copy an entire directory structure?","split":"development","categories":["semantic","english"]}
+{"schemaVersion":1,"id":"dev-035","text":"How does `fsPromises.cp` differ from `fsPromises.copyFile`?","split":"development","categories":["no-answer","english"]}
+{"schemaVersion":1,"id":"dev-036","text":"Node v22.3 的 `fsPromises.cp` 还是 Experimental 吗？","split":"development","categories":["chinese-english-mixed","version-error-code"]}
+{"schemaVersion":1,"id":"dev-037","text":"Node 16.7 中 `fsPromises.cp` 的稳定性级别是什么？","split":"development","categories":["chinese-english-mixed","version-error-code"]}
+{"schemaVersion":1,"id":"dev-038","text":"Which `fsPromises.cp` option may return a `Promise<boolean>`?","split":"development","categories":["code-symbol","exact-api","english"]}
+{"schemaVersion":1,"id":"dev-039","text":"In which version was the `mode` option first introduced for `fsPromises.cp`?","split":"development","categories":["no-answer","version-error-code","english"]}
+{"schemaVersion":1,"id":"dev-040","text":"Node v22.3 的 `mode` 默认值是多少？","split":"development","categories":["chinese-english-mixed","exact-api"]}
+{"schemaVersion":1,"id":"dev-041","text":"Which option skips symlink path resolution when it is true?","split":"development","categories":["exact-api","code-symbol","english"]}
+{"schemaVersion":1,"id":"dev-042","text":"Is the v16.7.0 `force` default `false`?","split":"development","categories":["exact-api","english"]}
+{"schemaVersion":1,"id":"dev-043","text":"Does Node v22.3.0 enable recursive copying by default?","split":"development","categories":["semantic","english"]}
+{"schemaVersion":1,"id":"dev-044","text":"Did the documented `recursive` default change between the v16.7.0 and v22.3.0 snapshots?","split":"development","categories":["multi-source","version-error-code","english"]}
+{"schemaVersion":1,"id":"dev-045","text":"What happens when destination exists and `force` is false?","split":"development","categories":["no-answer","semantic","english"]}
+{"schemaVersion":1,"id":"dev-046","text":"What does Node's Stability level 1 mean in general?","split":"development","categories":["no-answer","semantic","english"]}
+{"schemaVersion":1,"id":"dev-047","text":"Which captured Node version records that `fsPromises.cp` is no longer experimental?","split":"development","categories":["version-error-code","english"]}
+{"schemaVersion":1,"id":"dev-048","text":"What is the documented `fsPromises.cp` call signature in the captured Node docs?","split":"development","categories":["exact-api","code-symbol","english"]}
+{"schemaVersion":1,"id":"dev-049","text":"Do both captured Node versions say `fsPromises.cp` copies the entire directory structure?","split":"development","categories":["multi-source","english"]}
+{"schemaVersion":1,"id":"dev-050","text":"Does `fsPromises.cp` provide a `preserveOwnership` option in the captured corpus?","split":"development","categories":["no-answer","exact-api","english"]}

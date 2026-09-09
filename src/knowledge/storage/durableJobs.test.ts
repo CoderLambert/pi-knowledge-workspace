@@ -13,7 +13,7 @@ class ScriptedDatabase implements KnowledgeDatabase {
   runRows: RunStep[] = [];
 
   exec(sql: string): void { this.execLog.push(sql); }
-  close(): void {}
+  close(): void { /* no-op test database */ }
   pragma(): unknown { return undefined; }
   prepare(sql: string): SqliteStatement {
     this.sqlLog.push(sql);

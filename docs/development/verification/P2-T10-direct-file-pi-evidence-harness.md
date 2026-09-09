@@ -1,26 +1,29 @@
 # P2-T10 support verification — Direct-file Pi evidence harness
 
-Status: **OPEN — CI PREPARATION + LOCAL REAL RUN + HUMAN REVIEW REQUIRED**
+Status: **CI PREPARATION PASS / LOCAL REAL RUN + HUMAN REVIEW OPEN**
 
-## 1. CI preparation gate
+## 1. CI preparation gate — PASS
 
-The support PR must run `.github/workflows/p2-direct-file-pi-evidence.yml` successfully.
+Canonical final run: `34332760481`.
 
-PASS requires:
+Observed results:
 
-- clean dependency install;
-- `src/knowledge/eval/directFilePiBaseline.test.ts` focused tests PASS;
-- focused ESLint on the P2-T10 evaluator and test PASS;
-- prepare-only harness exits successfully;
-- exactly 50 development tasks are prepared;
-- every task uses the same six frozen corpus files;
-- development dataset hash equals `949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3`;
-- no Pi/provider call occurs during CI preparation;
-- preparation artifact is uploaded.
+```text
+focused evaluator suite = 1 file / 5 tests PASS
+focused P2-T10 lint = PASS
+prepare-only harness = PASS
+queryCount = 50
+datasetHash = 949cf28c36a3bfe6438e831aa96573ff10d30169f52dbc6b4192fca848fc40a3
+systemPromptSha256 = 8db92ab71e29b1f7228a5176e5f3de46f8eab02ad493896bc5a85e5463eddc16
+artifact = 10096440773
+artifact digest = sha256:e65d56a823499760e80cbc832d06a1d6b3f789a8228aaaec17771174866dc88f
+```
+
+All preparation steps passed on the final P2-T10 base. The prepare-only path does not execute Pi/provider inference and requires no provider credential.
 
 ## 2. Local runtime precondition
 
-On the user's Omarchy checkout, verify normal Pi authentication already works. Do not copy provider credentials into repository files, GitHub Actions secrets, evidence JSON, chat messages or command-line arguments.
+On the user's Omarchy checkout, normal Pi authentication must already work. Do not copy provider credentials into repository files, GitHub Actions secrets, evidence JSON, chat messages or command-line arguments.
 
 The harness consumes the existing local Pi authentication/configuration only.
 
@@ -34,7 +37,7 @@ npx tsx scripts/p2-run-direct-file-pi-baseline.mjs
 
 Optional explicit provider/model selection may be supplied through `P2_T10_PROVIDER` and `P2_T10_MODEL`. If omitted, the first actual Pi response freezes the runtime identity and every subsequent query must match it.
 
-The harness must fail closed on provider/model drift.
+The harness fails closed on provider/model drift.
 
 ## 4. Model-input audit
 
@@ -112,7 +115,7 @@ The model under test must not be the sole reviewer.
 
 ## 8. Evidence return
 
-Preserve the complete output directory, including raw Pi JSONL streams. Return the bundle to the repository/evidence review without credentials or unrelated user files.
+Preserve the complete output directory, including raw Pi JSONL streams. Return the bundle to repository/evidence review without credentials or unrelated user files.
 
 The machine report and completed human worksheet are both required to close P2-T10.
 
@@ -122,7 +125,7 @@ Do not execute P2-T10 holdout in this support harness. Development configuration
 
 ## 10. Direct-base scope
 
-Compared with `experiment/p2-direct-file-pi-baseline`, expected support scope is exactly:
+Compared with `experiment/p2-direct-file-pi-baseline`, support scope is exactly:
 
 ```text
 .github/workflows/p2-direct-file-pi-evidence.yml
@@ -135,4 +138,4 @@ No production Knowledge retrieval change, provider secret, dataset mutation, pro
 
 ## PASS condition
 
-The support harness is PASS when CI preparation proves the frozen task construction and the local one-shot command produces a complete, internally consistent 50-query evidence bundle. P2-T10 itself remains PARTIAL until independent human semantic review is completed and recorded.
+The **CI preparation portion is PASS**. The support harness as a complete real-evidence procedure remains open until the local one-shot command produces a complete, internally consistent 50-query bundle. P2-T10 itself remains PARTIAL until independent human semantic review is also completed and recorded.

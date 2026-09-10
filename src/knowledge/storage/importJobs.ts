@@ -87,17 +87,21 @@ export class MdTextImportJobs {
     const idempotencyKey = requireNonEmpty(input.idempotencyKey, "idempotencyKey");
 
     const existing = this.findByIdempotency(workspaceId, idempotencyKey);
-    if (existing) return existing;
+    if (existing !== null) return existing;
 
     try {
       return withTransaction(this.db, () => {
         const raced = this.findByIdempotency(workspaceId, idempotencyKey);
-        if (raced) return raced;
+        if (raced !== null) return raced;
 
+        const requestedDisplayName = input.displayName?.trim();
+        const displayName = requestedDisplayName === undefined || requestedDisplayName.length === 0
+          ? path.basename(relativePath)
+          : requestedDisplayName;
         const source = this.sources.createSource({
           knowledgeWorkspaceId: workspaceId,
           kind: "workspace-file",
-          displayName: input.displayName?.trim() || path.basename(relativePath),
+          displayName,
         });
         const now = this.now().toISOString();
         const job: ImportJob = {
@@ -132,7 +136,7 @@ export class MdTextImportJobs {
       });
     } catch (error) {
       const raced = this.findByIdempotency(workspaceId, idempotencyKey);
-      if (raced) return raced;
+      if (raced !== null) return raced;
       throw error;
     }
   }
@@ -146,7 +150,7 @@ export class MdTextImportJobs {
          FROM jobs WHERE id = ? AND kind = ?`,
       )
       .get(id, IMPORT_JOB_KIND);
-    if (!row) throw new Error(`Unknown import job: ${id}`);
+    if (row === undefined) throw new Error(`Unknown import job: ${id}`);
     return mapJob(row);
   }
 
@@ -272,11 +276,13 @@ export class MdTextImportJobs {
   }
 
   recoverInterrupted(): number {
-    const rows = this.db
+    const rows: unknown[] = this.db
       .prepare(`SELECT id FROM jobs WHERE kind = ? AND status = 'running'`)
-      .all(IMPORT_JOB_KIND) as Array<{ id: string }>;
+      .all(IMPORT_JOB_KIND);
     let recovered = 0;
-    for (const row of rows) {
+    for (const raw of rows) {
+      const row = recordValue(raw, "interrupted import row");
+      const jobId = requireRecordString(row, "id");
       const now = this.now().toISOString();
       withTransaction(this.db, () => {
         this.db
@@ -285,13 +291,13 @@ export class MdTextImportJobs {
              SET status = 'failed', finished_at = ?, error_json = ?
              WHERE job_id = ? AND status = 'running'`,
           )
-          .run(now, JSON.stringify({ name: "InterruptedImport", message: "Import process restarted" }), row.id);
+          .run(now, JSON.stringify({ name: "InterruptedImport", message: "Import process restarted" }), jobId);
         const result = this.db
           .prepare(
             `UPDATE jobs SET status = 'queued', updated_at = ?
              WHERE id = ? AND kind = ? AND status = 'running'`,
           )
-          .run(now, row.id, IMPORT_JOB_KIND);
+          .run(now, jobId, IMPORT_JOB_KIND);
         recovered += Number(result.changes);
       });
     }
@@ -301,7 +307,7 @@ export class MdTextImportJobs {
   private finishCancelled(jobId: string, attemptId?: string): ImportJob {
     const now = this.now().toISOString();
     withTransaction(this.db, () => {
-      if (attemptId) {
+      if (attemptId !== undefined) {
         this.db
           .prepare(
             `UPDATE job_attempts SET status = 'cancelled', finished_at = ?, error_json = NULL
@@ -320,10 +326,11 @@ export class MdTextImportJobs {
   }
 
   private nextAttempt(jobId: string): number {
-    const row = this.db
+    const raw = this.db
       .prepare(`SELECT COALESCE(MAX(attempt), 0) AS max_attempt FROM job_attempts WHERE job_id = ?`)
-      .get(jobId) as { max_attempt?: unknown } | undefined;
-    const current = row?.max_attempt;
+      .get(jobId);
+    const row = recordValue(raw, "import attempt state");
+    const current = row["max_attempt"];
     if (typeof current !== "number" || !Number.isSafeInteger(current) || current < 0) {
       throw new Error("Invalid import job attempt state");
     }
@@ -331,13 +338,15 @@ export class MdTextImportJobs {
   }
 
   private workspaceRoot(workspaceId: string): string {
-    const row = this.db
+    const raw = this.db
       .prepare(`SELECT canonical_realpath FROM knowledge_workspaces WHERE id = ?`)
-      .get(workspaceId) as { canonical_realpath?: unknown } | undefined;
-    if (!row || typeof row.canonical_realpath !== "string" || !row.canonical_realpath) {
+      .get(workspaceId);
+    const row = recordValue(raw, `Knowledge Workspace ${workspaceId}`);
+    const canonicalRealpath = row["canonical_realpath"];
+    if (typeof canonicalRealpath !== "string" || canonicalRealpath.length === 0) {
       throw new Error(`Unknown Knowledge Workspace: ${workspaceId}`);
     }
-    return row.canonical_realpath;
+    return canonicalRealpath;
   }
 
   private findByIdempotency(workspaceId: string, idempotencyKey: string): ImportJob | null {
@@ -349,7 +358,7 @@ export class MdTextImportJobs {
          WHERE knowledge_workspace_id = ? AND kind = ? AND idempotency_key = ?`,
       )
       .get(workspaceId, IMPORT_JOB_KIND, idempotencyKey);
-    return row ? mapJob(row) : null;
+    return row === undefined ? null : mapJob(row);
   }
 }
 
@@ -365,33 +374,73 @@ function requireSupportedRelativePath(input: string): string {
 
 function requireNonEmpty(value: string, name: string): string {
   const normalized = value.trim();
-  if (!normalized) throw new TypeError(`${name} must be non-empty`);
+  if (normalized.length === 0) throw new TypeError(`${name} must be non-empty`);
   return normalized;
 }
 
 function mapJob(row: unknown): ImportJob {
-  const value = row as {
-    id: string;
-    knowledge_workspace_id: string;
-    status: ImportJobStatus;
-    payload_json: string;
-    created_at: string;
-    updated_at: string;
-    idempotency_key: string;
-    cancel_requested: number;
-    result_json: string | null;
-  };
+  const value = recordValue(row, "import job row");
+  const id = requireRecordString(value, "id");
+  const knowledgeWorkspaceId = requireRecordString(value, "knowledge_workspace_id");
+  const status = importJobStatus(value["status"]);
+  const idempotencyKey = requireRecordString(value, "idempotency_key");
+  const payload = parseImportPayload(value["payload_json"]);
+  const cancelRequested = importBoolean(value["cancel_requested"], "cancel_requested");
+  const result = parseImportResult(value["result_json"]);
+  const createdAt = requireRecordString(value, "created_at");
+  const updatedAt = requireRecordString(value, "updated_at");
+  return { id, knowledgeWorkspaceId, status, idempotencyKey, payload, cancelRequested, result, createdAt, updatedAt };
+}
+
+function parseImportPayload(value: unknown): ImportPayload {
+  const parsed = parseJsonRecord(value, "payload_json");
   return {
-    id: value.id,
-    knowledgeWorkspaceId: value.knowledge_workspace_id,
-    status: value.status,
-    idempotencyKey: value.idempotency_key,
-    payload: JSON.parse(value.payload_json) as ImportPayload,
-    cancelRequested: value.cancel_requested === 1,
-    result: value.result_json ? (JSON.parse(value.result_json) as ImportJobResult) : null,
-    createdAt: value.created_at,
-    updatedAt: value.updated_at,
+    sourceId: requireRecordString(parsed, "sourceId"),
+    relativePath: requireRecordString(parsed, "relativePath"),
   };
+}
+
+function parseImportResult(value: unknown): ImportJobResult | null {
+  if (value === null) return null;
+  const parsed = parseJsonRecord(value, "result_json");
+  const byteLength = parsed["byteLength"];
+  if (typeof byteLength !== "number" || !Number.isSafeInteger(byteLength) || byteLength < 0) {
+    throw new Error("result_json byteLength is invalid");
+  }
+  return {
+    sourceId: requireRecordString(parsed, "sourceId"),
+    sourceVersionId: requireRecordString(parsed, "sourceVersionId"),
+    contentSha256: requireRecordString(parsed, "contentSha256"),
+    byteLength,
+  };
+}
+
+function parseJsonRecord(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "string") throw new Error(`${label} must contain JSON text`);
+  const parsed: unknown = JSON.parse(value);
+  return recordValue(parsed, label);
+}
+
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`${label} is invalid`);
+  return Object.fromEntries(Object.entries(value));
+}
+
+function requireRecordString(row: Record<string, unknown>, key: string): string {
+  const value = row[key];
+  if (typeof value !== "string" || value.length === 0) throw new Error(`${key} is invalid`);
+  return value;
+}
+
+function importBoolean(value: unknown, key: string): boolean {
+  if (value === 0) return false;
+  if (value === 1) return true;
+  throw new Error(`${key} is invalid`);
+}
+
+function importJobStatus(value: unknown): ImportJobStatus {
+  if (value === "queued" || value === "running" || value === "succeeded" || value === "failed" || value === "cancelled") return value;
+  throw new Error("Import job status is invalid");
 }
 
 function serializeError(error: unknown): { name: string; message: string } {

@@ -69,7 +69,7 @@ export class SourceDomain {
 
   listSources(knowledgeWorkspaceId: string, options: { includeArchived?: boolean } = {}): KnowledgeSource[] {
     const workspaceId = requireNonEmpty(knowledgeWorkspaceId, "knowledgeWorkspaceId");
-    const rows = options.includeArchived
+    const rows = options.includeArchived === true
       ? this.db
           .prepare(
             `SELECT id, knowledge_workspace_id, kind, display_name, archived_at, created_at
@@ -113,7 +113,7 @@ export class SourceDomain {
          FROM sources WHERE id = ?`,
       )
       .get(id);
-    if (!row) throw new Error(`Unknown Source: ${id}`);
+    if (row === undefined) throw new Error(`Unknown Source: ${id}`);
     return mapSourceRow(row);
   }
 
@@ -134,7 +134,7 @@ export class SourceDomain {
 
     const blob = await this.blobs.put(rawBytes);
     const existing = this.findSourceVersionByHash(id, blob.hash);
-    if (existing) return existing;
+    if (existing !== null) return existing;
 
     const version: KnowledgeSourceVersion = {
       id: this.createId(),
@@ -166,7 +166,7 @@ export class SourceDomain {
     } catch (error) {
       // A concurrent capture of identical bytes may win the UNIQUE(source_id, content_sha256) race.
       const raced = this.findSourceVersionByHash(id, blob.hash);
-      if (raced) return raced;
+      if (raced !== null) return raced;
       throw error;
     }
   }
@@ -182,50 +182,64 @@ export class SourceDomain {
          FROM source_versions WHERE source_id = ? AND content_sha256 = ?`,
       )
       .get(sourceId, hash);
-    return row ? mapSourceVersionRow(row) : null;
+    return row === undefined ? null : mapSourceVersionRow(row);
   }
 }
 
 function requireNonEmpty(value: string, name: string): string {
   const normalized = value.trim();
-  if (!normalized) throw new TypeError(`${name} must be non-empty`);
+  if (normalized.length === 0) throw new TypeError(`${name} must be non-empty`);
   return normalized;
 }
 
 function mapSourceRow(row: unknown): KnowledgeSource {
-  const value = row as {
-    id: string;
-    knowledge_workspace_id: string;
-    kind: string;
-    display_name: string;
-    archived_at: string | null;
-    created_at: string;
-  };
+  const value = recordValue(row, "Source row");
   return {
-    id: value.id,
-    knowledgeWorkspaceId: value.knowledge_workspace_id,
-    kind: value.kind,
-    displayName: value.display_name,
-    archivedAt: value.archived_at,
-    createdAt: value.created_at,
+    id: requireStringField(value, "id"),
+    knowledgeWorkspaceId: requireStringField(value, "knowledge_workspace_id"),
+    kind: requireStringField(value, "kind"),
+    displayName: requireStringField(value, "display_name"),
+    archivedAt: nullableStringField(value, "archived_at"),
+    createdAt: requireStringField(value, "created_at"),
   };
 }
 
 function mapSourceVersionRow(row: unknown): KnowledgeSourceVersion {
-  const value = row as {
-    id: string;
-    source_id: string;
-    content_sha256: string;
-    blob_key: string;
-    byte_length: number;
-    created_at: string;
-  };
+  const value = recordValue(row, "SourceVersion row");
   return {
-    id: value.id,
-    sourceId: value.source_id,
-    contentSha256: value.content_sha256,
-    blobKey: value.blob_key,
-    byteLength: value.byte_length,
-    createdAt: value.created_at,
+    id: requireStringField(value, "id"),
+    sourceId: requireStringField(value, "source_id"),
+    contentSha256: requireStringField(value, "content_sha256"),
+    blobKey: requireStringField(value, "blob_key"),
+    byteLength: requireNonNegativeIntegerField(value, "byte_length"),
+    createdAt: requireStringField(value, "created_at"),
   };
+}
+
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`${label} must be an object record`);
+  }
+  return Object.fromEntries(Object.entries(value));
+}
+
+function requireStringField(row: Record<string, unknown>, key: string): string {
+  const value = row[key];
+  if (typeof value !== "string" || value.length === 0) throw new Error(`${key} must be a non-empty string`);
+  return value;
+}
+
+function nullableStringField(row: Record<string, unknown>, key: string): string | null {
+  const value = row[key];
+  if (value === null) return null;
+  if (typeof value !== "string" || value.length === 0) throw new Error(`${key} must be null or a non-empty string`);
+  return value;
+}
+
+function requireNonNegativeIntegerField(row: Record<string, unknown>, key: string): number {
+  const value = row[key];
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${key} must be a non-negative integer`);
+  }
+  return value;
 }

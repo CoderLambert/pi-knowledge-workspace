@@ -85,13 +85,10 @@ function cloneJsonObject(value: Readonly<Record<string, unknown>>): Readonly<Rec
   } catch (error) {
     throw new TypeError("locatorSnapshot must be JSON-serializable", { cause: error });
   }
-  if (serialized === undefined) {
-    throw new TypeError("locatorSnapshot must be JSON-serializable");
-  }
 
   const parsed: unknown = JSON.parse(serialized);
   if (parsed === null || Array.isArray(parsed) || typeof parsed !== "object") {
     throw new TypeError("locatorSnapshot must be a JSON object");
   }
-  return Object.freeze(parsed as Record<string, unknown>);
+  return Object.freeze(Object.fromEntries(Object.entries(parsed)));
 }

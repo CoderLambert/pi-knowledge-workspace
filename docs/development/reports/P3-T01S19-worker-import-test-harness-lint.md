@@ -44,7 +44,8 @@ No production code, ADR, schema, retrieval configuration, P2 evaluation data/evi
 - make no-op database methods explicit;
 - make the fake store extend `DurableJobStore` so the worker receives a nominally valid store without type assertions;
 - model the one-shot claim-race injection with explicit fake-store state instead of method reassignment/type assertion;
-- replace unnecessary async handlers with explicit `Promise.resolve` handlers.
+- replace unnecessary async handlers with explicit `Promise.resolve` handlers;
+- add the required `override` modifiers to fake-store methods that intentionally override `DurableJobStore` methods.
 
 ## Contract preservation
 
@@ -64,7 +65,11 @@ The task does not alter production worker/import semantics and does not reopen A
 
 ## Verification state
 
-Automated GitHub CI has not yet established the child-slice endpoint at the time of this initial report commit. Until CI proves typecheck remains green and the 23 task-owned findings are removed without new task-owned failures, task status remains **PARTIAL**.
+Initial GitHub CI run `34443652575` on head `517cf46dc525bad026fb255d0aca633c39987748` failed during `npm run typecheck` before lint. The failure was task-owned and isolated to `workerLoop.test.ts`: seven methods on `FakeStore extends DurableJobStore` required explicit `override` modifiers under the repository TypeScript configuration.
+
+That defect was corrected in commit `1d8eabe9359e84f2ebd7d0cee17e8a8b698d2b08` without changing test scenarios or production code. P2 FTS Evidence run `34443652562` and P2 Lexical Evidence run `34443652553` both passed on the initial S19 head; no frozen evidence/configuration changed.
+
+A follow-up CI run has not yet been published for the corrected head at the time of this report update. Until CI proves typecheck remains green and the 23 task-owned lint findings are removed without new task-owned failures, task status remains **PARTIAL**.
 
 Expected inherited repository lint endpoint if all targeted findings close cleanly:
 

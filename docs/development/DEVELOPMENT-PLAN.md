@@ -294,6 +294,7 @@ P3-T01S14 restore-production lint slice: 191 ESLint errors → 176
 P3-T01S15 Evidence-read/viewer production lint slice: 176 ESLint errors → 162
 P3-T01S16 canonical-lineage-core production lint slice: 162 ESLint errors → 152
 P3-T01S17 index/search-publication production lint slice: 152 ESLint errors → 126
+P3-T01S18 worker/import production lint slice: 126 ESLint errors → 100
 ```
 
 The remaining ESLint findings are inherited across pre-existing Knowledge/plugin code. Continue closing them in **subsystem-scoped bounded slices**, not one-file micro-slices and not one repository-wide rewrite.
@@ -752,7 +753,7 @@ As of 2026-09-10:
 | P2-T12 | PASS | ADR-029 Accepted. |
 | P2 stack | PASS | Final ancestry restack is clean; #54 and #44 include latest #43 with task-only scopes. |
 | P3-T00 | PASS | Rebaseline plan to ADR-029. |
-| P3-T01 | PARTIAL | Typecheck is green; verified execution checkpoint is 126 inherited ESLint findings after S17. |
+| P3-T01 | PARTIAL | Typecheck is green; verified execution checkpoint is 100 inherited ESLint findings after S18. |
 
 Current architecture/development base:
 
@@ -763,6 +764,6 @@ experiment/p2-retrieval-adr
 
 Current next implementation task:
 
-# **Continue P3-T01 with subsystem-scoped bounded inherited lint closure**
+# **Continue P3-T01 with evaluation and remaining test-harness lint closure**
 
-Prefer cohesive 10–30-finding slices where risk permits. Do not let status-document churn dominate implementation, and do not enter P3 production features until the baseline provides a trustworthy regression signal.
+Prefer a cohesive bounded slice that preserves frozen P2 evaluation data and retrieval decisions. Do not retune benchmarks or mutate P2 evidence, and do not enter P3 production features until the baseline provides a trustworthy regression signal.

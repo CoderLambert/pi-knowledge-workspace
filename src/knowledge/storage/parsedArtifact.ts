@@ -109,7 +109,11 @@ function normalizeUtf8Bytes(rawInput: Uint8Array): { bytes: Uint8Array; sourceMa
     } else {
       const nextCr = raw.indexOf(0x0d, sourceOffset);
       const end = nextCr === -1 ? raw.byteLength : nextCr;
-      for (let index = sourceOffset; index < end; index += 1) output.push(raw[index]!);
+      for (let index = sourceOffset; index < end; index += 1) {
+        const byte = raw[index];
+        if (byte === undefined) throw new RangeError("Source byte lookup exceeded normalized input");
+        output.push(byte);
+      }
       sourceOffset = end;
     }
 
@@ -142,7 +146,8 @@ function parseStructure(text: string, sourceKind: "md" | "txt"): DocumentNode[] 
   };
 
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]!;
+    const line = lines[index];
+    if (line === undefined) throw new RangeError("ParsedArtifact line lookup exceeded normalized text");
     const lineBytes = encoder.encode(line).byteLength;
     const lineStart = byteOffset;
     const lineEnd = lineStart + lineBytes;
@@ -175,8 +180,10 @@ function parseStructure(text: string, sourceKind: "md" | "txt"): DocumentNode[] 
     if (sourceKind === "md") {
       const heading = /^(#{1,6})\s+/.exec(line);
       if (heading) {
+        const marker = heading[1];
+        if (marker === undefined) throw new Error("Markdown heading match is missing its marker");
         closeParagraph(lineStart);
-        nodes.push({ kind: "heading", startByte: lineStart, endByte: lineEnd, level: heading[1]!.length });
+        nodes.push({ kind: "heading", startByte: lineStart, endByte: lineEnd, level: marker.length });
         byteOffset = nextByteOffset;
         continue;
       }

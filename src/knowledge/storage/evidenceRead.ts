@@ -56,7 +56,7 @@ export class EvidenceReadApi {
       throw new Error("Evidence does not belong to the requested Knowledge Workspace");
     }
 
-    const mode = input.mode ?? "exact";
+    const mode = normalizeEvidenceReadMode(input.mode ?? "exact");
     const contextBytes = validateBoundedInteger(
       input.contextBytes ?? DEFAULT_CONTEXT_BYTES,
       "contextBytes",
@@ -103,16 +103,13 @@ export class EvidenceReadApi {
         startByte: Math.max(containerRange.startByte, evidenceRange.startByte - contextBytes),
         endByte: Math.min(containerRange.endByte, evidenceRange.endByte + contextBytes),
       };
-    } else if (mode === "section") {
+    } else {
       containerRange = findContainingSection(
         artifact.documentStructure,
         evidenceRange,
         artifact.canonicalBytes.byteLength,
       );
       desiredRange = containerRange;
-    } else {
-      const exhaustive: never = mode;
-      throw new TypeError(`Unsupported Evidence read mode: ${String(exhaustive)}`);
     }
 
     const range = mode === "exact"
@@ -140,6 +137,11 @@ export class EvidenceReadApi {
       truncatedAfter: range.endByte < containerRange.endByte,
     };
   }
+}
+
+function normalizeEvidenceReadMode(value: unknown): EvidenceReadMode {
+  if (value === "exact" || value === "context" || value === "section") return value;
+  throw new TypeError(`Unsupported Evidence read mode: ${String(value)}`);
 }
 
 function findContainingSection(
@@ -207,7 +209,10 @@ function boundedUtf8Window(
 
 function moveToBoundary(bytes: Uint8Array, offset: number, direction: 1 | -1): number {
   let cursor = Math.max(0, Math.min(bytes.byteLength, offset));
-  while (cursor > 0 && cursor < bytes.byteLength && isContinuationByte(bytes[cursor]!)) {
+  while (cursor > 0 && cursor < bytes.byteLength) {
+    const byte = bytes[cursor];
+    if (byte === undefined) throw new RangeError("UTF-8 boundary lookup exceeded artifact bytes");
+    if (!isContinuationByte(byte)) break;
     cursor += direction;
   }
   return cursor;
@@ -230,8 +235,11 @@ function validateDocumentStructure(nodes: readonly DocumentNode[], byteLength: n
     ) {
       throw new Error("ParsedArtifact document structure contains an invalid byte range");
     }
-    if (node.kind === "heading" && (!Number.isSafeInteger(node.level) || node.level! < 1 || node.level! > 6)) {
-      throw new Error("ParsedArtifact heading contains an invalid level");
+    if (node.kind === "heading") {
+      const level = node.level;
+      if (typeof level !== "number" || !Number.isSafeInteger(level) || level < 1 || level > 6) {
+        throw new Error("ParsedArtifact heading contains an invalid level");
+      }
     }
     previousStart = node.startByte;
   }
@@ -245,7 +253,7 @@ function requireNonEmpty(value: string, name: string): string {
 
 function validateBoundedInteger(value: number, name: string, min: number, max: number): number {
   if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new TypeError(`${name} must be an integer between ${min} and ${max}`);
+    throw new TypeError(`${name} must be an integer between ${String(min)} and ${String(max)}`);
   }
   return value;
 }

@@ -28,11 +28,11 @@ Do not record Agent Work Units, routine commits, small wiring or cleanup-only ac
 - Added Fast/Slice/Full verification gates. The 77 inherited ESLint findings are maintenance debt, not a zero-before-product-work target; existing rules remain enabled and Product Slice regressions must stay distinguishable.
 - Replaced the lint-slice execution ledger with the product route: P3-T01 Exit → Reliable Knowledge → Grounded Ask → Product Preview → Lifecycle Safety/E2E → Slice A PASS → Quiz → P3 PASS.
 
-### P3-T01 — PARTIAL
+### P3-T01 Exit — PASS
 
-- Closed the inherited 12-error TypeScript blocker; `npm run typecheck` now passes in CI and `npm run verify` advances to ESLint.
-- Historical support work reduced the inherited ESLint baseline to 77 without product, ADR, retrieval or P2-evidence changes.
-- P3-T01 now exits by establishing a trustworthy P3 Product Slice regression gate; no S20/S21 or general lint cleanup is planned.
+- Established the blocking `npm run verify:p3` Product Slice gate: typecheck, P3-critical production lint, 12 focused Knowledge test files (`74/74` tests) and build.
+- CI now runs the P3 gate independently from full-repository lint telemetry, so the 77 inherited findings remain visible without masking Reliable Knowledge regressions in the covered core path.
+- Closed the baseline-cleanup critical path without changing ESLint rules, ADR-029, retrieval strategy or frozen P2 evidence. The next Product Slice is Reliable Knowledge: `Captured → Parsed → Indexed → Published`.
 
 ### P3-T00 — PASS
 

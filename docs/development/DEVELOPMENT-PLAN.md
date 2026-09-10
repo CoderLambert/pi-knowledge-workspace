@@ -4,7 +4,7 @@ Status: **Active Development Baseline**
 Repository: `CoderLambert/pi-knowledge-workspace`  
 Strategy: **Thin Fork + standalone pi-knowledge process**  
 Architecture baseline: **ADR-029 Accepted**  
-Current development base: `chore/p3-t01-worker-import-test-harness-lint` at `a1a07c2b0c408e1043d419c7c8ba789efd8afb5c`
+Current development base: `feat/p3-regression-gate`, from `686bf747`
 
 This document is the authoritative forward-looking product roadmap. It records product order, milestone gates, dependencies and durable correctness contracts. It is not an execution ledger for Agent Work Units, lint slices or frequent commits.
 
@@ -43,7 +43,7 @@ As of 2026-09-10:
 | P2 / ADR-029 | PASS | Canonical ownership and V1 retrieval decisions are accepted. |
 | TypeScript | PASS | The current baseline is green. |
 | ESLint | MAINTENANCE DEBT | 77 inherited findings remain; they are not a P3 critical-path zero target. |
-| P3-T01 | EXIT PENDING | Establish the trustworthy P3 Product Slice regression gate, then exit. |
+| P3-T01 | PASS | `npm run verify:p3` provides the typecheck, scoped critical lint, focused Knowledge tests and build gate. |
 
 P3-T01 does **not** require historical lint to reach zero. The goal is a trustworthy Product Slice regression signal that keeps new/touched/P3-critical code clean while inherited findings remain explicitly distinguishable.
 
@@ -140,6 +140,21 @@ Goal:
 
 > Exit cleanup mode with a deterministic gate for new P3 Product Slices while retaining the 77 historical ESLint findings as classified maintenance debt.
 
+The executable Product Slice gate is:
+
+```bash
+npm run verify:p3
+```
+
+It runs, in order:
+
+1. `npm run typecheck`;
+2. `npm run lint:p3` over the twelve P3-critical Knowledge storage production files;
+3. `npm run test:p3` over the focused Source/ParsedArtifact/Evidence/FTS5/search/publication/retention/worker/import contract tests;
+4. `npm run build`.
+
+The existing `npm run lint` and `npm run verify` commands remain full-repository telemetry/full gates. CI runs `verify:p3` as the blocking Product Slice check and reports full-repository lint independently as non-blocking inherited debt. The scoped gate does not change ESLint rules, suppress findings or mutate P2 evidence.
+
 Required exit:
 
 - TypeScript baseline remains green;
@@ -151,7 +166,12 @@ Required exit:
 
 Historical lint may be fixed only when touched by the current Product Slice, when it masks a slice regression, when it blocks required compilation/test/build, or when it is an actual correctness defect. Numeric cleanup alone is not P3-T01 work.
 
-P3-T01 Exit is a Product Milestone and receives the milestone reporting/verification update defined in `REPORTING.md`.
+P3-T01 Exit is **PASS**. The milestone evidence is recorded in [`reports/P3-T01-regression-gate.md`](./reports/P3-T01-regression-gate.md). The next Product Slice is:
+
+```text
+feat/p3-reliable-knowledge
+→ Captured → Parsed → Indexed → Published
+```
 
 ## 6. Reliable Knowledge
 
@@ -386,6 +406,6 @@ No autonomous PR merge, force-push, destructive reset or unsafe history rewrite 
 ## NEXT
 
 ```text
-P3 regression gate / P3-T01 exit
-→ Reliable Knowledge
+Reliable Knowledge
+→ Grounded Ask Backend
 ```

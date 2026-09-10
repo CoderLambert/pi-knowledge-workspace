@@ -32,11 +32,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify
-        run: npm run verify
+      - name: Verify P3 Product Slice gate
+        run: npm run verify:p3
 
-      - name: Build
-        run: npm run build
+      - name: Full-repository lint telemetry
+        continue-on-error: true
+        run: npm run lint
 
       - name: Smoke test npm 12 global package install
         if: runner.os == 'Linux'

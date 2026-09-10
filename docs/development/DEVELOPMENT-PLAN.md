@@ -285,6 +285,7 @@ P3-T01S5 storage-test-harness lint slice: 242 ESLint errors → 233
 P3-T01S6 UTF-8-range-test lint slice: 233 ESLint errors → 227
 P3-T01S7 Workspace-identity-test lint slice: 227 ESLint errors → 222
 P3-T01S8 selected-Machine-federation-test lint slice: 222 ESLint errors → 219
+P3-T01S9 Source-Evidence-Viewer-test lint slice: 219 ESLint errors → 215
 ```
 
 The remaining ESLint findings are inherited across pre-existing Knowledge/plugin code. They must be closed in bounded, subsystem-scoped support slices; do not turn P3-T01 into one repository-wide rewrite.
@@ -706,7 +707,7 @@ As of 2026-09-10:
 | P2-T12 | PASS | ADR-029 Accepted. |
 | P2 stack | PASS | Final ancestry restack is clean; #54 and #44 include latest #43 with task-only scopes. |
 | P3-T00 | PASS | Rebaseline plan to ADR-029. |
-| P3-T01 | PARTIAL | Typecheck is green; inherited ESLint baseline reduced from 261 to 219 through bounded support slices. |
+| P3-T01 | PARTIAL | Typecheck is green; inherited ESLint baseline reduced from 261 to 215 through bounded support slices. |
 
 Current architecture/development base:
 

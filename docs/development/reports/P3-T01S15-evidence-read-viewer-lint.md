@@ -1,6 +1,6 @@
 # P3-T01S15 — Evidence Read / Viewer Production Lint
 
-Status: **PARTIAL — CI PENDING**
+Status: **PASS**
 
 Date: 2026-09-10
 
@@ -33,14 +33,18 @@ Targeted inherited findings from the 176 baseline: **14** (8 + 6).
 - UTF-8 read windows still stop at valid byte boundaries;
 - section/context/exact modes preserve their existing range semantics and limits.
 
-## Expected verification
+## Verification evidence
+
+GitHub CI run `34439146038` confirmed:
 
 ```text
 npm run typecheck → PASS
-ESLint baseline: 176 → expected 162
+ESLint 176 → 162
 ```
 
-CI determines the authoritative endpoint. Focused viewer/evidence read tests must remain behaviorally unchanged when reachable.
+All 14 S15-owned findings are closed. The workflow remains red only because 162 inherited repository-wide ESLint findings remain and lint stops `npm run verify` before later knip/test/build steps.
+
+P2 FTS Evidence run `34439146034` and P2 Lexical Evidence run `34439146054` both succeeded on the same head. Frozen P2 evidence/configuration was not modified.
 
 ## Scope exclusions
 

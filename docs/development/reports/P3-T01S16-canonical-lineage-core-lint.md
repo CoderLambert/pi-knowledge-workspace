@@ -1,6 +1,6 @@
 # P3-T01S16 — Canonical Lineage Core Production Lint
 
-Status: **PARTIAL — CI EVIDENCE PENDING**
+Status: **PASS**
 
 Date: 2026-09-10
 
@@ -36,14 +36,18 @@ Targeted inherited findings: **10** (5 + 2 + 3).
 - locator snapshots still must be JSON objects and fail closed otherwise;
 - no captured-vs-published Source state is introduced here.
 
-## Expected verification
+## Automated verification
+
+GitHub CI run `34439965936` confirmed on Ubuntu:
 
 ```text
 npm run typecheck → PASS
-ESLint baseline: 162 → expected 152
+ESLint baseline: 162 → 152
 ```
 
-CI determines the authoritative endpoint. Focused Source/ParsedArtifact/Evidence tests should retain existing behavior when reachable.
+All ten S16-owned findings are closed. The verify job remains globally red only because 152 inherited repository-wide ESLint findings remain, so later knip/test/build steps are not reached by that workflow.
+
+P2 FTS Evidence run `34439965928` passed on the same code head. P2 Lexical Evidence is tracked separately by the same PR checks and does not require any frozen-evidence mutation.
 
 ## Scope exclusions
 

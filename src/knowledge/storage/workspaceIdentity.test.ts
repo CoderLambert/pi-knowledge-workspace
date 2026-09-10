@@ -8,9 +8,9 @@ import { resolveKnowledgeWorkspaceIdentity } from "./workspaceIdentity.js";
 
 class IdentityDatabase implements KnowledgeDatabase {
   installation: { id: string; created_at: string } | undefined;
-  workspaces: Array<{ id: string; installation_id: string; canonical_realpath: string; external_binding: string | null }> = [];
-  exec(): void {}
-  close(): void {}
+  workspaces: { id: string; installation_id: string; canonical_realpath: string; external_binding: string | null }[] = [];
+  exec(): void { /* test database no-op */ }
+  close(): void { /* test database no-op */ }
   pragma(): unknown { return undefined; }
   prepare(sql: string): SqliteStatement {
     return {
@@ -27,16 +27,27 @@ class IdentityDatabase implements KnowledgeDatabase {
         if (sql.startsWith("INSERT INTO installations")) {
           this.installation = { id: String(params[0]), created_at: String(params[1]) };
         } else if (sql.startsWith("INSERT INTO knowledge_workspaces")) {
-          this.workspaces.push({ id: String(params[0]), installation_id: String(params[1]), canonical_realpath: String(params[2]), external_binding: params[3] as string | null });
+          this.workspaces.push({
+            id: String(params[0]),
+            installation_id: String(params[1]),
+            canonical_realpath: String(params[2]),
+            external_binding: nullableString(params[3]),
+          });
         } else if (sql.startsWith("UPDATE knowledge_workspaces")) {
           const row = this.workspaces.find((item) => item.id === params[1]);
-          if (row) row.external_binding = params[0] as string | null;
+          if (row !== undefined) row.external_binding = nullableString(params[0]);
         } else throw new Error(`unexpected run SQL: ${sql}`);
         return { changes: 1, lastInsertRowid: 0 };
       },
       all: () => [],
     };
   }
+}
+
+function nullableString(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value === "string") return value;
+  throw new TypeError("expected string or null fixture value");
 }
 
 function workspace(name: string): string {

@@ -25,14 +25,14 @@ export function assertValidUtf8Range(bytes: Uint8Array, range: Utf8ByteRange): v
   }
   if (startByte < 0 || endByte < startByte || endByte > bytes.byteLength) {
     throw new InvalidUtf8RangeError(
-      `UTF-8 byte range [${startByte}, ${endByte}) is outside canonical byte length ${bytes.byteLength}`,
+      `UTF-8 byte range [${String(startByte)}, ${String(endByte)}) is outside canonical byte length ${String(bytes.byteLength)}`,
     );
   }
   if (!isUtf8Boundary(bytes, startByte)) {
-    throw new InvalidUtf8RangeError(`startByte ${startByte} is not a UTF-8 code-point boundary`);
+    throw new InvalidUtf8RangeError(`startByte ${String(startByte)} is not a UTF-8 code-point boundary`);
   }
   if (!isUtf8Boundary(bytes, endByte)) {
-    throw new InvalidUtf8RangeError(`endByte ${endByte} is not a UTF-8 code-point boundary`);
+    throw new InvalidUtf8RangeError(`endByte ${String(endByte)} is not a UTF-8 code-point boundary`);
   }
 }
 
@@ -82,6 +82,7 @@ function assertCanonicalUtf8(bytes: Uint8Array): void {
 
 function isUtf8Boundary(bytes: Uint8Array, offset: number): boolean {
   if (offset === 0 || offset === bytes.byteLength) return true;
-  const byte = bytes[offset]!;
+  const byte = bytes[offset];
+  if (byte === undefined) return false;
   return (byte & 0xc0) !== 0x80;
 }

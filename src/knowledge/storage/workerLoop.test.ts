@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import type { KnowledgeDatabase, SqliteStatement } from "./database.js";
-import type { DurableJob, DurableJobStore, JobLease } from "./durableJobs.js";
+import { DurableJobStore, type DurableJob, type JobLease } from "./durableJobs.js";
 import { DurableJobWorker, type DurableJobHandler } from "./workerLoop.js";
 
 const NOW = "2026-09-09T04:00:00.000Z";
 
 class ScriptedDatabase implements KnowledgeDatabase {
   allRows: unknown[][] = [];
-  runRows: Array<{ changes: number; lastInsertRowid: number }> = [];
+  runRows: { changes: number; lastInsertRowid: number }[] = [];
   sqlLog: string[] = [];
-  exec(): void {}
-  close(): void {}
+  exec(): void { /* no-op test double */ }
+  close(): void { /* no-op test double */ }
   pragma(): unknown { return undefined; }
   prepare(sql: string): SqliteStatement {
     this.sqlLog.push(sql);
@@ -46,21 +46,30 @@ function job(overrides: Partial<DurableJob> = {}): DurableJob {
   };
 }
 
-class FakeStore {
+class FakeStore extends DurableJobStore {
   current = job();
   claims: string[] = [];
-  recovered: Array<[string, number]> = [];
+  recovered: [string, number][] = [];
   heartbeats = 0;
   succeeded: unknown[] = [];
   failed: unknown[] = [];
   cancelled = 0;
   claimFailure: Error | undefined;
+  claimFailuresRemaining = 0;
   completionFailure: Error | undefined;
+
+  constructor(db: KnowledgeDatabase) {
+    super(db);
+  }
 
   get(): DurableJob { return this.current; }
   claim(jobId: string, workerId: string): JobLease {
+    if (this.claimFailuresRemaining > 0) {
+      this.claimFailuresRemaining -= 1;
+      throw new Error(`Job ${jobId} claim lost a race`);
+    }
     this.claims.push(jobId);
-    if (this.claimFailure) throw this.claimFailure;
+    if (this.claimFailure !== undefined) throw this.claimFailure;
     this.current = job({ id: jobId, leaseOwner: workerId });
     return { job: this.current, workerId, fencingToken: this.current.fencingToken };
   }
@@ -70,13 +79,13 @@ class FakeStore {
   }
   heartbeat(): DurableJob { this.heartbeats += 1; return this.current; }
   succeed(_jobId: string, _worker: string, _token: number, result: unknown): DurableJob {
-    if (this.completionFailure) throw this.completionFailure;
+    if (this.completionFailure !== undefined) throw this.completionFailure;
     this.succeeded.push(result);
     this.current = job({ status: "succeeded", result });
     return this.current;
   }
   fail(_jobId: string, _worker: string, _token: number, error: unknown): DurableJob {
-    if (this.completionFailure) throw this.completionFailure;
+    if (this.completionFailure !== undefined) throw this.completionFailure;
     this.failed.push(error);
     this.current = job({ status: "failed", error });
     return this.current;
@@ -89,7 +98,7 @@ class FakeStore {
 }
 
 function worker(db: ScriptedDatabase, store: FakeStore, handlers: ReadonlyMap<string, DurableJobHandler>): DurableJobWorker {
-  return new DurableJobWorker(db, store as unknown as DurableJobStore, handlers, {
+  return new DurableJobWorker(db, store, handlers, {
     workerId: "worker-a",
     leaseMs: 30_000,
     heartbeatMs: 10_000,
@@ -102,7 +111,7 @@ describe("DurableJobWorker", () => {
     const db = new ScriptedDatabase();
     db.allRows = [[{ id: "stale-1", fencing_token: 3 }], []];
     db.runRows = [{ changes: 2, lastInsertRowid: 0 }];
-    const store = new FakeStore();
+    const store = new FakeStore(db);
 
     const result = await worker(db, store, new Map()).runOnce();
 
@@ -115,8 +124,8 @@ describe("DurableJobWorker", () => {
     const db = new ScriptedDatabase();
     db.allRows = [[], [{ id: "job-1" }]];
     db.runRows = [{ changes: 0, lastInsertRowid: 0 }];
-    const store = new FakeStore();
-    const handlers = new Map<string, DurableJobHandler>([["import", async ({ job: running }) => ({ sourceId: running.id })]]);
+    const store = new FakeStore(db);
+    const handlers = new Map<string, DurableJobHandler>([["import", ({ job: running }) => Promise.resolve({ sourceId: running.id })]]);
 
     const result = await worker(db, store, handlers).runOnce();
 
@@ -129,7 +138,7 @@ describe("DurableJobWorker", () => {
     const db = new ScriptedDatabase();
     db.allRows = [[], [{ id: "job-1" }]];
     db.runRows = [{ changes: 0, lastInsertRowid: 0 }];
-    const store = new FakeStore();
+    const store = new FakeStore(db);
 
     const result = await worker(db, store, new Map()).runOnce();
 
@@ -142,10 +151,10 @@ describe("DurableJobWorker", () => {
     const db = new ScriptedDatabase();
     db.allRows = [[], [{ id: "job-1" }]];
     db.runRows = [{ changes: 0, lastInsertRowid: 0 }];
-    const store = new FakeStore();
-    const handlers = new Map<string, DurableJobHandler>([["import", async () => {
+    const store = new FakeStore(db);
+    const handlers = new Map<string, DurableJobHandler>([["import", () => {
       store.current = job({ cancelRequested: true });
-      return { ignored: true };
+      return Promise.resolve({ ignored: true });
     }]]);
 
     const result = await worker(db, store, handlers).runOnce();
@@ -159,9 +168,9 @@ describe("DurableJobWorker", () => {
     const db = new ScriptedDatabase();
     db.allRows = [[], [{ id: "job-1" }]];
     db.runRows = [{ changes: 0, lastInsertRowid: 0 }];
-    const store = new FakeStore();
+    const store = new FakeStore(db);
     store.completionFailure = new Error("Job job-1 completion rejected stale, expired, cancelled, or non-owner lease");
-    const handlers = new Map<string, DurableJobHandler>([["import", async () => ({ ok: true })]]);
+    const handlers = new Map<string, DurableJobHandler>([["import", () => Promise.resolve({ ok: true })]]);
 
     const result = await worker(db, store, handlers).runOnce();
 
@@ -173,16 +182,9 @@ describe("DurableJobWorker", () => {
     const db = new ScriptedDatabase();
     db.allRows = [[], [{ id: "raced" }, { id: "job-1" }]];
     db.runRows = [{ changes: 0, lastInsertRowid: 0 }];
-    const store = new FakeStore();
-    let calls = 0;
-    store.claim = ((jobId: string, workerId: string): JobLease => {
-      calls += 1;
-      if (calls === 1) throw new Error(`Job ${jobId} claim lost a race`);
-      store.claims.push(jobId);
-      store.current = job({ id: jobId, leaseOwner: workerId });
-      return { job: store.current, workerId, fencingToken: 1 };
-    }) as FakeStore["claim"];
-    const handlers = new Map<string, DurableJobHandler>([["import", async () => ({ ok: true })]]);
+    const store = new FakeStore(db);
+    store.claimFailuresRemaining = 1;
+    const handlers = new Map<string, DurableJobHandler>([["import", () => Promise.resolve({ ok: true })]]);
 
     const result = await worker(db, store, handlers).runOnce();
 

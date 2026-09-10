@@ -82,6 +82,7 @@ describe("Grounded Ask Product Preview E2E", () => {
     click(preview, "[data-file-picker-trigger]");
     await settleUi();
     click(preview, "[data-file-picker-file='handbook.md']");
+    await settleUi();
     click(preview, "[data-import]");
     await fixture.bridge.waitForLastRequest();
     await settleUi();

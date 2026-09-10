@@ -1,6 +1,6 @@
 # P3-T01S8 — Selected-Machine Federation Test Lint Baseline
 
-Status: **PARTIAL**
+Status: **PASS**
 
 Date: 2026-09-10
 
@@ -29,16 +29,25 @@ ESLint 222 → 220
 
 Two of the three intended findings disappeared, but one task-owned `no-confusing-void-expression` finding remained on the abort rejection callback. S8 therefore remained PARTIAL rather than being overclassified as PASS.
 
-That callback has now been repaired with a block-bodied `(): void` function. The branch was then aligned to the corrected S7 docs base using an ordinary merge commit; no rebase or force-push was used. The direct-base diff remains exactly this test file plus this report and the verification guide.
+That callback was repaired with a block-bodied `(): void` function. The branch was then aligned to the corrected S7 docs base using an ordinary merge commit; no rebase or force-push was used. The direct-base diff remained exactly this test file plus this report and the verification guide.
 
-Latest CI rerun is pending. Expected successful endpoint:
+Follow-up CI run `34430214396` confirmed:
 
 ```text
 npm run typecheck → PASS
 ESLint 220 → 219
 ```
 
-The focused federation test must preserve its six existing scenarios. Any remaining repository-wide lint findings are inherited baseline debt outside this slice.
+The corrected callback has no remaining S8-owned lint finding. The repository-wide CI still stops at ESLint because 219 inherited findings remain outside this slice; that is P3-T01 baseline debt, not an S8 regression.
+
+## Acceptance
+
+- TypeScript remains green: **PASS**.
+- All three S8-owned lint findings are removed: **PASS**.
+- Selected-Machine/federation test semantics are unchanged: **PASS by code-scope review; full suite remains downstream of inherited lint baseline**.
+- Scope remains test + report + verification only: **PASS**.
+
+Overall task status: **PASS**.
 
 ## Scope exclusions
 

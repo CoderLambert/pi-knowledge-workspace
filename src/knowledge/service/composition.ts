@@ -67,7 +67,7 @@ export interface KnowledgePublishTransportInput {
 }
 
 export interface KnowledgeServiceComposition {
-  groundedAsk: GroundedAskDispatch;
+  groundedAsk?: GroundedAskDispatch;
   importJobs: KnowledgeImportDispatch;
   publish: KnowledgePublishDispatch;
 }
@@ -230,15 +230,21 @@ function importRelativePath(payloadJson: string): string {
  * resolution once and keeps import/publish/ask in one service boundary.
  */
 export function createKnowledgeServiceComposition(options: {
-  groundedAsk: GroundedAskService;
+  groundedAsk?: GroundedAskService;
   importJobs: KnowledgeImportPort;
   publish: KnowledgePublishPort;
   scopeResolver: GroundedAskScopeResolver;
-  modelIdentity: GroundedAskModelIdentity;
+  modelIdentity?: GroundedAskModelIdentity;
 }): KnowledgeServiceComposition {
   const { scopeResolver } = options;
+  if ((options.groundedAsk === undefined) !== (options.modelIdentity === undefined)) {
+    throw new Error("Grounded Ask service and model identity must be configured together");
+  }
+  const groundedAsk = options.groundedAsk === undefined || options.modelIdentity === undefined
+    ? undefined
+    : createGroundedAskDispatch(options.groundedAsk, scopeResolver, options.modelIdentity);
   return Object.freeze({
-    groundedAsk: createGroundedAskDispatch(options.groundedAsk, scopeResolver, options.modelIdentity),
+    ...(groundedAsk === undefined ? {} : { groundedAsk }),
     importJobs: Object.freeze({
       submit(input: KnowledgeImportTransportInput) {
         return options.importJobs.submit({

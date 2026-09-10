@@ -68,9 +68,23 @@ The focused P3 tests must demonstrate:
 - Workspace authority is host-derived and model/provider identity is server-owned;
 - after `A1 → A2`, an A1 citation still opens the immutable A1 ParsedArtifact and exact Evidence.
 
-## Manual/provider debt
+## Manual/provider verification
 
-The repository-level E2E intentionally does not contact a paid or credentialed model. Before claiming target-provider acceptance, a process owner must compose the Knowledge service with a server-side `GroundedAskProvider` and its exact provider/model revision, then exercise the same UI journey with approved credentials. The browser must never submit credentials or choose the durable model identity recorded on the GenerationRun.
+The repository-level E2E intentionally does not contact a paid or credentialed model. The production `pi-knowledge` entry composes the same storage/import/publication/viewer stack and, when configured, the server-side Pi model adapter.
+
+For target-provider acceptance, start the service with an approved model already available in the selected Pi agent directory:
+
+```bash
+export PI_KNOWLEDGE_TOKEN='local-grounded-ask-token-at-least-16-characters'
+export PI_KNOWLEDGE_PROVIDER='<provider>'
+export PI_KNOWLEDGE_MODEL='<model-id>'
+export PI_KNOWLEDGE_MODEL_REVISION='<deployed-prompt-or-config-revision>'
+npm run start:knowledge
+```
+
+Start PI WEB/sessiond with the same `PI_KNOWLEDGE_TOKEN`, open Knowledge for a Workspace, and repeat Import → Publish → Ask → Citation. The browser must never submit credentials or choose the durable model identity recorded on the GenerationRun.
+
+Live-provider acceptance remains manual debt unless it is run with approved credentials and recorded; it is not simulated by the deterministic E2E.
 
 ## PASS condition
 

@@ -27,6 +27,9 @@ interface ProductAnswer {
   citations: ProductCitation[];
   generationRunId: string | undefined;
   publicationId: string | undefined;
+  provider: string | undefined;
+  model: string | undefined;
+  modelRevision: string | undefined;
 }
 
 interface ProductState {
@@ -168,6 +171,7 @@ export class KnowledgeProductPreview extends HTMLElement {
         <section class="card" aria-labelledby="ask-title">
           <div class="card-heading"><div><span class="step-number">3</span><h3 id="ask-title">Ask your knowledge</h3></div>${state.generationRunId === undefined ? "" : `<small>run <code>${escapeHtml(state.generationRunId)}</code></small>`}</div>
           <label>Question<textarea data-question rows="3" placeholder="What does the handbook say about deployment?">${escapeHtml(this.questionValue())}</textarea></label>
+          <p class="muted">The top matching excerpts from this frozen publication are sent to the server-configured model provider.</p>
           <button class="primary" type="button" data-ask ${state.publicationId === undefined || state.status === "loading" ? "disabled" : ""}>${state.status === "loading" && state.publicationId !== undefined ? "Asking…" : "Ask"}</button>
           ${state.answer === undefined && state.publicationId !== undefined ? `<p class="metadata">This Ask uses only the published snapshot above.</p>` : ""}
         </section>
@@ -405,7 +409,10 @@ export class KnowledgeProductPreview extends HTMLElement {
   }
 
   private renderAnswer(answer: ProductAnswer): string {
-    return `<section class="card answer-card" aria-labelledby="answer-title"><div class="card-heading"><h3 id="answer-title">Answer</h3>${answer.id === undefined ? "" : `<small>saved <code>${escapeHtml(answer.id)}</code></small>`}</div><p class="answer-text">${escapeHtml(answer.text)}</p>${answer.citations.length === 0 ? `<p class="muted no-evidence">No citations were returned. Treat this answer as insufficiently supported.</p>` : `<div class="citations" aria-label="Answer citations"><strong>Evidence used</strong>${answer.citations.map((citation) => `<button type="button" class="citation" data-citation-id="${escapeAttr(citation.id)}" aria-label="Open citation ${escapeAttr(citation.label)}"><span class="citation-label">${escapeHtml(citation.label)}</span><span>${escapeHtml(citation.exactQuote ?? citation.evidenceId)}</span></button>`).join("")}</div>`}</section>`;
+    const model = answer.provider === undefined || answer.model === undefined
+      ? ""
+      : ` · ${escapeHtml(answer.provider)}/${escapeHtml(answer.model)}${answer.modelRevision === undefined ? "" : ` · ${escapeHtml(answer.modelRevision)}`}`;
+    return `<section class="card answer-card" aria-labelledby="answer-title"><div class="card-heading"><h3 id="answer-title">Answer</h3>${answer.id === undefined ? "" : `<small>saved <code>${escapeHtml(answer.id)}</code>${model}</small>`}</div><p class="answer-text">${escapeHtml(answer.text)}</p>${answer.citations.length === 0 ? `<p class="muted no-evidence">No citations were returned. Treat this answer as insufficiently supported.</p>` : `<div class="citations" aria-label="Answer citations"><strong>Evidence used</strong>${answer.citations.map((citation) => `<button type="button" class="citation" data-citation-id="${escapeAttr(citation.id)}" aria-label="Open citation ${escapeAttr(citation.label)}"><span class="citation-label">${escapeHtml(citation.label)}</span><span>${escapeHtml(citation.exactQuote ?? citation.evidenceId)}</span></button>`).join("")}</div>`}</section>`;
   }
 
   private renderEvidence(document: ArtifactDocument): string {
@@ -462,6 +469,7 @@ function parseAnswer(value: unknown): ProductAnswer {
   const rawCitations = answerValue["citations"] ?? answerValue["citationRefs"] ?? [];
   if (!Array.isArray(rawCitations)) throw new Error("Answer citations must be an array");
   const deliveredEvidence = isRecord(record["deliveredEvidence"]) ? record["deliveredEvidence"] : {};
+  const run = isRecord(record["run"]) ? record["run"] : {};
   const evidenceById = new Map<string, Record<string, unknown>>();
   if (Array.isArray(deliveredEvidence["evidence"])) {
     for (const item of deliveredEvidence["evidence"]) {
@@ -475,6 +483,9 @@ function parseAnswer(value: unknown): ProductAnswer {
     text,
     generationRunId: optionalString(record, "generationRunId") ?? optionalString(answerValue, "generationRunId"),
     publicationId: optionalString(record, "publicationId"),
+    provider: optionalString(run, "provider"),
+    model: optionalString(run, "model"),
+    modelRevision: optionalString(run, "modelRevision"),
     citations: rawCitations.map((value, index) => parseCitation(value, index, evidenceById)),
   };
 }

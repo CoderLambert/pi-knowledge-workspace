@@ -92,6 +92,7 @@ describe("Grounded Ask Product Preview E2E", () => {
     await fixture.bridge.waitForLastRequest();
     await settleUi();
     expect(preview.shadowRoot.textContent).toContain("Alpha deploys using the blue release train");
+    expect(preview.shadowRoot.textContent).toContain("fixture/grounded-e2e");
     expect(preview.shadowRoot.querySelector("[data-citation-id]")).not.toBeNull();
 
     const first = activeSelection(runtime.db);

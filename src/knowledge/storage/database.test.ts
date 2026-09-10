@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
-import { KNOWLEDGE_SCHEMA_VERSION, withTransaction } from "./database.js";
+import { KNOWLEDGE_SCHEMA_VERSION, openKnowledgeRuntimeDatabase, withTransaction } from "./database.js";
 import { applyMigrations, type MigrationDatabase } from "./migrations.js";
 
 class FakeDatabase implements MigrationDatabase {
@@ -25,6 +28,17 @@ class FakeDatabase implements MigrationDatabase {
 }
 
 describe("Knowledge database migrations", () => {
+  it("opens the production service database with the bundled SQLite runtime", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "knowledge-runtime-db-"));
+    try {
+      const db = openKnowledgeRuntimeDatabase(path.join(root, "knowledge.sqlite"));
+      expect(db.pragma("user_version", { simple: true })).toBe(KNOWLEDGE_SCHEMA_VERSION);
+      db.close();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("creates Evidence Core and advances through IndexBuild pin/lease retention", () => {
     const db = new FakeDatabase();
     applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);

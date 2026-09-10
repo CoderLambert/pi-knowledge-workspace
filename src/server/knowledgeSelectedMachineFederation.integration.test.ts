@@ -132,9 +132,14 @@ describe("Knowledge selected-machine federation contract", () => {
         reject(new Error("Expected federation cancellation signal"));
         return;
       }
-      const failOnAbort = () => reject(new RemoteMachineRequestError("request cancelled", 502));
-      if (observedSignal.aborted) failOnAbort();
-      else observedSignal.addEventListener("abort", failOnAbort, { once: true });
+      const failOnAbort = (): void => {
+        reject(new RemoteMachineRequestError("request cancelled", 502));
+      };
+      if (observedSignal.aborted) {
+        failOnAbort();
+      } else {
+        observedSignal.addEventListener("abort", failOnAbort, { once: true });
+      }
     }));
     appTestContext.remoteClient = fakeRemoteClient({ request });
 
@@ -147,11 +152,15 @@ describe("Knowledge selected-machine federation contract", () => {
       signal: controller.signal,
     });
 
-    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => {
+      expect(request).toHaveBeenCalledTimes(1);
+    });
     controller.abort();
 
     await expect(pending).rejects.toThrow();
-    await vi.waitFor(() => expect(observedSignal?.aborted).toBe(true));
+    await vi.waitFor(() => {
+      expect(observedSignal?.aborted).toBe(true);
+    });
     expect(appTestContext.sessionDaemonRequests).toEqual([]);
   });
 

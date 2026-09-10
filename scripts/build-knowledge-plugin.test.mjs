@@ -23,10 +23,11 @@ describe("Knowledge browser package build", () => {
     expect(files).toContain("server-plugin.js");
     expect(files).toContain("service-client.js");
     expect(files).toContain("browser/pi-web-plugin.js");
+    expect(files.filter((path) => path.startsWith("browser/"))).toEqual(["browser/pi-web-plugin.js"]);
     expect(files.some((path) => /\.(?:ts|map)$/u.test(path))).toBe(false);
 
     const entry = await readFile(join(target, "browser/pi-web-plugin.js"), "utf8");
-    expect(entry).not.toMatch(/(?:from\s*["']lit["']|import\s*\(\s*["']lit["']\s*\))/u);
+    expect(entry).not.toMatch(/(?:\bfrom\s*["']lit(?:\/[^"']+)?["']|\bimport\s*(?:\(\s*)?["']lit(?:\/[^"']+)?["'])/u);
     expect((await stat(join(target, "browser/pi-web-plugin.js"))).isFile()).toBe(true);
   });
 });

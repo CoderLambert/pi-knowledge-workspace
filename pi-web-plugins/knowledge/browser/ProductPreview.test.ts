@@ -193,6 +193,33 @@ describe("Knowledge product preview", () => {
     expect(element.shadowRoot?.activeElement).toBe(displayName);
   });
 
+  it("keeps question drafts isolated when switching between workspaces", async () => {
+    const request = vi.fn(() => Promise.resolve({}));
+    const element = await mount(context(request, "draft-workspace-a"));
+    const workspaceAQuestion = element.shadowRoot?.querySelector<HTMLTextAreaElement>("[data-question]");
+    if (workspaceAQuestion === null || workspaceAQuestion === undefined) throw new Error("workspace A question input is missing");
+
+    workspaceAQuestion.value = "Question for workspace A";
+    workspaceAQuestion.dispatchEvent(new Event("input", { bubbles: true }));
+
+    element.context = context(request, "draft-workspace-b");
+    await element.updateComplete;
+    const workspaceBQuestion = element.shadowRoot?.querySelector<HTMLTextAreaElement>("[data-question]");
+    if (workspaceBQuestion === null || workspaceBQuestion === undefined) throw new Error("workspace B question input is missing");
+    expect(workspaceBQuestion.value).toBe("");
+
+    workspaceBQuestion.value = "Question for workspace B";
+    workspaceBQuestion.dispatchEvent(new Event("input", { bubbles: true }));
+
+    element.context = context(request, "draft-workspace-a");
+    await element.updateComplete;
+    expect(element.shadowRoot?.querySelector<HTMLTextAreaElement>("[data-question]")?.value).toBe("Question for workspace A");
+
+    element.context = context(request, "draft-workspace-b");
+    await element.updateComplete;
+    expect(element.shadowRoot?.querySelector<HTMLTextAreaElement>("[data-question]")?.value).toBe("Question for workspace B");
+  });
+
   it("normalizes supported source names without weakening the extension allowlist", () => {
     expect(workspaceFileName("docs/reference/handbook.markdown")).toBe("handbook.markdown");
     expect(workspaceFileName("docs\\notes.txt")).toBe("notes.txt");

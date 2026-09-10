@@ -95,7 +95,7 @@ async function writeBackup(
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   await writeFile(path.join(backup, "manifest.json"), manifestBytes);
   await writeFile(path.join(backup, "manifest.sha256"), `${sha(manifestBytes)}  manifest.json\n`);
-  return { backup, manifest, ...(blobHash ? { blobHash } : {}) };
+  return { backup, manifest, ...(blobHash !== undefined ? { blobHash } : {}) };
 }
 
 describe("KnowledgeRestore", () => {

@@ -2,7 +2,7 @@
 
 Chronological implementation reports for Pi Knowledge Workspace.
 
-These reports are execution evidence: what changed, what was verified, what remains uncertain, and what task follows next.
+These reports preserve selected Product Slice evidence and required Product Milestone records with long-term maintenance value. Agent Work Units normally use a concise handoff rather than a repository report.
 
 ## Index
 
@@ -17,5 +17,5 @@ These reports are execution evidence: what changed, what was verified, what rema
 - **PARTIAL** — implementation exists, but one or more required verification gates remain outstanding.
 - **BLOCKED** — the task cannot currently satisfy its objective or exit condition.
 
-Use [`TEMPLATE.md`](./TEMPLATE.md) for every new task report.
-See [`../REPORTING.md`](../REPORTING.md) for the mandatory report format and completion rules.
+Use [`TEMPLATE.md`](./TEMPLATE.md) when a standalone report is warranted, adapting task-oriented legacy fields to the Product Slice or milestone being recorded.
+See [`../REPORTING.md`](../REPORTING.md) for report boundaries and milestone completion rules.

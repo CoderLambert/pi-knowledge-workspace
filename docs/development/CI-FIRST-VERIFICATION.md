@@ -36,7 +36,7 @@ Use ordinary PR CI for deterministic repository checks such as:
 
 CI failure must be classified before changing code:
 
-1. task-attributable failure -> fix in the owning task;
+1. Product Slice-attributable failure -> fix in the owning slice;
 2. inherited failure with unchanged signature -> record/classify, do not patch unrelated code;
 3. infrastructure/transient failure -> rerun or improve the workflow, do not treat as product failure.
 
@@ -54,7 +54,7 @@ Use a dedicated evidence workflow when acceptance requires a real executable wor
 - cross-profile quality comparisons;
 - reproducibility bundles needed by an ADR.
 
-Evidence workflows should execute production code paths rather than simulated ranks or hand-written fixtures whenever the task acceptance depends on real runtime behavior.
+Evidence workflows should execute production code paths rather than simulated ranks or hand-written fixtures whenever Product Slice or milestone acceptance depends on real runtime behavior.
 
 Each evidence workflow should upload an artifact containing enough provenance to audit the run independently.
 
@@ -119,18 +119,20 @@ For retrieval work:
 - do not publish holdout per-query identities/hit lists into ordinary tuning artifacts when that would enable parameter tuning against the holdout;
 - fixture or static-research results must never be represented as a real retrieval benchmark when the task requires executable evidence.
 
-## Workflow for autonomous tasks
+## Workflow for Product Slices
 
-For each task:
+For each Product Slice:
 
-1. Implement on the dedicated task branch/PR.
+1. Integrate Agent Work Units on the Product Slice branch/Draft PR.
 2. Run or trigger existing GitHub CI.
 3. Read the actual checks/logs and classify every relevant failure.
 4. If CI is insufficient but GitHub can execute the required workload, add or reuse the narrowest evidence harness/workflow.
 5. Upload and inspect the evidence artifact.
-6. Update the task report, verification guide, PR body, ADR, and verification-debt classification from real evidence only.
+6. Update the Product Slice PR, any warranted slice/user-journey verification guide, relevant ADR, and verification-debt classification from real evidence only.
 7. Create or retain local/manual verification debt only for the acceptance portion that still cannot be credibly executed on GitHub.
 8. Continue implementation under `AUTONOMOUS-EXECUTION.md` when policy permits; do not weaken a hard architecture/phase gate.
+
+Agent Work Units normally use the Fast Gate and contribute their results through a concise handoff. They do not each require a dedicated CI workflow, remote branch, report or verification guide.
 
 Do not repeatedly ask the user to execute commands that GitHub Actions can execute reproducibly.
 
@@ -138,8 +140,8 @@ Do not repeatedly ask the user to execute commands that GitHub Actions can execu
 
 A verification harness may live in:
 
-- the owning task PR when it is intrinsic to that task's acceptance contract; or
-- a narrow support PR stacked on the owning task when adding the harness to the task diff would pollute product scope.
+- the owning Product Slice PR when it is intrinsic to that slice's acceptance contract; or
+- a narrow support PR when the harness has a genuinely independent lifecycle or review surface.
 
 Support harnesses must not silently alter production behavior just to make the benchmark pass.
 
@@ -166,7 +168,7 @@ Do **not** mass-close old debt without evidence. Instead, when an owning task is
 
 CI-first changes *where* evidence is obtained, not the acceptance standard.
 
-- `PASS` still requires all acceptance evidence required by the task/gate.
+- `PASS` still requires all acceptance evidence required by the Product Slice or milestone gate.
 - `PARTIAL` remains correct when GitHub proves repository/runtime behavior but target-machine or human evidence is still mandatory.
 - `BLOCKED` remains correct for a hard gate whose required decision/evidence does not yet exist.
 - A green GitHub workflow alone must never be used to override an explicit architecture or phase gate.

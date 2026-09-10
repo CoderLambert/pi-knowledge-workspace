@@ -1,119 +1,106 @@
 # Branch Hygiene Policy
 
-This document defines the remote-branch lifecycle for autonomous development in this repository.
+This document defines branch/worktree isolation and remote-branch lifecycle under the Product Slice First model.
 
-It supplements `docs/development/AUTONOMOUS-EXECUTION.md` and applies to task, corrective, experiment, support, research, and policy branches.
+## Default branch unit
 
-## Goal
+Each independently reviewable Product Slice normally has one target branch and one Draft PR. Multiple Agent Work Units may contribute to that branch; they do not normally create remote branches or PRs of their own.
 
-Keep stacked development reviewable without accumulating duplicate, superseded, merged, or orphan remote branches that can confuse later automation.
+Before creating a Product Slice branch:
 
-The repository deliberately uses many stacked PR branches. A high branch count is therefore not itself a problem. Cleanup must be dependency-aware rather than based on age or naming alone.
+1. search open PRs and remote branches for the same slice goal;
+2. reuse the canonical slice branch when it already exists;
+3. confirm the intended direct base and accepted dependencies;
+4. create an additional remote PR only when independent review, risk containment or dependency order materially benefits.
 
-## Before creating a branch
+Branch names should describe the Product Slice, for example:
 
-Before creating a new task/support branch:
+```text
+feat/p3-reliable-knowledge
+feat/p3-grounded-ask-backend
+feat/p3-grounded-ask-ui
+test/p3-production-lifecycle-e2e
+```
 
-1. Search current open PRs for the same task id/purpose.
-2. Search remote branches for an existing canonical branch.
-3. If an equivalent task branch/PR already exists, reuse or restack it instead of creating a competitor.
-4. If an accidental duplicate is created, select one canonical task branch immediately, close the duplicate PR, and mark the duplicate branch as cleanup-eligible once no open PR depends on it.
+## Multi-Agent workspace policy
 
-One task should have one canonical implementation branch/PR unless an explicitly documented corrective/support layer is required.
+Multiple Agents must not edit the same working tree concurrently.
 
-## Branch states
+Recommended shape:
+
+```text
+one Product Slice target branch
+
+Lead / Integrator
+├── Agent worktree A
+├── Agent worktree B
+└── Agent worktree C
+```
+
+Each Agent works in an isolated worktree, normally on a temporary local branch based on the Product Slice target. Temporary Agent branches:
+
+- do not require a remote push;
+- do not require a PR;
+- do not require a repository report, verification guide or changelog entry;
+- should remain narrowly scoped to the assigned handoff.
+
+The Lead/Integrator reviews and integrates completed work units into the Product Slice branch. Use the safest non-destructive Git method appropriate to the actual ancestry and worktree state; cherry-pick is allowed but not required. Preserve user-owned or unrelated changes and resolve overlapping edits deliberately.
+
+## Integration checks
+
+Before integrating a work unit:
+
+1. inspect its status, diff, tests, risks and handoff;
+2. confirm it is based on the expected Product Slice ancestry;
+3. ensure it does not overwrite concurrent work or broaden scope silently;
+4. run the relevant Fast Gate after integration;
+5. remove or retain the temporary local branch/worktree only after its work is safely represented and no longer needed.
+
+Before updating the Product Slice PR, compare the complete branch with its direct base. Reviewability applies to the Product Slice as a whole; it does not require artificial one-file or one-Agent commits.
+
+## Remote branch states
 
 Treat remote branches as one of:
 
-- **ACTIVE** — head of an open PR.
-- **DEPENDENCY** — base/ancestor required by an open stacked PR.
-- **RETAINED** — intentionally kept for an accepted historical reason that is documented.
-- **CLEANUP-ELIGIBLE** — merged, duplicate-closed, or superseded and no longer required by any open PR.
+- **ACTIVE** — head of an open Product Slice or explicitly justified support PR.
+- **DEPENDENCY** — base/ancestor required by an open PR.
+- **RETAINED** — intentionally kept for a documented historical reason.
+- **CLEANUP-ELIGIBLE** — merged, duplicate-closed or superseded and no longer required.
 - **UNKNOWN** — ownership/dependency not yet proven; do not delete.
 
 ## Safe deletion conditions
 
 A remote branch may be deleted only when all applicable conditions are proven:
 
-1. It is not `main` or another protected/stable base.
-2. It is not the head branch of any open PR.
-3. It is not the base branch of any open PR.
-4. It is not needed as the canonical branch for an unresolved task.
-5. One of the following is true:
-   - its PR was merged;
-   - its PR was explicitly closed as a duplicate and a canonical replacement exists;
-   - its work is fully contained in a documented successor branch and it has no independent required commits;
-   - it is a temporary review/probe branch whose work was never intended to remain canonical.
-6. The replacement/descendant ancestry has been checked when deletion relies on supersession.
+1. it is not `main` or another protected/stable base;
+2. it is not the head or base of an open PR;
+3. it is not required by an unresolved Product Slice;
+4. its work was merged, explicitly superseded without unique required commits, or was a temporary probe never intended to remain canonical;
+5. replacement/descendant ancestry was checked when deletion relies on supersession.
 
 When any condition is uncertain, keep the branch.
 
-## Stacked PR rule
+## Stacked Product Slices
 
-Do not delete intermediate branches simply because later descendants contain their commits.
-
-For an open stack such as:
-
-```text
-Task A
-  -> Task B
-  -> Task C
-```
-
-A and B remain required while their PRs are open or while later PRs target them as bases. Cleanup normally happens oldest-first after merge/retarget operations have made the branch unnecessary.
+Product Slices may be stacked when a real dependency requires it. Intermediate branches remain required while their PRs are open or descendants target them.
 
 After merging a lower PR:
 
-1. verify descendant PR bases/ancestry;
-2. retarget/rebase descendants if needed;
-3. confirm direct-base task-only diffs remain reviewable;
+1. verify descendant PR bases and ancestry;
+2. retarget or otherwise integrate descendants safely;
+3. confirm each remaining Product Slice diff stays reviewable;
 4. only then mark the merged branch cleanup-eligible.
 
-## Duplicate/superseded branch handling
+Do not impose a stack merely because several Agent Work Units exist inside one Product Slice.
 
-When automation detects duplicate task branches:
+## Safety authority
 
-1. identify the canonical PR using current dependency ancestry and downstream references;
-2. do not merge competing implementations;
-3. close the duplicate PR with an explicit reason;
-4. verify no open PR uses the duplicate branch as head/base;
-5. compare ancestry/content when needed to ensure no unique required commits are lost;
-6. delete the duplicate remote branch when safe.
+Autonomous development may inspect and report branch hygiene, but it must not:
 
-## Autonomous hygiene check
+- merge a PR without owner authority;
+- force-push;
+- use destructive reset or unsafe history rewriting;
+- delete an ACTIVE, DEPENDENCY or UNKNOWN branch;
+- delete a branch merely because it is old or its commits appear in a descendant.
 
-Autonomous development should perform a lightweight branch-hygiene check:
-
-- before creating a new branch;
-- after closing a duplicate PR;
-- after a restack that supersedes an old support/corrective branch;
-- after merging or explicitly retiring a task;
-- periodically when the remote branch set grows materially.
-
-The check should report, not delete, branches when the available GitHub tool surface cannot delete refs safely. In that case provide the user with exact `git push origin --delete ...` commands only for branches whose safety has already been established.
-
-## No automatic destructive cleanup
-
-Branch deletion is destructive repository maintenance. Autonomous development must not guess.
-
-- Never delete an ACTIVE, DEPENDENCY, or UNKNOWN branch.
-- Never force-move a branch ref as a substitute for deletion.
-- Never delete a branch merely because it is old.
-- Never delete a branch solely because its commits appear in a descendant while an open PR still references it.
-- Prefer a small verified cleanup set over broad branch pruning.
-
-## Cleanup record
-
-When a cleanup is performed, record at least:
-
-```text
-branch
-reason
-associated PR/task
-canonical replacement, if any
-open-PR head/base check
-ancestry/supersession evidence when relevant
-result
-```
-
-A cleanup operation does not change task PASS/PARTIAL/BLOCKED status and must not be used to hide unmerged work or unresolved verification debt.
+If remote deletion is not safely available, report exact cleanup candidates and evidence. A cleanup does not change Product Slice or milestone PASS/PARTIAL/BLOCKED status and must not hide unmerged work or unresolved verification debt.

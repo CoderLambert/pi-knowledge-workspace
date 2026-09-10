@@ -6,7 +6,7 @@ Each phase has an explicit exit condition. Dependencies may be explored in paral
 
 This file defines phase-level goals and gates. The authoritative forward-looking task breakdown is [`DEVELOPMENT-PLAN.md`](./DEVELOPMENT-PLAN.md).
 
-Task reporting is part of the Definition of Done. Every behavior-changing task must add/update a report under `docs/development/reports/` and a reproducible verification guide under `docs/development/verification/`. Analysis-only tasks require a report; a verification guide is optional when no executable behavior changes.
+Product Milestone reporting is part of the Definition of Done. Product Slice PRs carry integrated implementation and verification context; standalone reports and verification guides are created at milestone or Product Slice/user-journey boundaries when they provide durable value. Agent Work Units normally require only the concise handoff defined in [`REPORTING.md`](./REPORTING.md).
 
 A verification guide documents how to test a feature; it is not itself proof that the feature passed.
 
@@ -93,87 +93,40 @@ P3 implements the accepted ADR instead of reopening it.
 
 Docs-only transition task that aligns the development plan and phase gates with ADR-029.
 
-### P3-T01 — Pre-P3 baseline closure
+### P3-T01 — Regression gate / exit
 
-Close the known inherited Knowledge static/test debt so Slice A gets a trustworthy regression signal. Do not mix product features or frozen-evidence changes into this cleanup.
+TypeScript is green and 77 inherited ESLint findings remain. Historical lint is maintenance debt, not a zero target. P3-T01 exits when touched/P3-critical lint, focused tests, typecheck and build provide a trustworthy Product Slice regression signal without disabling rules or mutating frozen P2 evidence.
 
-### Slice A — Production Knowledge Closure
+### Slice A — Reliable Knowledge through production lifecycle
 
-Goal:
-
-> Make the canonical Knowledge lineage and grounded generation path production-coherent for Markdown/TXT.
-
-Required contracts:
+Build and verify these Product Slices in order:
 
 ```text
-captured Source state
-→ explicit published SourceVersion + ParsedArtifact + publication generation
-→ consistent retrieval snapshot
-→ frozen GenerationRun / ScopeManifest
-→ DeliveredEvidence
-→ persistent Answer / CitationRef
-→ historical retention closure
+Reliable Knowledge
+→ Grounded Ask Backend
+→ Grounded Ask UI
+→ PRODUCT PREVIEW
+→ Lifecycle Safety
+→ Production E2E / Backup Restore
+→ SLICE A PASS
 ```
 
-Must include:
+Required contracts include captured-vs-published Source state, immutable SourceVersion/ParsedArtifact identity, consistent retrieval snapshot publication, frozen GenerationRun scope, DeliveredEvidence, durable Answer/CitationRef, historical citation reopening, business-commit fencing, `archive != purge`, canonical retention independent of index GC, crash/retry consistency, backup/restore and host-authoritative Workspace/worktree coverage.
 
-- immutable ParsedArtifact interpretation identity;
-- stale/out-of-order publication protection;
-- business-commit worker fencing;
-- retrieval snapshot protection for active runs;
-- CitationRef → Evidence historical reopening;
-- archive != purge;
-- index GC independent of canonical-history retention;
-- crash/retry consistency;
-- backup/restore of canonical history plus deterministic rebuild of a usable retrieval index;
-- host-authoritative Workspace/worktree regression coverage.
+### Quiz — First Derived Resource
 
-Slice A exit:
+After Slice A PASS:
 
 ```text
-Import MD/TXT
-→ publish canonical Knowledge
-→ FTS retrieval
-→ frozen GenerationRun
-→ DeliveredEvidence
-→ durable Answer/CitationRef
-→ update Source/reindex
-→ old citation still reopens historical content
-→ old index GC
-→ backup/restore
-→ rebuild usable retrieval index
-→ old citation still resolves
+Quiz Generate
+→ Quiz Lifecycle
+→ Quiz E2E
+→ P3 PASS
 ```
 
-### Slice B — First Derived Resource
+Quiz uses `DerivedArtifact` with immutable `ArtifactRevision`, `pinned | follow-current` dependency policy and `current | needs-review` freshness. It must preserve candidate/accept/edit history, reject stale overwrites, retain canonical Evidence/SourceVersion lineage and generator provenance, and reopen the same accepted revision/citations after restart.
 
-Goal:
-
-> Prove Pi's canonical lineage supports a long-lived generated resource, not only ephemeral chat.
-
-Implement exactly one first type: **Quiz or Interview**.
-
-Required domain:
-
-```text
-DerivedArtifact
-└── immutable ArtifactRevision
-
-policy: pinned | follow-current
-freshness: current | needs-review
-```
-
-Must prove:
-
-- candidate → accept without rewriting history;
-- user edits survive regeneration;
-- stale concurrent candidate cannot overwrite newer user edits;
-- Evidence/SourceVersion lineage and generator provenance are retained;
-- follow-current marks `needs-review` on published dependency change;
-- pinned remains historical until explicitly changed;
-- restart/reopen preserves the accepted revision and citations.
-
-P3 exit is not “all future Studio features exist”. P3 exits when the supported Knowledge/grounded-generation path and first Derived Resource are coherent enough to move into product hardening.
+P3 PASS does not require every future Studio resource. It requires the supported Reliable Knowledge/Grounded Ask lifecycle and first Quiz resource to pass their integrated milestone gates.
 
 ---
 
@@ -194,7 +147,7 @@ Required themes:
 - user-value comparison against direct-file Pi;
 - closure of mandatory P0/P1 verification debt for release scope.
 
-Release requires no known correctness failure in supported scope and must not claim production readiness while inherited static/test failures or mandatory acceptance debt remain unresolved.
+Release requires no known correctness failure in supported scope and must not claim production readiness while mandatory acceptance debt remains unresolved. Inherited static/lint findings remain maintenance debt unless they mask release regressions, block required gates or represent correctness defects.
 
 ---
 

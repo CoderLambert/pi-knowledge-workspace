@@ -1,4 +1,4 @@
-# <Task ID> — <Feature Name> Verification Guide
+# <Product Slice or Journey> Verification Guide
 
 ## What this verifies
 
@@ -21,7 +21,7 @@ Describe the exact user-visible/runtime behavior this guide proves.
 ### Focused tests
 
 ```bash
-# exact task-specific commands
+# exact slice/journey-specific commands
 ```
 
 ### Repository regression
@@ -119,11 +119,7 @@ This guide does not prove:
 
 ## Recording the result
 
-After executing this guide, update the corresponding file under:
-
-```text
-docs/development/reports/
-```
+After executing this guide, record the result in the Product Slice PR. For a Product Milestone, update its corresponding report under `docs/development/reports/`.
 
 Record:
 

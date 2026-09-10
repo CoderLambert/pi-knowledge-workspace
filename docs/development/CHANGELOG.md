@@ -4,29 +4,35 @@ A concise progress log for Pi Knowledge Workspace.
 
 Use this file to answer quickly:
 
-> What development task changed most recently, what was delivered, and what is its current status?
+> What Product Slice, Product Milestone, important architecture decision, blocker or user-visible capability changed most recently?
 
 Detailed implementation evidence belongs in `docs/development/reports/`. Human acceptance steps belong in `docs/development/verification/`.
 
 ## Format
 
 ```text
-YYYY-MM-DD  TASK-ID  STATUS
+YYYY-MM-DD  SLICE/MILESTONE  STATUS
 - one-line outcome
 - optional one-line important consequence / blocker
 ```
 
-Only record task-level progress. Do not duplicate commit-by-commit history.
+Do not record Agent Work Units, routine commits, small wiring or cleanup-only activity. Record Product Slice completion, Product Milestones, important architecture decisions/blockers and meaningful user-visible capabilities. Do not duplicate implementation logs.
 
 ---
 
 ## 2026-09-10
 
+### Development Policy V2 — ACCEPTED
+
+- Adopted Product Slice First: a Product Slice is the default remote branch, Draft PR, CI and review unit; internal Agent Work Units use isolated worktrees and concise handoffs.
+- Added Fast/Slice/Full verification gates. The 77 inherited ESLint findings are maintenance debt, not a zero-before-product-work target; existing rules remain enabled and Product Slice regressions must stay distinguishable.
+- Replaced the lint-slice execution ledger with the product route: P3-T01 Exit → Reliable Knowledge → Grounded Ask → Product Preview → Lifecycle Safety/E2E → Slice A PASS → Quiz → P3 PASS.
+
 ### P3-T01 — PARTIAL
 
 - Closed the inherited 12-error TypeScript blocker; `npm run typecheck` now passes in CI and `npm run verify` advances to ESLint.
-- Bounded support slices P3-T01S1 and P3-T01S2 reduced the inherited ESLint baseline from 261 → 254 → 252 without product, ADR, retrieval or P2-evidence changes.
-- P3-T01 remains PARTIAL while the remaining inherited static/test baseline is closed in subsystem-scoped slices before Slice A.
+- Historical support work reduced the inherited ESLint baseline to 77 without product, ADR, retrieval or P2-evidence changes.
+- P3-T01 now exits by establishing a trustworthy P3 Product Slice regression gate; no S20/S21 or general lint cleanup is planned.
 
 ### P3-T00 — PASS
 

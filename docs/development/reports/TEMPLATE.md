@@ -1,8 +1,8 @@
-# <TASK-ID> — <Task Title> Report
+# <SLICE-OR-MILESTONE> — <Title> Report
 
-## Task metadata
+## Product metadata
 
-- **Task:** `<TASK-ID>`
+- **Product Slice / Milestone:** `<identifier>`
 - **Phase:** `<phase>`
 - **Date:** `YYYY-MM-DD`
 - **Branch:** `<branch>`
@@ -11,7 +11,7 @@
 
 ## Objective
 
-Describe exactly what this task was intended to prove or deliver.
+Describe exactly what this Product Slice or milestone was intended to prove or deliver.
 
 ## Scope
 
@@ -79,10 +79,10 @@ Explain why this status is accurate.
 
 ## Impact on the plan
 
-State whether this task changed later implementation, architecture, scope, risks or phase sequencing.
+State whether this outcome changed later implementation, architecture, scope, risks or product sequencing.
 
-## Next task
+## Next Product Slice
 
-**<NEXT-TASK-ID> — <title>**
+**<NEXT-SLICE> — <title>**
 
 Describe the exact next proof/deliverable and important exclusions.

@@ -6,12 +6,14 @@ The authoritative execution policy is `docs/development/AUTONOMOUS-EXECUTION.md`
 
 ## Rules
 
-- Missing local/manual evidence keeps the originating task `PARTIAL` when that evidence is required for PASS.
+- Missing local/manual evidence keeps the originating Product Slice or milestone `PARTIAL` when that evidence is required for PASS.
 - Verification debt does not by itself stop later implementation.
-- Later tasks must document assumptions when they consume an unverified contract.
-- Each task remains isolated in its own branch/PR.
+- Later Product Slices must document assumptions when they consume an unverified contract.
+- Each Product Slice normally remains isolated in its own branch/PR; Agent Work Units do not require separate remote branches.
 - A phase/release gate cannot be declared PASS while required debt for that gate remains unresolved.
-- When evidence is later supplied, update this ledger, the task report, plan/changelog status, and PR description.
+- When evidence is later supplied, update this ledger and the owning Product Slice PR. Update the milestone report, plan and changelog when a milestone status changes.
+
+Historical rows retain their original task/branch metadata. Do not rewrite or mass-close them merely to match the newer Product Slice naming model.
 
 ## Open debt
 

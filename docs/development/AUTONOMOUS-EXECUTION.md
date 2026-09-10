@@ -1,150 +1,143 @@
 # Autonomous Development Execution Policy
 
-This document supplements `DEVELOPMENT-PLAN.md` for unattended development periods and **supersedes the stop-on-unverified-dependency sentence in `DEVELOPMENT-PLAN.md` §1.3(4) while unattended automation is active**.
+This document defines the default **Product Slice First** execution model for autonomous and multi-Agent development. It supplements `DEVELOPMENT-PLAN.md` and keeps final PASS, milestone and release gates strict while reducing coordination overhead inside a slice.
 
-Verification execution follows `docs/development/CI-FIRST-VERIFICATION.md`. When repository/runtime evidence can be produced credibly by GitHub Actions, GitHub Actions is the default verification environment before local/manual debt is created.
+Verification execution follows [`CI-FIRST-VERIFICATION.md`](./CI-FIRST-VERIFICATION.md). When GitHub Actions can produce credible repository/runtime evidence, use it before creating target-machine or manual verification debt.
 
-## Objective
+## Delivery model
 
-Allow implementation to continue autonomously while the user is unavailable, without weakening final PASS, phase-gate, or release-gate standards.
+```text
+Product Milestone
+└── Product Slice                 default branch / Draft PR / CI / review unit
+    ├── Agent Work Unit
+    ├── Agent Work Unit
+    └── Agent Work Unit
+```
 
-Development progression and final acceptance are separate concerns:
+A **Product Slice** is an independently reviewable vertical increment with one coherent goal and acceptance surface. It may span domain, service, client, UI and tests when those pieces are needed to demonstrate the slice.
 
-- implementation may advance;
-- reproducible verification should be executed through GitHub CI/evidence workflows whenever possible;
-- genuinely unavailable target-machine/manual verification is recorded as debt;
-- no task is falsely marked PASS;
-- deferred verification does not by itself block later implementation unless the project defines a hard gate.
+An **Agent Work Unit** is a bounded implementation task inside that slice. Multiple Agents may contribute work units to the same Product Slice. A work unit normally does not get its own remote branch, PR, repository report, verification guide, changelog entry or development-plan update.
+
+For example, `P3-A2 Grounded Ask` may contain GenerationRun, retrieval, DeliveredEvidence, Answer, Citation, provider integration, service API, client, UI and test work units while producing one or a small number of Product Slice PRs.
+
+## Agent assignment
+
+Simple, explicit and mechanical work units are appropriate for a fast Agent such as Luna, including:
+
+- test fixtures;
+- API types;
+- UI components;
+- runtime validation;
+- migration tests;
+- small wiring;
+- lint in touched files;
+- verification execution.
+
+Use a stronger Agent for work that carries architectural or concurrency risk, including:
+
+- architecture and schema design;
+- migration design;
+- identity and historical lineage;
+- transaction boundaries;
+- compare-and-swap, fencing and concurrency;
+- retention and destructive lifecycle semantics.
+
+The Lead/Integrator owns slice coherence, integration, verification classification and the final PR description.
 
 ## Unattended execution rule
 
-When a task reaches verification:
+1. Confirm the Product Slice goal, accepted ADRs, correctness invariants and integration owner.
+2. Decompose the slice into dependency-safe Agent Work Units without turning the decomposition into permanent repository process artifacts.
+3. Run every automated/static/build check available at the appropriate gate.
+4. Classify failures before changing code: slice-attributable, inherited, or infrastructure/transient.
+5. If ordinary CI is insufficient but GitHub Actions can credibly execute the workload, add or reuse the narrowest evidence harness.
+6. Record checks that truly require the user's machine, browser/desktop trust boundary, Fleet/multi-host topology, hardware/GPU, system services, credentials, provider access or human judgment in `VERIFICATION-DEBT.md`.
+7. Keep the Product Slice or milestone `PARTIAL` when required acceptance evidence remains missing.
+8. Continue dependency-safe work against explicit contracts and assumptions; isolate unverified dependencies and add focused contract tests or fixtures where practical.
+9. Stop only when progress requires unavailable information/authority, unsafe or destructive action, or violates an explicit architecture/product gate.
 
-1. Run every automated/static/build check available through the current environment or existing GitHub CI.
-2. If ordinary CI is insufficient but GitHub Actions can credibly execute the required real workload, add or reuse the narrowest evidence harness/workflow and inspect its logs/artifacts.
-3. Classify failures before changing code: task-attributable, inherited, or infrastructure/transient.
-4. Only after GitHub-capable verification is exhausted, record checks that truly require the user's target machine, browser/desktop trust boundary, Fleet/multi-host topology, hardware/GPU, system services, user-owned credentials, provider access, or human judgment in `docs/development/VERIFICATION-DEBT.md` and the task report/verification guide.
-5. Keep the task `PARTIAL` if required acceptance evidence is still missing.
-6. Continue to the next planned implementation task instead of waiting for the user when policy and architecture permit.
-7. If a later task depends on an unverified invariant, proceed against the documented contract/assumption, isolate that dependency behind the narrowest practical interface, and add contract tests, mocks, fixtures, or GitHub evidence workflows where possible.
-8. Record the assumption and dependency risk in both the producer and consumer task records.
-9. Stop only when implementation is literally impossible without missing information/data/credentials that cannot reasonably be stubbed, when continuing would require destructive/unsafe actions, or when an explicit architecture/phase gate forbids progression without the missing decision/evidence.
-
-A missing runnable checkout in the assistant environment is not, by itself, a reason to defer executable repository verification to the user. Prefer GitHub Actions when it can execute the workload reproducibly.
-
-A deferred invariant is therefore a recorded risk, not an automatic development stop condition, unless it is part of an explicit hard gate.
-
-## CI-first verification tiers
-
-Use the following order by default:
-
-```text
-Level 1 — GitHub CI
-  unit/integration/static/build/package checks
-
-Level 2 — GitHub evidence workflow
-  real SQLite/FTS/parser/chunker/retrieval/benchmark workloads + artifacts
-
-Level 3 — target-machine / human acceptance
-  Omarchy performance, physical Fleet, desktop/browser trust boundaries,
-  hardware/GPU, local system services, user credentials, human review
-```
-
-GitHub runner measurements are valid evidence for the runner environment but must not be relabeled as target-machine performance.
-
-Do not ask the user to repeat deterministic repository work that GitHub Actions can execute and preserve as auditable logs/artifacts.
+Never fabricate evidence. A missing runnable checkout in one Agent environment is not itself a reason to defer deterministic repository verification when another available environment can run it reproducibly.
 
 ## Branch and PR policy
 
-Each development task must have its own branch and PR.
-
-Preferred naming:
-
-```text
-feat/p0-<task-name>
-feat/p1-<task-name>
-experiment/p2-<task-name>
-feat/p3-<task-name>
-chore/p4-<task-name>
-feat/p5-<task-name>
-```
+Each independently reviewable Product Slice normally gets one branch and one Draft PR. The Product Slice—not each Agent Work Unit—is the default remote branch, CI and review boundary.
 
 Rules:
 
-1. One task scope per branch/PR.
-2. Do not place later-task implementation into an earlier task branch.
-3. When task B depends on unmerged task A, branch B from A and open B as a stacked PR against A's branch.
-4. Continue stacking dependent tasks in implementation order.
-5. Independent tasks may branch from the nearest accepted/stable base instead of being needlessly stacked.
-6. Every PR description must state its base task/branch, deferred verification debt, and whether it is safe to merge independently.
-7. Do not automatically merge PRs unless the user explicitly authorizes merging.
-8. Before marking a PR implementation-complete, compare it against its direct base and confirm the diff contains only that task's intended scope.
-9. Verification-support harnesses/workflows may use a separate narrow stacked PR when including them in the owning task would pollute product scope; support PRs must not silently change production behavior.
+1. Keep each Product Slice coherent and reviewable; do not mix an unrelated product goal merely to reduce PR count.
+2. Multiple Agent Work Units may contribute through isolated local branches/worktrees and be integrated into the Product Slice branch.
+3. A large slice may use a small number of PRs when risk, dependency order or reviewability genuinely requires it. Do not create a PR per schema type, API layer, UI state or test group by default.
+4. The Product Slice PR description records the goal, important implementation, architecture/correctness invariants, automated verification and known limitations.
+5. Do not autonomously merge a PR. Do not force-push, destructively reset or unsafely rewrite history.
+6. Before declaring a slice implementation-complete, compare it with its direct base and confirm its complete diff matches the Product Slice goal.
+7. Verification harnesses normally travel with the Product Slice they verify. Use a separate support PR only when it has a genuinely independent lifecycle or review surface.
 
-This structure lets the user later validate and merge progress incrementally in dependency order without losing task boundaries.
+See [`BRANCH-HYGIENE.md`](./BRANCH-HYGIENE.md) for worktree isolation and remote-branch lifecycle rules.
 
-## Status semantics during unattended development
+## Agent Work Unit handoff
 
-- `PASS`: all required implementation and acceptance evidence exists.
-- `PARTIAL`: implementation is complete or substantially complete, but required verification debt remains.
-- `BLOCKED`: implementation cannot proceed because required information/capability cannot reasonably be stubbed, proceeding would be destructive/unsafe, or an explicit hard gate requires missing evidence/decision.
-- `TODO`: implementation has not started.
-
-Do not convert `PARTIAL` to `PASS` solely because later tasks have been implemented successfully or because a GitHub workflow is green when the task still requires target-machine/human acceptance.
-
-## Verification debt discipline
-
-Before creating a new debt row, determine whether the requirement can be covered credibly by GitHub CI or a dedicated evidence workflow under `CI-FIRST-VERIFICATION.md`.
-
-Every deferred item must include:
+Each work unit returns a short handoff to the Lead/Integrator:
 
 ```text
-Task
-Branch
-PR
+TASK
+STATUS
+FILES_CHANGED
+IMPLEMENTED
+TESTS
+RISKS
+HANDOFF
+```
+
+Keep this handoff in the orchestration/PR workflow unless it has clear long-term maintenance value. It is not a default repository document.
+
+## Status semantics
+
+- `PASS`: all required implementation and acceptance evidence for the Product Slice or milestone exists.
+- `PARTIAL`: implementation exists, but required acceptance evidence remains open.
+- `BLOCKED`: progress requires unavailable information/capability/authority, an unsafe action, or a missing hard-gate decision.
+- `TODO`: implementation has not started.
+
+Do not convert `PARTIAL` to `PASS` merely because dependent work exists or because one CI layer is green while required acceptance remains open.
+
+## Verification debt
+
+Before creating debt, determine whether CI or a dedicated evidence workflow can cover it credibly. Each deferred item must identify:
+
+```text
+Product Slice or Product Milestone
 Status
-Why GitHub/current automation cannot credibly verify it
-GitHub evidence already obtained, if any
-Exact remaining local/manual verification procedure
+Why automation cannot credibly verify it
+Evidence already obtained
+Exact remaining procedure
 Expected PASS evidence
-Assumptions used by later tasks
-Dependent tasks, if any
+Assumptions and dependents
 Resolution state
 ```
 
-Older debt rows that say the assistant lacks a checkout/dependency tree must be re-evaluated when their owning task is revisited. Do not mass-close them; execute the GitHub-capable portion first, close only evidence actually proven, and leave genuinely target-specific portions open.
+When an older task-level debt row is revisited, do not mass-close it. Execute what is now automatable, close only what evidence proves, and preserve genuinely target-specific debt. Compatible manual checks may be batched by Product Slice or user journey.
 
-When the user returns, remaining target-machine/manual verification should be performed task-by-task or in compatible batches, preferably through a one-shot harness that minimizes user actions. Once evidence is supplied, update the originating task report, changelog/plan status, PR description, and debt ledger.
+## Inherited debt
 
-## Benchmark and holdout discipline
+Inherited failures must remain distinguishable from Product Slice regressions. Do not fix inherited debt unless it:
 
-Autonomous evidence collection must preserve experiment isolation:
+1. is in code touched by the current Product Slice;
+2. masks a Product Slice regression;
+3. blocks required compilation, tests or build; or
+4. is an actual correctness defect.
 
-- development diagnostics may be exposed for tuning;
-- holdout results may be computed for acceptance but must remain tuning-blind;
-- do not publish holdout per-query identities/hit lists into tuning artifacts when doing so would enable parameter tuning against the holdout;
-- fixture/static-research results must not be represented as real benchmark evidence when executable runtime evidence is required.
+Do not perform general cleanup for a prettier lint count, and do not disable or weaken existing ESLint rules. The inherited repository-wide lint baseline is maintenance debt, not permission to introduce new findings in touched or P3-critical code.
 
-## Merge order
+## Safety and correctness remain strict
 
-For stacked work, the normal merge order is oldest dependency first:
+Product Slice First changes coordination granularity, not correctness authority. ADR-029 remains authoritative, including:
 
-```text
-Task A
-→ Task B
-→ Task C
-```
+- captured content is not the same as published Knowledge;
+- SourceVersion and ParsedArtifact are immutable;
+- `CitationRef -> Evidence`, and historical citations never silently redirect to latest;
+- the retrieval index is a projection, not canonical identity;
+- `archive != purge`;
+- a stale worker cannot publish after losing fencing authority;
+- P2 frozen evidence is not mutated;
+- V1 retrieval remains SQLite FTS5 / `unicode61` / `quoted-literal-or` / Top-K 10.
 
-After merging a lower PR, later stacked PRs may be retargeted/rebased as appropriate, but their task-specific diff must remain reviewable.
-
-## Inherited failures
-
-Known inherited baseline failures remain explicitly classified and must not be patched inside unrelated task branches merely to make a test suite appear green.
-
-When GitHub CI exposes a failure, compare the failing file/signature with the direct-base task diff and prior evidence before assigning ownership.
-
-## Final gates remain strict
-
-Autonomous progression and CI-first verification do not waive phase or release acceptance. Before a phase/release is declared PASS, all verification debt required by that gate must be resolved or explicitly removed by an intentional plan/architecture decision.
-
-A green CI/evidence workflow never overrides an explicit architecture or phase gate such as a required ADR decision.
+No autonomous PR merge, force-push, destructive reset or unsafe history rewrite is permitted. Phase, milestone and release gates remain strict, and task/slice-owned failures must never be disguised as inherited failures.

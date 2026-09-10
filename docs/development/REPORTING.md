@@ -1,122 +1,113 @@
 # Development Reporting Standard
 
-This repository treats task reporting, human verification documentation, and the concise development changelog as part of the Definition of Done.
+Reporting follows the Product Slice First hierarchy. Permanent repository documentation is created when it provides durable review or maintenance value—not for every internal Agent task.
 
-A development task is not considered complete until its repository report has been written or updated. A user-visible or behavior-changing task must also include a reproducible verification guide. Every task status change must be reflected in `CHANGELOG.md`.
+## Level 1 — Agent Work Unit
 
-## Required workflow
-
-For analysis/documentation-only tasks:
+An Agent Work Unit returns a short handoff:
 
 ```text
-Task deliverable
-→ verification/review
-→ repository report
-→ CHANGELOG entry
-→ report index / phase status update
-→ task may be marked complete
+TASK
+STATUS
+FILES_CHANGED
+IMPLEMENTED
+TESTS
+RISKS
+HANDOFF
 ```
 
-For behavior-changing tasks:
+This is enough by default. A work unit does not normally require its own remote branch, PR, report file, verification guide, changelog entry, report index entry or development-plan update.
+
+The handoff must distinguish code written from checks actually executed and must identify unresolved integration or correctness risk. Keep it in the orchestration/PR workflow unless future maintainers need it as durable repository documentation.
+
+## Level 2 — Product Slice
+
+The Product Slice is the default branch, Draft PR, CI and review unit. Its PR description must record:
 
 ```text
-Task implementation
-→ automated verification
-→ repository report
-→ human verification guide
-→ CHANGELOG entry
-→ report/verification indexes + phase status update
-→ task may be marked complete
+Goal
+Important implementation
+Architecture/correctness invariants
+Automated verification
+Known limitations
+```
+
+It should also identify its direct base, required follow-up or external verification debt, and whether another Product Slice depends on it.
+
+Create a standalone report under `docs/development/reports/` only when the slice produces evidence, rationale or operational knowledge with clear long-term value—for example a durable architecture/correctness analysis, benchmark result, migration rehearsal, incident finding or complex acceptance record. Do not create a report merely to mirror the PR description.
+
+## Level 3 — Product Milestone
+
+At a Product Milestone, formally record:
+
+- a development report with the milestone result and evidence;
+- the `DEVELOPMENT-PLAN.md` status/next-step update;
+- a `CHANGELOG.md` entry;
+- verification status and unresolved debt.
+
+Typical milestones include:
+
+```text
+P3-T01 Exit
+Reliable Knowledge
+Product Preview
+Slice A PASS
+Quiz Preview
+P3 PASS
+```
+
+A milestone is not PASS until its required evidence exists. Missing mandatory evidence is reported as `PARTIAL` or `BLOCKED`, not hidden by documentation status.
+
+## Changelog policy
+
+`CHANGELOG.md` is a concise product-development history, not an Agent activity ledger. Record only:
+
+- Product Slice completion;
+- Product Milestones;
+- important architecture decisions;
+- important blockers;
+- meaningful user-visible capabilities.
+
+Do not record individual Agent Work Units, frequent commits, routine wiring, test fixture work or inherited-debt cleanup merely because it occurred.
+
+## Evidence rules
+
+Reports and PR descriptions must distinguish:
+
+- implemented behavior;
+- static review;
+- tests written;
+- tests actually executed;
+- CI state;
+- manual verification;
+- assumptions and deferred validation;
+- Product Slice regressions versus inherited failures.
+
+Never report a check as passing unless it ran successfully. A verification guide describes how to test a slice or user journey; its existence is not proof that the verification ran.
+
+```text
+Verification guide exists != verification passed
 ```
 
 ## Documentation locations
 
-Detailed task reports:
+- `docs/architecture/`: durable architecture decisions and baselines.
+- `docs/development/`: roadmap, standards, verification debt and concise changelog.
+- `docs/development/reports/`: selected Product Slice or required milestone evidence with long-term value.
+- `docs/development/verification/`: Product Slice or user-journey verification guides.
+
+If work changes a durable architecture decision, update or add the relevant ADR. Process changes do not silently redefine ADR-029.
+
+## Completion rules
 
 ```text
-docs/development/reports/
+Agent Work Unit + accurate handoff = ready for integration
+
+Product Slice + required implementation/verification
++ complete PR description = reviewable
+
+Product Milestone + required evidence
++ development report + plan + changelog + verification/debt status = eligible for PASS
 ```
 
-Human-executable feature verification guides:
-
-```text
-docs/development/verification/
-```
-
-Concise project progress log:
-
-```text
-docs/development/CHANGELOG.md
-```
-
-See [`VERIFICATION.md`](./VERIFICATION.md) for the required verification-guide format.
-
-## Report requirements
-
-Every task report must contain, at minimum:
-
-1. Task metadata.
-2. Objective.
-3. Scope.
-4. Changes.
-5. Files changed.
-6. Architecture decisions.
-7. Security / correctness invariants.
-8. Verification actually executed.
-9. User verification guide link for behavior-changing tasks.
-10. Known limitations / unresolved items.
-11. Result: PASS / PARTIAL / BLOCKED.
-12. Impact on the plan.
-13. Next task.
-
-## Changelog requirements
-
-`CHANGELOG.md` is intentionally short. It is for quick progress review, not implementation evidence.
-
-For each task status change, add:
-
-```text
-YYYY-MM-DD  TASK-ID  STATUS
-- one-line outcome
-- optional one-line important consequence / blocker
-```
-
-Do not duplicate file-by-file details, test logs, or architecture rationale there. Link to reports when detail is needed.
-
-## Evidence rules
-
-Reports must distinguish between implemented behavior, static review, tests written, tests actually executed, CI state, manual verification, and assumptions/deferred validation.
-
-Do not report a test or CI gate as passing unless it actually ran successfully.
-
-A verification guide documents **how** a user can test a feature. It is not evidence that the user test has already been performed.
-
-```text
-Verification guide exists ≠ verification passed
-```
-
-When a task produces a PR, the PR should link to both its repository report and its human verification guide when the task changes behavior.
-
-## Architecture discipline
-
-Use:
-
-- `docs/architecture/` for durable architecture decisions and baselines;
-- `docs/development/` for plans, standards, and the concise changelog;
-- `docs/development/reports/` for chronological task execution evidence;
-- `docs/development/verification/` for copyable human acceptance procedures.
-
-If a task changes a durable architectural decision, update or add the corresponding ADR in the same task.
-
-## Completion rule
-
-From P0 onward:
-
-```text
-Analysis task + report/changelog missing = NOT COMPLETE
-Behavior implementation + report missing = NOT COMPLETE
-Behavior implementation + verification guide missing = NOT COMPLETE
-Behavior implementation + changelog missing = NOT COMPLETE
-Behavior implementation + required runtime/CI verification pending = PARTIAL
-Implementation + required verification + report + verification guide + changelog = PASS
-```
+An independent report or verification guide may be required by the nature of the Product Slice, but neither is a universal per-work-unit Definition of Done.

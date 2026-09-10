@@ -4,6 +4,12 @@ import type { DurableJob, DurableJobStore, JobLease } from "./durableJobs.js";
 export interface DurableJobHandlerContext {
   readonly job: DurableJob;
   readonly signal: AbortSignal;
+  /**
+   * Revalidates the worker lease immediately before a user-visible business write.
+   * Long-running handlers must call this at their commit boundary; handler return
+   * alone is not authority because ownership may have changed while work was in flight.
+   */
+  assertAuthority(): void;
 }
 
 export type DurableJobHandler = (context: DurableJobHandlerContext) => Promise<unknown>;
@@ -99,7 +105,11 @@ export class DurableJobWorker {
         return { status: "cancelled", jobId, recoveredLeases, expiredDeadlines };
       }
 
-      const result = await handler({ job: lease.job, signal: abortController.signal });
+      const result = await handler({
+        job: lease.job,
+        signal: abortController.signal,
+        assertAuthority: () => this.assertAuthority(jobId, lease.fencingToken, abortController.signal),
+      });
       if (heartbeatFailure !== undefined) {
         return { status: "lost-lease", jobId, recoveredLeases, expiredDeadlines };
       }
@@ -131,6 +141,24 @@ export class DurableJobWorker {
       }
     } finally {
       clearInterval(timer);
+    }
+  }
+
+  private assertAuthority(jobId: string, fencingToken: number, signal: AbortSignal): void {
+    const current = this.jobs.get(jobId);
+    const leaseExpiresAt = current.leaseExpiresAt;
+    const now = this.now().getTime();
+    const leaseExpiry = leaseExpiresAt === null ? Number.NaN : Date.parse(leaseExpiresAt);
+    if (
+      signal.aborted
+      || current.status !== "running"
+      || current.cancelRequested
+      || current.leaseOwner !== this.workerId
+      || current.fencingToken !== fencingToken
+      || !Number.isFinite(leaseExpiry)
+      || leaseExpiry < now
+    ) {
+      throw new Error(`Job ${jobId} authority rejected stale, expired, cancelled, or non-owner lease`);
     }
   }
 

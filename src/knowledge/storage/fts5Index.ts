@@ -62,7 +62,7 @@ WHERE ib.id = ?
         input.sourceVersionId,
         input.knowledgeWorkspaceId,
       );
-    if (!authority) {
+    if (authority === undefined) {
       throw new Error("IndexBuild, ParsedArtifact and SourceVersion do not belong to the requested Knowledge Workspace");
     }
 
@@ -119,20 +119,20 @@ INSERT INTO chunk_fts (
     assertNonEmptyIdentity(input.knowledgeWorkspaceId, "knowledgeWorkspaceId");
     assertNonEmptyIdentity(input.indexBuildId, "indexBuildId");
     const query = input.query.trim();
-    if (!query) throw new TypeError("query must not be empty");
+    if (query.length === 0) throw new TypeError("query must not be empty");
 
     const limit = input.limit ?? DEFAULT_LIMIT;
     if (!Number.isSafeInteger(limit) || limit <= 0 || limit > MAX_LIMIT) {
-      throw new TypeError(`limit must be an integer between 1 and ${MAX_LIMIT}`);
+      throw new TypeError(`limit must be an integer between 1 and ${String(MAX_LIMIT)}`);
     }
 
     const allowed = input.allowedSourceVersionIds;
-    if (allowed && allowed.length === 0) return [];
-    if (allowed) {
+    if (allowed?.length === 0) return [];
+    if (allowed !== undefined) {
       for (const sourceVersionId of allowed) assertNonEmptyIdentity(sourceVersionId, "allowedSourceVersionId");
     }
 
-    const sourceFilter = allowed ? ` AND source_version_id IN (${allowed.map(() => "?").join(", ")})` : "";
+    const sourceFilter = allowed === undefined ? "" : ` AND source_version_id IN (${allowed.map(() => "?").join(", ")})`;
     const statement = this.db.prepare(`
 SELECT
   chunk_id AS chunkId,
@@ -149,7 +149,7 @@ LIMIT ?
 `);
 
     const params: unknown[] = [query, input.knowledgeWorkspaceId, input.indexBuildId];
-    if (allowed) params.push(...allowed);
+    if (allowed !== undefined) params.push(...allowed);
     params.push(limit);
 
     return statement.all(...params).map(parseSearchHit);
@@ -158,7 +158,9 @@ LIMIT ?
 
 function stableChunkId(indexBuildId: string, parsedArtifactId: string, chunk: StructureAwareChunk): string {
   const digest = createHash("sha256")
-    .update(`${indexBuildId}\0${parsedArtifactId}\0${chunk.ordinal}\0${chunk.startByte}\0${chunk.endByte}`)
+    .update(
+      `${indexBuildId}\0${parsedArtifactId}\0${String(chunk.ordinal)}\0${String(chunk.startByte)}\0${String(chunk.endByte)}`,
+    )
     .digest("hex");
   return `chunk_${digest}`;
 }
@@ -166,7 +168,8 @@ function stableChunkId(indexBuildId: string, parsedArtifactId: string, chunk: St
 function assertChunks(chunks: readonly StructureAwareChunk[]): void {
   let previousEnd = -1;
   for (let index = 0; index < chunks.length; index += 1) {
-    const chunk = chunks[index]!;
+    const chunk = chunks[index];
+    if (chunk === undefined) throw new Error("Chunk collection changed during validation");
     if (chunk.ordinal !== index) throw new Error("Chunk ordinals must be contiguous and zero-based");
     if (
       !Number.isSafeInteger(chunk.startByte) ||
@@ -186,23 +189,28 @@ function assertNonEmptyIdentity(value: string, name: string): void {
 }
 
 function parseSearchHit(row: unknown): Fts5SearchHit {
-  const value = row as Partial<Fts5SearchHit> | undefined;
+  const value = recordValue(row, "FTS5 search row");
+  const chunkId = value["chunkId"];
+  const sourceVersionId = value["sourceVersionId"];
+  const parsedArtifactId = value["parsedArtifactId"];
+  const text = value["text"];
+  const rank = value["rank"];
   if (
-    !value ||
-    typeof value.chunkId !== "string" ||
-    typeof value.sourceVersionId !== "string" ||
-    typeof value.parsedArtifactId !== "string" ||
-    typeof value.text !== "string" ||
-    typeof value.rank !== "number" ||
-    !Number.isFinite(value.rank)
+    typeof chunkId !== "string" ||
+    typeof sourceVersionId !== "string" ||
+    typeof parsedArtifactId !== "string" ||
+    typeof text !== "string" ||
+    typeof rank !== "number" ||
+    !Number.isFinite(rank)
   ) {
     throw new Error("SQLite returned an invalid FTS5 search row");
   }
-  return {
-    chunkId: value.chunkId,
-    sourceVersionId: value.sourceVersionId,
-    parsedArtifactId: value.parsedArtifactId,
-    text: value.text,
-    rank: value.rank,
-  };
+  return { chunkId, sourceVersionId, parsedArtifactId, text, rank };
+}
+
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`${label} must be an object record`);
+  }
+  return Object.fromEntries(Object.entries(value));
 }

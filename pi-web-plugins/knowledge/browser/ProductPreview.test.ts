@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { JsonValue, Workspace, WorkspacePanelContext } from "@jmfederico/pi-web/plugin-api";
+import type { FileTreeResponse, JsonValue, Workspace, WorkspaceFilesCapabilityV1, WorkspacePanelContext } from "@jmfederico/pi-web/plugin-api";
 import {
   KNOWLEDGE_ASK_OPERATION,
   KNOWLEDGE_CITATION_OPEN_OPERATION,
@@ -9,6 +9,8 @@ import {
   KNOWLEDGE_PUBLISH_OPERATION,
   KnowledgeProductPreview,
   defineKnowledgeProductPreview,
+  isSupportedImportPath,
+  workspaceFileName,
 } from "./ProductPreview.js";
 
 defineKnowledgeProductPreview();
@@ -45,12 +47,13 @@ describe("Knowledge product preview", () => {
       else throw new Error(`unexpected operation ${operation}`);
       return Promise.resolve(response);
     });
-    const element = mount(context(request));
+    const element = mount(context(request, "workspace-1", workspaceFiles(() => Promise.resolve(treeResponse("", [
+      { name: "handbook.md", path: "docs/handbook.md", type: "file" },
+    ])))));
 
-    const path = element.shadowRoot?.querySelector<HTMLInputElement>("[data-import-path]");
-    if (path === null || path === undefined) throw new Error("import path input is missing");
-    path.value = "docs/handbook.md";
-    path.dispatchEvent(new Event("input", { bubbles: true }));
+    click(element, "[data-file-picker-trigger]");
+    await vi.waitFor(() => { expect(element.shadowRoot?.textContent).toContain("handbook.md"); });
+    click(element, "[data-file-picker-file='docs/handbook.md']");
     click(element, "[data-import]");
     await settle();
     click(element, "[data-publish]");
@@ -84,11 +87,12 @@ describe("Knowledge product preview", () => {
     let rejectRequest: ((reason?: unknown) => void) | undefined;
     const pending = new Promise<JsonValue>((_resolve, reject) => { rejectRequest = reject; });
     const request = vi.fn(() => pending);
-    const element = mount(context(request, "loading-workspace"));
-    const path = element.shadowRoot?.querySelector<HTMLInputElement>("[data-import-path]");
-    if (path === null || path === undefined) throw new Error("import path input is missing");
-    path.value = "notes/readme.txt";
-    path.dispatchEvent(new Event("input", { bubbles: true }));
+    const element = mount(context(request, "loading-workspace", workspaceFiles(() => Promise.resolve(treeResponse("", [
+      { name: "readme.txt", path: "notes/readme.txt", type: "file" },
+    ])))));
+    click(element, "[data-file-picker-trigger]");
+    await vi.waitFor(() => { expect(element.shadowRoot?.textContent).toContain("readme.txt"); });
+    click(element, "[data-file-picker-file='notes/readme.txt']");
     click(element, "[data-import]");
     await settle();
 
@@ -100,12 +104,56 @@ describe("Knowledge product preview", () => {
     expect(element.shadowRoot?.querySelector("[role='alert']")?.textContent).toContain("Knowledge backend is unavailable");
   });
 
-  it("keeps empty and validation states actionable", async () => {
+  it("keeps empty and validation states actionable", () => {
     const element = mount(context(vi.fn(), "empty-workspace"));
+    expect(element.shadowRoot?.querySelector<HTMLButtonElement>("[data-import]")?.disabled).toBe(true);
+    expect(element.shadowRoot?.textContent).toContain("Your answer will appear here");
+  });
+
+  it("chooses an import source from workspace files and derives its display name", async () => {
+    const listFiles = vi.fn<WorkspaceFilesCapabilityV1["listFiles"]>((path) => Promise.resolve(path === ""
+      ? treeResponse("", [
+          { name: "docs", path: "docs", type: "directory" },
+          { name: "README.md", path: "README.md", type: "file", size: 120 },
+          { name: "package.json", path: "package.json", type: "file", size: 80 },
+        ])
+      : treeResponse(path, [
+          { name: "guide.txt", path: "docs/guide.txt", type: "file", size: 42 },
+          { name: "image.png", path: "docs/image.png", type: "file", size: 200 },
+        ])));
+    const request = vi.fn(() => Promise.resolve({ job: { id: "job-picker", status: "succeeded", payload: { sourceId: "source-picker" }, result: { sourceId: "source-picker", sourceVersionId: "version-picker" } } }));
+    const element = mount(context(request, "picker-workspace", workspaceFiles(listFiles)));
+
+    click(element, "[data-file-picker-trigger]");
+    await vi.waitFor(() => { expect(element.shadowRoot?.textContent).toContain("README.md"); });
+    expect(element.shadowRoot?.querySelector<HTMLDialogElement>("[data-file-picker]")?.open).toBe(true);
+    expect(element.shadowRoot?.textContent).not.toContain("package.json");
+
+    click(element, "[data-file-picker-directory='docs']");
+    await vi.waitFor(() => { expect(element.shadowRoot?.textContent).toContain("guide.txt"); });
+    expect(element.shadowRoot?.textContent).not.toContain("image.png");
+    click(element, "[data-file-picker-file='docs/guide.txt']");
+
+    expect(element.shadowRoot?.querySelector("[data-file-picker]")).toBeNull();
+    expect(element.shadowRoot?.querySelector<HTMLButtonElement>("[data-file-picker-trigger]")?.textContent).toContain("docs/guide.txt");
+    expect(element.shadowRoot?.querySelector<HTMLInputElement>("[data-display-name]")?.value).toBe("guide.txt");
+    expect(element.shadowRoot?.querySelector<HTMLButtonElement>("[data-import]")?.disabled).toBe(false);
+
     click(element, "[data-import]");
     await settle();
-    expect(element.shadowRoot?.querySelector("[role='alert']")?.textContent).toContain("Enter a workspace-relative");
-    expect(element.shadowRoot?.textContent).toContain("Your answer will appear here");
+    expect(request).toHaveBeenCalledWith(KNOWLEDGE_IMPORT_OPERATION, expect.objectContaining({
+      relativePath: "docs/guide.txt",
+      displayName: "guide.txt",
+    }));
+    expect(listFiles.mock.calls.map(([path]) => path)).toEqual(["", "docs"]);
+    expect(listFiles.mock.calls.every(([, options]) => options?.signal instanceof AbortSignal)).toBe(true);
+  });
+
+  it("normalizes supported source names without weakening the extension allowlist", () => {
+    expect(workspaceFileName("docs/reference/handbook.markdown")).toBe("handbook.markdown");
+    expect(workspaceFileName("docs\\notes.txt")).toBe("notes.txt");
+    expect(isSupportedImportPath("docs/README.MD")).toBe(true);
+    expect(isSupportedImportPath("docs/image.png")).toBe(false);
   });
 });
 
@@ -126,24 +174,49 @@ function click(element: KnowledgeProductPreview, selector: string): void {
 function context(
   request: (operation: string, input: JsonValue) => Promise<JsonValue>,
   workspaceId = "workspace-1",
+  files: WorkspacePanelContext["files"] = unavailableWorkspaceFiles(),
 ): WorkspacePanelContext {
   const workspace: Workspace = { id: workspaceId, projectId: "project-1", path: "/work/project", label: "main", isMain: true };
   return {
     machine: { id: "local", name: "Local", kind: "local" },
     workspace,
     state: { selectedWorkspace: workspace, workspaceTool: "knowledge:workspace.knowledge", mainView: "knowledge:workspace.knowledge" },
-    files: {
-      readFile: () => Promise.reject(new Error("not implemented")),
-      listFiles: () => Promise.reject(new Error("not implemented")),
-      writeFile: () => Promise.reject(new Error("not implemented")),
-      deleteFile: () => Promise.reject(new Error("not implemented")),
-      moveFile: () => Promise.reject(new Error("not implemented")),
-    },
+    files,
     pairedBackend: { version: 1, requestVersion: 1, request },
     host: { requestRender: () => undefined },
     prompt: { insertText: () => undefined, getText: () => "", getSelection: () => null },
     terminal: { open: () => undefined, runCommand: () => Promise.reject(new Error("not implemented")) },
   };
+}
+
+function unavailableWorkspaceFiles(): WorkspacePanelContext["files"] {
+  return {
+    readFile: () => Promise.reject(new Error("not implemented")),
+    listFiles: () => Promise.reject(new Error("not implemented")),
+    writeFile: () => Promise.reject(new Error("not implemented")),
+    deleteFile: () => Promise.reject(new Error("not implemented")),
+    moveFile: () => Promise.reject(new Error("not implemented")),
+  };
+}
+
+function workspaceFiles(listFiles: WorkspaceFilesCapabilityV1["listFiles"]): WorkspaceFilesCapabilityV1 {
+  return {
+    capabilityVersion: 1,
+    defaultUploadFolder: "",
+    maxInlinePreviewBytes: 1024,
+    readFile: () => Promise.reject(new Error("not implemented")),
+    listFiles,
+    writeFile: () => Promise.reject(new Error("not implemented")),
+    deleteFile: () => Promise.reject(new Error("not implemented")),
+    moveFile: () => Promise.reject(new Error("not implemented")),
+    previewUrl: () => "http://example.test/preview",
+    downloadUrl: () => "http://example.test/download",
+    uploadFile: () => ({ path: "", completed: Promise.reject(new Error("not implemented")), cancel: () => undefined }),
+  };
+}
+
+function treeResponse(path: string, entries: FileTreeResponse["entries"]): FileTreeResponse {
+  return { path, entries, scannedAt: "2026-09-10T00:00:00.000Z", truncated: false };
 }
 
 async function settle(): Promise<void> {

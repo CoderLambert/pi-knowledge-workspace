@@ -68,12 +68,17 @@ describe("Knowledge browser plugin", () => {
     expect(panel.visible).toBeUndefined();
     render(panel.render(context), container);
     const preview = container.querySelector("pi-web-knowledge-product-preview");
-    const path = preview?.shadowRoot?.querySelector<HTMLInputElement>("[data-import-path]");
+    const filePicker = preview?.shadowRoot?.querySelector<HTMLButtonElement>("[data-file-picker-trigger]");
     const importButton = preview?.shadowRoot?.querySelector<HTMLButtonElement>("[data-import]");
-    if (path === null || path === undefined || importButton === null || importButton === undefined) throw new Error("Product Preview import controls are missing");
-    path.value = "docs/readme.md";
-    path.dispatchEvent(new Event("input", { bubbles: true }));
-    importButton.click();
+    if (filePicker === null || filePicker === undefined || importButton === null || importButton === undefined) throw new Error("Product Preview import controls are missing");
+    filePicker.click();
+    await settleBackend();
+    const file = preview?.shadowRoot?.querySelector<HTMLButtonElement>("[data-file-picker-file='docs/readme.md']");
+    if (file === null || file === undefined) throw new Error("Workspace source file is missing");
+    file.click();
+    const selectedImportButton = preview?.shadowRoot?.querySelector<HTMLButtonElement>("[data-import]");
+    if (selectedImportButton === null || selectedImportButton === undefined) throw new Error("Product Preview import action is missing");
+    selectedImportButton.click();
     await settleBackend();
 
     expect(preview?.shadowRoot?.textContent).toContain("Paired backend request capability is unavailable");
@@ -125,7 +130,12 @@ function panelContext(
     },
     files: {
       readFile: () => Promise.reject(new Error("not implemented")),
-      listFiles: () => Promise.reject(new Error("not implemented")),
+      listFiles: (path) => Promise.resolve({
+        path,
+        entries: path === "" ? [{ name: "readme.md", path: "docs/readme.md", type: "file" }] : [],
+        scannedAt: "2026-09-10T00:00:00.000Z",
+        truncated: false,
+      }),
       writeFile: () => Promise.reject(new Error("not implemented")),
       deleteFile: () => Promise.reject(new Error("not implemented")),
       moveFile: () => Promise.reject(new Error("not implemented")),

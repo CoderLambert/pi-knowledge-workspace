@@ -1,4 +1,4 @@
-import type { JsonValue, WorkspacePanelContext } from "@jmfederico/pi-web/plugin-api";
+import type { FileTreeEntry, JsonValue, WorkspacePanelContext } from "@jmfederico/pi-web/plugin-api";
 
 export const knowledgeProductPreviewTagName = "pi-web-knowledge-product-preview";
 
@@ -94,6 +94,12 @@ export class KnowledgeProductPreview extends HTMLElement {
   private contextValue: WorkspacePanelContext | undefined;
   private contextKey: string | undefined;
   private state: ProductState = emptyState();
+  private filePickerOpen = false;
+  private filePickerRootEntries: FileTreeEntry[] = [];
+  private readonly filePickerExpandedDirectories = new Map<string, FileTreeEntry[]>();
+  private filePickerLoadingPath: string | undefined;
+  private filePickerError: string | undefined;
+  private filePickerRequest: { path: string; controller: AbortController } | undefined;
 
   constructor() {
     super();
@@ -104,6 +110,7 @@ export class KnowledgeProductPreview extends HTMLElement {
     const nextKey = value === undefined ? undefined : knowledgePreviewStateKey(value);
     this.contextValue = value;
     if (nextKey !== this.contextKey) {
+      this.resetFilePicker();
       this.contextKey = nextKey;
       this.state = nextKey === undefined ? emptyState() : stateForKey(nextKey);
     }
@@ -112,6 +119,10 @@ export class KnowledgeProductPreview extends HTMLElement {
 
   connectedCallback(): void {
     this.render();
+  }
+
+  disconnectedCallback(): void {
+    this.resetFilePicker();
   }
 
   private render(): void {
@@ -152,13 +163,15 @@ export class KnowledgeProductPreview extends HTMLElement {
           <div class="card-heading"><div><span class="step-number">1</span><h3 id="import-title">Import source</h3></div><small>Markdown / TXT</small></div>
           <p class="muted">Use a workspace-relative path. The source is captured immutably before publishing.</p>
           <div class="form-row">
-            <label>File path<input data-import-path type="text" value="${escapeAttr(state.importPath)}" placeholder="docs/handbook.md" autocomplete="off"></label>
-            <label>Display name <span class="optional">(optional)</span><input data-display-name type="text" value="${escapeAttr(state.displayName)}" placeholder="Handbook"></label>
-            <button class="primary" type="button" data-import ${state.status === "loading" ? "disabled" : ""}>${state.status === "loading" ? "Importing…" : "Import"}</button>
+            <label>Source file<button class="path-picker-trigger" type="button" data-file-picker-trigger aria-haspopup="dialog"><span>${state.importPath.length === 0 ? "Choose a Markdown or TXT file" : escapeHtml(state.importPath)}</span><strong>${state.importPath.length === 0 ? "Browse…" : "Change…"}</strong></button></label>
+            <label>Display name <span class="optional">(from filename; editable)</span><input data-display-name type="text" value="${escapeAttr(state.displayName)}" placeholder="handbook.md"></label>
+            <button class="primary" type="button" data-import ${state.status === "loading" || state.importPath.length === 0 ? "disabled" : ""}>${state.status === "loading" ? "Importing…" : "Import"}</button>
           </div>
           ${state.importJobId === undefined ? "" : `<p class="metadata">Import job <code>${escapeHtml(state.importJobId)}</code>${state.sourceVersionId === undefined ? " is still being prepared." : ` · SourceVersion <code>${escapeHtml(state.sourceVersionId)}</code>`}</p>`}
           ${state.importJobId !== undefined && state.sourceVersionId === undefined ? `<button class="secondary" type="button" data-import-status ${state.status === "loading" ? "disabled" : ""}>Check import status</button>` : ""}
         </section>
+
+        ${this.filePickerOpen ? this.renderFilePicker() : ""}
 
         <section class="card" aria-labelledby="publish-title">
           <div class="card-heading"><div><span class="step-number">2</span><h3 id="publish-title">Publish snapshot</h3></div>${state.publicationId === undefined ? "" : "<small>published</small>"}</div>
@@ -181,6 +194,7 @@ export class KnowledgeProductPreview extends HTMLElement {
       </section>`;
 
     this.bindEvents(context);
+    this.showFilePickerDialog();
   }
 
   private questionValue(): string {
@@ -188,12 +202,11 @@ export class KnowledgeProductPreview extends HTMLElement {
   }
 
   private bindEvents(context: WorkspacePanelContext): void {
-    const pathInput = this.root.querySelector<HTMLInputElement>("[data-import-path]");
     const displayNameInput = this.root.querySelector<HTMLInputElement>("[data-display-name]");
     const questionInput = this.root.querySelector<HTMLTextAreaElement>("[data-question]");
-    pathInput?.addEventListener("input", () => { this.state.importPath = pathInput.value; });
     displayNameInput?.addEventListener("input", () => { this.state.displayName = displayNameInput.value; });
     questionInput?.addEventListener("input", () => { this.setAttribute("data-question", questionInput.value); });
+    this.root.querySelector<HTMLButtonElement>("[data-file-picker-trigger]")?.addEventListener("click", (event) => { this.openFilePicker(context, event); });
     this.root.querySelector<HTMLButtonElement>("[data-import]")?.addEventListener("click", () => { void this.importSource(context); });
     this.root.querySelector<HTMLButtonElement>("[data-import-status]")?.addEventListener("click", () => { void this.refreshImportStatus(context); });
     this.root.querySelector<HTMLButtonElement>("[data-sources-refresh]")?.addEventListener("click", () => { void this.loadSources(context); });
@@ -209,6 +222,146 @@ export class KnowledgeProductPreview extends HTMLElement {
     for (const button of this.root.querySelectorAll<HTMLButtonElement>("[data-artifact-id]")) {
       button.addEventListener("click", () => { void this.openHistoricalArtifact(context, button.dataset["artifactId"] ?? ""); });
     }
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>("[data-file-picker-directory]")) {
+      button.addEventListener("click", () => { this.toggleFilePickerDirectory(context, button.dataset["filePickerDirectory"] ?? ""); });
+    }
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>("[data-file-picker-file]")) {
+      button.addEventListener("click", () => { this.selectFilePickerEntry(button.dataset["filePickerFile"] ?? ""); });
+    }
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>("[data-file-picker-close]")) {
+      button.addEventListener("click", () => { this.closeFilePicker(); });
+    }
+    const filePicker = this.root.querySelector<HTMLDialogElement>("[data-file-picker]");
+    filePicker?.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      this.closeFilePicker();
+    });
+    filePicker?.addEventListener("click", (event) => {
+      if (event.target === filePicker) this.closeFilePicker();
+    });
+  }
+
+  private renderFilePicker(): string {
+    const entries = supportedPickerEntries(this.filePickerRootEntries);
+    const rootLoading = this.filePickerLoadingPath === "";
+    return `<dialog class="file-picker-dialog" data-file-picker aria-labelledby="knowledge-file-picker-title">
+      <header class="file-picker-header">
+        <div><p class="eyebrow">Workspace files</p><h3 id="knowledge-file-picker-title">Choose a source to import</h3></div>
+        <button class="file-picker-close" type="button" data-file-picker-close aria-label="Close workspace file picker">×</button>
+      </header>
+      <p class="muted">Select a Markdown or TXT file from ${escapeHtml(this.contextValue?.workspace.label ?? "this workspace")}.</p>
+      ${this.filePickerError === undefined ? "" : `<p class="file-picker-error" role="alert">${escapeHtml(this.filePickerError)}</p>`}
+      <div class="file-picker-tree" role="tree" aria-busy="${String(rootLoading)}">
+        ${rootLoading ? `<p class="empty-inline">Loading workspace files…</p>` : entries.length === 0 ? `<p class="empty-inline">No Markdown or TXT files are available at this level.</p>` : this.renderFilePickerEntries(entries, 0)}
+      </div>
+      <footer class="file-picker-footer"><span>Supported: .md, .markdown, .txt</span><button type="button" data-file-picker-close>Cancel</button></footer>
+    </dialog>`;
+  }
+
+  private renderFilePickerEntries(entries: readonly FileTreeEntry[], depth: number): string {
+    return supportedPickerEntries(entries).map((entry) => {
+      if (entry.type === "directory") {
+        const children = this.filePickerExpandedDirectories.get(entry.path);
+        const expanded = children !== undefined;
+        const loading = this.filePickerLoadingPath === entry.path;
+        return `<div role="treeitem" aria-expanded="${String(expanded)}">
+          <button class="file-picker-row directory" type="button" data-file-picker-directory="${escapeAttr(entry.path)}" style="--picker-indent:${String(9 + depth * 18)}px"><span class="file-picker-chevron">${loading ? "…" : expanded ? "▾" : "▸"}</span><span>${escapeHtml(entry.name)}</span></button>
+          ${expanded ? `<div role="group">${this.renderFilePickerEntries(children, depth + 1)}</div>` : ""}
+        </div>`;
+      }
+      return `<button class="file-picker-row file" type="button" role="treeitem" data-file-picker-file="${escapeAttr(entry.path)}" style="--picker-indent:${String(9 + depth * 18)}px"><span class="file-picker-chevron">·</span><span>${escapeHtml(entry.name)}</span><small>${entry.size === undefined ? "" : `${String(entry.size)} B`}</small></button>`;
+    }).join("");
+  }
+
+  private openFilePicker(context: WorkspacePanelContext, event: Event): void {
+    event.preventDefault();
+    this.resetFilePicker();
+    this.filePickerOpen = true;
+    this.render();
+    void this.loadFilePickerDirectory(context, "");
+  }
+
+  private toggleFilePickerDirectory(context: WorkspacePanelContext, path: string): void {
+    if (path.length === 0 || this.filePickerLoadingPath !== undefined) return;
+    if (this.filePickerExpandedDirectories.has(path)) {
+      this.filePickerExpandedDirectories.delete(path);
+      this.render();
+      return;
+    }
+    void this.loadFilePickerDirectory(context, path);
+  }
+
+  private async loadFilePickerDirectory(context: WorkspacePanelContext, path: string): Promise<void> {
+    this.filePickerRequest?.controller.abort();
+    const controller = new AbortController();
+    const request = { path, controller };
+    this.filePickerRequest = request;
+    this.filePickerLoadingPath = path;
+    this.filePickerError = undefined;
+    this.render();
+    try {
+      const files = context.files;
+      const response = files.capabilityVersion === 1
+        ? await files.listFiles(path, { signal: controller.signal })
+        : await files.listFiles(path);
+      if (!this.isCurrentFilePickerRequest(context, request)) return;
+      if (path.length === 0) this.filePickerRootEntries = response.entries;
+      else this.filePickerExpandedDirectories.set(path, response.entries);
+    } catch (error) {
+      if (!this.isCurrentFilePickerRequest(context, request) || isAbortError(error)) return;
+      this.filePickerError = errorMessage(error);
+    } finally {
+      if (this.isCurrentFilePickerRequest(context, request)) {
+        this.filePickerRequest = undefined;
+        this.filePickerLoadingPath = undefined;
+        this.render();
+      }
+    }
+  }
+
+  private isCurrentFilePickerRequest(
+    context: WorkspacePanelContext,
+    request: { path: string; controller: AbortController },
+  ): boolean {
+    return this.filePickerOpen
+      && this.filePickerRequest === request
+      && this.contextKey === knowledgePreviewStateKey(context);
+  }
+
+  private selectFilePickerEntry(path: string): void {
+    if (!isSupportedImportPath(path)) return;
+    this.state.importPath = path;
+    this.state.displayName = workspaceFileName(path);
+    this.state.status = "idle";
+    this.state.statusMessage = undefined;
+    this.state.error = undefined;
+    this.resetFilePicker();
+    this.persistAndRender();
+    this.root.querySelector<HTMLButtonElement>("[data-file-picker-trigger]")?.focus();
+  }
+
+  private closeFilePicker(): void {
+    this.resetFilePicker();
+    this.render();
+    this.root.querySelector<HTMLButtonElement>("[data-file-picker-trigger]")?.focus();
+  }
+
+  private resetFilePicker(): void {
+    this.filePickerRequest?.controller.abort();
+    this.filePickerRequest = undefined;
+    this.filePickerOpen = false;
+    this.filePickerRootEntries = [];
+    this.filePickerExpandedDirectories.clear();
+    this.filePickerLoadingPath = undefined;
+    this.filePickerError = undefined;
+  }
+
+  private showFilePickerDialog(): void {
+    if (!this.filePickerOpen) return;
+    const dialog = this.root.querySelector<HTMLDialogElement>("[data-file-picker]");
+    if (dialog === null || dialog.open) return;
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
   }
 
   private async importSource(context: WorkspacePanelContext): Promise<void> {
@@ -217,7 +370,7 @@ export class KnowledgeProductPreview extends HTMLElement {
       this.fail("Enter a workspace-relative Markdown or TXT path.");
       return;
     }
-    if (!/\.(?:md|markdown|txt)$/iu.test(relativePath)) {
+    if (!isSupportedImportPath(relativePath)) {
       this.fail("Only Markdown and TXT files can be imported.");
       return;
     }
@@ -451,6 +604,23 @@ function stateForKey(key: string): ProductState {
   return created;
 }
 
+export function isSupportedImportPath(path: string): boolean {
+  return /\.(?:md|markdown|txt)$/iu.test(path);
+}
+
+export function workspaceFileName(path: string): string {
+  const normalized = path.replaceAll("\\", "/");
+  return normalized.slice(normalized.lastIndexOf("/") + 1);
+}
+
+function supportedPickerEntries(entries: readonly FileTreeEntry[]): FileTreeEntry[] {
+  return entries.filter((entry) => entry.type === "directory" || (entry.type === "file" && isSupportedImportPath(entry.path)));
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
 function step(number: string, label: string, complete: boolean): string {
   return `<li class="${complete ? "complete" : ""}"><span>${complete ? "✓" : number}</span>${label}</li>`;
 }
@@ -631,6 +801,12 @@ function styles(): string {
     input,textarea { box-sizing:border-box; width:100%; border:1px solid var(--pi-border,#444); border-radius:6px; padding:8px 9px; background:var(--pi-bg,transparent); color:inherit; font:inherit; } textarea { margin-bottom:8px; resize:vertical; }
     button { border:1px solid var(--pi-border,#555); border-radius:6px; padding:7px 11px; background:var(--pi-surface,transparent); color:inherit; cursor:pointer; font:inherit; } button:hover:not(:disabled) { background:var(--pi-surface-hover,rgba(127,127,127,.14)); } button:focus-visible,input:focus-visible,textarea:focus-visible { outline:2px solid var(--pi-accent,#5b8def); outline-offset:2px; } button:disabled { cursor:not-allowed; opacity:.55; }
     button.primary { border-color:var(--pi-accent-border,var(--pi-accent,#5b8def)); background:var(--pi-accent,#5b8def); color:var(--pi-bg,#101216); } .secondary { margin-top:4px; }
+    .path-picker-trigger { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:34px; width:100%; text-align:left; } .path-picker-trigger span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .path-picker-trigger strong { flex:0 0 auto; color:var(--pi-accent,#5b8def); font-size:.75rem; }
+    .file-picker-dialog { box-sizing:border-box; width:min(620px,calc(100vw - 32px)); max-height:min(720px,calc(100vh - 48px)); border:1px solid var(--pi-border,#444); border-radius:12px; padding:0; overflow:hidden; background:var(--pi-surface,#161b22); color:var(--pi-text,inherit); box-shadow:0 20px 60px var(--pi-overlay,rgba(0,0,0,.45)); } .file-picker-dialog::backdrop { background:var(--pi-overlay,rgba(0,0,0,.45)); }
+    .file-picker-header,.file-picker-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 15px; border-bottom:1px solid var(--pi-border,#444); } .file-picker-header .eyebrow { margin-bottom:3px; } .file-picker-close { border:0; padding:4px 8px; font-size:1.25rem; line-height:1; } .file-picker-dialog > .muted,.file-picker-dialog > .file-picker-error { margin:0; padding:10px 15px; border-bottom:1px solid var(--pi-border-muted,#333); }
+    .file-picker-error { color:var(--pi-danger,#d96c6c); font-size:.8rem; } .file-picker-tree { min-height:180px; max-height:min(480px,55vh); overflow:auto; padding:8px; } .file-picker-tree > .empty-inline { margin:12px; }
+    .file-picker-row { display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:7px; width:100%; padding:7px 9px 7px var(--picker-indent); border-color:transparent; text-align:left; } .file-picker-row span:nth-child(2) { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .file-picker-row small { color:var(--pi-muted,#79808c); font-size:.7rem; } .file-picker-row.file:hover { border-color:var(--pi-accent-border,var(--pi-accent,#5b8def)); } .file-picker-chevron { color:var(--pi-muted,#79808c); }
+    .file-picker-footer { border-top:1px solid var(--pi-border,#444); border-bottom:0; color:var(--pi-muted,#79808c); font-size:.72rem; }
     .status { margin:0; padding:8px 10px; border-radius:7px; background:var(--pi-surface-hover,rgba(127,127,127,.1)); font-size:.8rem; } .status.error,.error { border:1px solid var(--pi-danger,#d96c6c); color:var(--pi-danger,#d96c6c); } .error { padding:10px; border-radius:7px; } .error p { margin:5px 0 8px; font-size:.8rem; }
     .empty-inline,.empty-answer,.empty { color:var(--pi-muted,#79808c); } .empty-inline { margin:10px 0 0; font-size:.8rem; } .empty { padding:22px; }
     .answer-text { white-space:pre-wrap; line-height:1.55; } .no-evidence { margin-bottom:0; }

@@ -76,7 +76,9 @@ describe("Grounded Ask Product Preview E2E", () => {
       throw new Error("Grounded Ask Product Preview is missing");
     }
 
-    setValue(preview, "[data-import-path]", "handbook.md");
+    click(preview, "[data-file-picker-trigger]");
+    await settleUi();
+    click(preview, "[data-file-picker-file='handbook.md']");
     click(preview, "[data-import]");
     await fixture.bridge.waitForLastRequest();
     await settleUi();
@@ -311,7 +313,12 @@ function panelContext(
     state: { selectedWorkspace: workspace, workspaceTool: "knowledge:workspace.knowledge", mainView: "knowledge:workspace.knowledge" },
     files: {
       readFile: () => Promise.reject(new Error("not implemented")),
-      listFiles: () => Promise.reject(new Error("not implemented")),
+      listFiles: (path) => Promise.resolve({
+        path,
+        entries: path === "" ? [{ name: "handbook.md", path: "handbook.md", type: "file" }] : [],
+        scannedAt: "2026-09-10T00:00:00.000Z",
+        truncated: false,
+      }),
       writeFile: () => Promise.reject(new Error("not implemented")),
       deleteFile: () => Promise.reject(new Error("not implemented")),
       moveFile: () => Promise.reject(new Error("not implemented")),

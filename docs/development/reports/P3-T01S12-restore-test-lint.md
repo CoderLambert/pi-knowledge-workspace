@@ -1,6 +1,6 @@
 # P3-T01S12 — Restore Test Lint Baseline
 
-Status: **PARTIAL**
+Status: **PASS**
 
 Date: 2026-09-10
 
@@ -28,16 +28,16 @@ npm run typecheck → PASS
 ESLint 205 → 202
 ```
 
-Three of the four task-owned findings closed, but one `strict-boolean-expressions` finding remained at the optional `blobHash` result construction. That task-owned remainder was corrected with an explicit `blobHash !== undefined` guard. Follow-up CI is required before this slice can be PASS.
+Three of the four task-owned findings closed, but one `strict-boolean-expressions` finding remained at the optional `blobHash` result construction. That task-owned remainder was corrected with an explicit `blobHash !== undefined` guard.
 
-Expected corrected endpoint:
+Follow-up GitHub CI run `34437208536` confirmed:
 
 ```text
 npm run typecheck → PASS
 ESLint 202 → 201
 ```
 
-The remaining repository-wide lint findings are inherited baseline debt outside this slice.
+All four original S12 findings are now closed. The workflow remains red only because 201 inherited repository-wide ESLint findings remain and lint stops `npm run verify` before later knip/test/build steps. P2 FTS Evidence run `34437208551` and P2 Lexical Evidence run `34437208528` both succeeded on the corrected head.
 
 ## Scope exclusions
 

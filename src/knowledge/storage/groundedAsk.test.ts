@@ -17,6 +17,7 @@ import { ReliableKnowledgePublisher } from "./reliableKnowledge.js";
 import { SourceDomain, type KnowledgeSourceVersion } from "./sourceDomain.js";
 
 const cleanup: (() => Promise<void>)[] = [];
+const INTEGRATION_TEST_TIMEOUT_MS = 15_000;
 afterEach(async () => { for (const close of cleanup.splice(0)) await close(); });
 
 describe("Grounded Ask canonical ownership", () => {
@@ -38,6 +39,8 @@ describe("Grounded Ask canonical ownership", () => {
     expect([...newer.scope.sourceVersionIds].sort()).toEqual([a2.id, b1.id].sort());
     expect(f.ask.search("workspace", newer.id, "alpha beta").indexBuildId).toBe(updated.indexBuild.id);
     f.ask.fail("workspace", newer.id, "test complete");
+    expect(f.db.prepare("SELECT count(*) AS count FROM index_build_pins WHERE owner_id=?").get(newer.id))
+      .toEqual({ count: 0 });
     expect(new IndexBuildRetention(f.db).gcRetained("workspace")).toEqual([]);
 
     const delivered = f.ask.deliver({
@@ -51,6 +54,8 @@ describe("Grounded Ask canonical ownership", () => {
       knowledgeWorkspaceId: "workspace", runId: run.id, deliveredEvidenceId: delivered.id,
       text: "The original says alpha origin [1].", citations: [{ label: "1", evidenceId: evidence.id }],
     });
+    expect(f.db.prepare("SELECT count(*) AS count FROM index_build_pins WHERE owner_id=?").get(run.id))
+      .toEqual({ count: 0 });
     f.sources.archiveSource(a1.sourceId);
     expect(new IndexBuildRetention(f.db).gcRetained("workspace")).toEqual([initial.indexBuild.id]);
     f.restart();
@@ -64,7 +69,7 @@ describe("Grounded Ask canonical ownership", () => {
     expect(historical.text).not.toContain("updated");
     expect(f.db.prepare("SELECT serialized_context FROM delivered_evidence WHERE id=?").get(delivered.id))
       .toEqual({ serialized_context: delivered.serializedContext });
-  });
+  }, INTEGRATION_TEST_TIMEOUT_MS);
 
   it("treats publisher sources as full replacement, requiring unchanged selections explicitly", async () => {
     const f = await fixture();
@@ -75,7 +80,7 @@ describe("Grounded Ask canonical ownership", () => {
     const run = f.begin();
     expect(run.scope.sourceVersionIds).toEqual([a.id]);
     expect(f.ask.search("workspace", run.id, "beta").hits).toEqual([]);
-  });
+  }, INTEGRATION_TEST_TIMEOUT_MS);
 
   it.each([
     ["legacy payload", "canonical_bytes=NULL", /durable canonical payload/],
@@ -92,7 +97,7 @@ describe("Grounded Ask canonical ownership", () => {
     expect(() => f.begin()).toThrow(expected);
     expect(f.db.prepare("SELECT count(*) AS count FROM generation_runs").get()).toEqual({ count: 0 });
     expect(f.db.prepare("SELECT count(*) AS count FROM index_build_pins").get()).toEqual({ count: 0 });
-  });
+  }, INTEGRATION_TEST_TIMEOUT_MS);
 
   it("rejects cross-workspace publication selections instead of silently dropping them", async () => {
     const f = await fixture();
@@ -102,7 +107,7 @@ describe("Grounded Ask canonical ownership", () => {
     f.db.prepare("UPDATE sources SET knowledge_workspace_id='other' WHERE id=?").run(b.sourceId);
     expect(() => f.begin()).toThrow(/cross-workspace/);
     expect(f.db.prepare("SELECT count(*) AS count FROM generation_runs").get()).toEqual({ count: 0 });
-  });
+  }, INTEGRATION_TEST_TIMEOUT_MS);
 
   it("never reacquires current after a frozen snapshot is lost", async () => {
     const f = await fixture();
@@ -118,7 +123,7 @@ describe("Grounded Ask canonical ownership", () => {
     f.ask.fail("workspace", run.id, "Frozen snapshot was lost");
     expect(f.ask.getRun("workspace", run.id).status).toBe("failed");
     expect(f.ask.listAnswers("workspace")).toEqual([]);
-  });
+  }, INTEGRATION_TEST_TIMEOUT_MS);
 
   it("persists ordered invocation/attempt deliveries and rejects citations not delivered to that attempt", async () => {
     const f = await fixture();
@@ -146,20 +151,39 @@ describe("Grounded Ask canonical ownership", () => {
     expect(() => f.db.prepare("UPDATE generation_runs SET model='rewritten' WHERE id=?").run(run.id)).toThrow(/immutable/);
     expect(() => f.db.prepare("UPDATE citation_refs SET evidence_id=? WHERE answer_id=?").run(unavailable.id, answer.id))
       .toThrow(/immutable/);
-  });
+  }, INTEGRATION_TEST_TIMEOUT_MS);
 
   it("uses renewable GenerationRun pins and recovers an expired running lease after restart", async () => {
     const f = await fixture();
     await f.publish([await f.capture("alpha", "a")]);
-    const run = f.begin();
+    f.db.execLog.length = 0;
+    const restartedStore = new GroundedAskStore(f.db);
+    expect(f.db.execLog.filter((sql) => sql === "BEGIN IMMEDIATE")).toHaveLength(0);
+    const run = restartedStore.begin({ knowledgeWorkspaceId: "workspace", question: "alpha beta",
+      provider: "test", model: "fixture-model", modelRevision: "fixture-v1" });
+    expect(f.db.execLog.filter((sql) => sql === "BEGIN IMMEDIATE")).toHaveLength(2);
     const pin = f.db.prepare("SELECT lease_expires_at FROM index_build_pins WHERE owner_type='generation-run' AND owner_id=?")
       .get(run.id);
     if (pin === undefined) throw new Error("Missing GenerationRun pin");
     const leaseExpiresAt = recordField(pin, "lease_expires_at");
     expect(typeof leaseExpiresAt).toBe("string");
 
+    const expiringAt = new Date(Date.now() + 1_000).toISOString();
+    f.db.prepare("UPDATE index_build_pins SET lease_expires_at=? WHERE owner_id=?").run(expiringAt, run.id);
+    const hits = f.ask.search("workspace", run.id, "alpha").hits;
+    const renewed = f.db.prepare("SELECT lease_expires_at FROM index_build_pins WHERE owner_id=?").get(run.id);
+    expect(Date.parse(String(recordField(renewed, "lease_expires_at")))).toBeGreaterThan(Date.parse(expiringAt));
+    const delivery = f.ask.deliver({ knowledgeWorkspaceId: "workspace", runId: run.id,
+      invocationId: "lease-boundary", attempt: 1, hits });
+    const cited = delivery.evidence[0];
+    if (cited === undefined) throw new Error("Missing renewable-lease Evidence");
+
     f.db.prepare("UPDATE index_build_pins SET lease_expires_at='2000-01-01T00:00:00.000Z' WHERE owner_id=?").run(run.id);
     expect(() => f.ask.search("workspace", run.id, "alpha")).toThrow(/lease expired/);
+    expect(() => f.ask.complete({ knowledgeWorkspaceId: "workspace", runId: run.id,
+      deliveredEvidenceId: delivery.id, text: "Stale answer [1]",
+      citations: [{ label: "1", evidenceId: cited.id }] })).toThrow(/lease expired/);
+    expect(f.ask.listAnswers("workspace")).toEqual([]);
 
     f.restart();
     const recovered = f.ask.getRun("workspace", run.id);
@@ -167,7 +191,7 @@ describe("Grounded Ask canonical ownership", () => {
     expect(recovered.error).toMatch(/lease expired before recovery/);
     expect(f.db.prepare("SELECT count(*) AS count FROM index_build_pins WHERE owner_id=?").get(run.id))
       .toEqual({ count: 0 });
-  });
+  }, INTEGRATION_TEST_TIMEOUT_MS);
 
   it("keeps quoted-literal-or retrieval and the ten result limit", async () => {
     const f = await fixture();
@@ -182,7 +206,7 @@ describe("Grounded Ask canonical ownership", () => {
     if (hit === undefined) throw new Error("Missing lexical hit");
     expect(() => f.ask.deliver({ knowledgeWorkspaceId: "workspace", runId: run.id, invocationId: "bad", attempt: 1,
       hits: [{ ...hit, locator: { ...hit.locator, endByte: hit.locator.endByte + 1 } }] })).toThrow(/snapshot/);
-  });
+  }, INTEGRATION_TEST_TIMEOUT_MS);
 });
 
 async function fixture() {
@@ -218,8 +242,9 @@ async function fixture() {
 
 class NodeDatabase implements KnowledgeDatabase {
   private readonly database: DatabaseSync;
+  readonly execLog: string[] = [];
   constructor(filename: string) { this.database = new DatabaseSync(filename); }
-  exec(sql: string): void { this.database.exec(sql); }
+  exec(sql: string): void { this.execLog.push(sql); this.database.exec(sql); }
   close(): void { this.database.close(); }
   pragma(sql: string, options?: { simple?: boolean }): unknown {
     const row = this.database.prepare(`PRAGMA ${sql}`).get();

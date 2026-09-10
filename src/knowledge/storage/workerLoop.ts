@@ -5,11 +5,16 @@ export interface DurableJobHandlerContext {
   readonly job: DurableJob;
   readonly signal: AbortSignal;
   /**
-   * Revalidates the worker lease immediately before a user-visible business write.
-   * Long-running handlers must call this at their commit boundary; handler return
-   * alone is not authority because ownership may have changed while work was in flight.
+   * Cheap pre-work authority check. This does not fence a later business write;
+   * user-visible commits must use commitWithAuthority().
    */
   assertAuthority(): void;
+  /**
+   * Atomically validates this lease and runs a synchronous business commit on
+   * the same SQLite transaction. Aggregate-specific generation/state CAS still
+   * belongs inside the callback.
+   */
+  commitWithAuthority<T>(operation: (db: KnowledgeDatabase) => T): T;
 }
 
 export type DurableJobHandler = (context: DurableJobHandlerContext) => Promise<unknown>;
@@ -110,6 +115,12 @@ export class DurableJobWorker {
         signal: abortController.signal,
         assertAuthority: () => {
           this.assertAuthority(jobId, lease.fencingToken, abortController.signal);
+        },
+        commitWithAuthority: <T>(operation: (db: KnowledgeDatabase) => T): T => {
+          if (abortController.signal.aborted) {
+            throw new Error(`Job ${jobId} business commit rejected stale, expired, cancelled, or non-owner lease`);
+          }
+          return this.jobs.commitWithAuthority(jobId, this.workerId, lease.fencingToken, operation);
         },
       });
       if (heartbeatFailure !== undefined) {

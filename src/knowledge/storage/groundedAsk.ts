@@ -4,7 +4,7 @@ import { withTransaction, type KnowledgeDatabase } from "./database.js";
 import { createStableEvidence, type StableEvidence } from "./evidence.js";
 import { EvidenceReadApi } from "./evidenceRead.js";
 import { Fts5BaselineIndex } from "./fts5Index.js";
-import { IndexBuildRetention } from "./indexBuildRetention.js";
+import { IndexBuildRetention, type IndexBuildPin } from "./indexBuildRetention.js";
 import { SqliteParsedArtifactStore } from "./parsedArtifact.js";
 import { acquirePublishedKnowledgeSnapshot, type PublishedKnowledgeSnapshot } from "./publishedKnowledge.js";
 import { SearchQueryApi, type SearchQueryHit, type SearchQueryResult } from "./searchQuery.js";
@@ -105,7 +105,6 @@ export class GroundedAskStore {
   }
 
   begin(input: BeginGenerationRunInput): GenerationRun {
-    this.recoverExpiredRuns();
     const workspaceId = nonEmpty(input.knowledgeWorkspaceId, "knowledgeWorkspaceId");
     const question = nonEmpty(input.question, "question");
     const provider = nonEmpty(input.provider, "provider");
@@ -183,7 +182,7 @@ export class GroundedAskStore {
 
   deliver(input: DeliverEvidenceInput): DeliveredEvidence {
     const run = this.requireRunning(input.knowledgeWorkspaceId, input.runId);
-    this.requireSnapshot(run);
+    this.requireSnapshot(run, false);
     const invocationId = nonEmpty(input.invocationId, "invocationId");
     if (!Number.isSafeInteger(input.attempt) || input.attempt <= 0) throw new TypeError("attempt must be positive");
     if (input.hits.length > 10) throw new TypeError("DeliveredEvidence exceeds the baseline TopK10 budget");
@@ -336,14 +335,19 @@ export class GroundedAskStore {
     return run;
   }
 
-  private requireSnapshot(run: GenerationRun) {
+  private requireSnapshot(run: GenerationRun): IndexBuildPin;
+  private requireSnapshot(run: GenerationRun, renew: false): undefined;
+  private requireSnapshot(run: GenerationRun, renew = true): IndexBuildPin | undefined {
+    const at = this.now().toISOString();
     const row = this.db.prepare(`SELECT p.id FROM index_build_pins p
       JOIN index_builds b ON b.id=p.index_build_id
       WHERE p.index_build_id=? AND p.owner_type=? AND p.owner_id=?
+        AND p.lease_expires_at IS NOT NULL AND p.lease_expires_at>?
         AND b.knowledge_workspace_id=? AND b.status IN ('active', 'retained')`)
-      .get(run.scope.indexBuildId, RUN_PIN_OWNER, run.id, run.knowledgeWorkspaceId);
-    if (row === undefined) throw new Error("Frozen GenerationRun retrieval snapshot is unavailable; refusing current publication");
+      .get(run.scope.indexBuildId, RUN_PIN_OWNER, run.id, at, run.knowledgeWorkspaceId);
+    if (row === undefined) throw new Error("Frozen GenerationRun retrieval snapshot is unavailable or its lease expired; refusing current publication");
     const pinId = stringField(record(row), "id");
+    if (!renew) return undefined;
     try {
       return this.retention.renew(pinId, this.runPinLeaseMs);
     } catch {
@@ -372,24 +376,39 @@ export class GroundedAskStore {
 
   private recoverExpiredRuns(): number {
     const at = this.now().toISOString();
-    const rows = this.db.prepare(`SELECT r.id FROM generation_runs r
+    const candidates = this.db.prepare(`SELECT r.id FROM generation_runs r
       LEFT JOIN index_build_pins p ON p.index_build_id=r.index_build_id
         AND p.owner_type=? AND p.owner_id=r.id
         AND (p.lease_expires_at IS NULL OR p.lease_expires_at>?)
-      WHERE r.status='running' AND p.id IS NULL`).all(RUN_PIN_OWNER, at);
-    let recovered = 0;
-    withTransaction(this.db, () => {
+      WHERE r.status='running' AND p.id IS NULL LIMIT 1`).all(RUN_PIN_OWNER, at);
+    if (candidates.length === 0) return 0;
+
+    return withTransaction(this.db, () => {
+      const rows = this.db.prepare(`SELECT r.id FROM generation_runs r
+        LEFT JOIN index_build_pins p ON p.index_build_id=r.index_build_id
+          AND p.owner_type=? AND p.owner_id=r.id
+          AND (p.lease_expires_at IS NULL OR p.lease_expires_at>?)
+        WHERE r.status='running' AND p.id IS NULL`).all(RUN_PIN_OWNER, at);
+      let recovered = 0;
       for (const raw of rows) {
         const runId = stringField(record(raw), "id");
         const result = this.db.prepare(`UPDATE generation_runs
-          SET status='failed', error=?, finished_at=? WHERE id=? AND status='running'`)
-          .run("GenerationRun retrieval lease expired before recovery", at, runId);
-        if (Number(result.changes) === 1) recovered += 1;
+          SET status='failed', error=?, finished_at=?
+          WHERE id=? AND status='running'
+            AND NOT EXISTS (
+              SELECT 1 FROM index_build_pins p
+              WHERE p.index_build_id=generation_runs.index_build_id
+                AND p.owner_type=? AND p.owner_id=generation_runs.id
+                AND (p.lease_expires_at IS NULL OR p.lease_expires_at>?)
+            )`)
+          .run("GenerationRun retrieval lease expired before recovery", at, runId, RUN_PIN_OWNER, at);
+        if (Number(result.changes) !== 1) continue;
+        recovered += 1;
         this.db.prepare("DELETE FROM index_build_pins WHERE owner_type=? AND owner_id=?")
           .run(RUN_PIN_OWNER, runId);
       }
+      return recovered;
     });
-    return recovered;
   }
 }
 

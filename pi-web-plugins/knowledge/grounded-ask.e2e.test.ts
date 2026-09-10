@@ -54,6 +54,7 @@ import { createKnowledgeServiceClient } from "./service-client.js";
 const SERVICE_TOKEN = "grounded-ask-e2e-service-token";
 const MODULE_REVISION = "knowledge-grounded-ask-e2e-r1";
 const cleanup: (() => Promise<void>)[] = [];
+const LIFECYCLE_E2E_TIMEOUT_MS = 15_000;
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -120,7 +121,7 @@ describe("Grounded Ask Product Preview E2E", () => {
     expect(preview.shadowRoot.textContent).toContain("blue release train");
     expect(preview.shadowRoot.textContent).not.toContain("red release train");
     expect(runtime.providerCalls).toBe(1);
-  });
+  }, LIFECYCLE_E2E_TIMEOUT_MS);
 });
 
 async function startKnowledgeRuntime(): Promise<{

@@ -68,7 +68,7 @@ Repository CI/typecheck/test failures that can be fixed autonomously are **imple
 3. Prefer upstream/public PI WEB seams over core patches.
 4. One task per branch and Draft PR; stacked PRs are allowed for unmerged dependencies.
 5. No automatic merge.
-6. No force-push or casual history rewrite; restacks use ordinary merge commits unless a later explicit exception is approved.
+6. No force-push, no casual rebase, and no autonomous merge. If safe continuation or stack maintenance requires a merge, rebase, destructive ref move or other history rewrite, stop and classify the task BLOCKED until explicit owner authority is given.
 7. Do not mutate frozen P2 evidence to improve scores.
 8. Holdout remains one-shot aggregate evidence; no holdout tuning or per-query diagnostics for optimization.
 9. Do not add framework abstractions without a concrete need.

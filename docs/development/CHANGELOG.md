@@ -31,7 +31,7 @@ Do not record Agent Work Units, routine commits, small wiring or cleanup-only ac
 ### P3-T01 Exit — PASS
 
 - Established the blocking `npm run verify:p3` Product Slice gate: typecheck, P3-critical production lint, 12 focused Knowledge test files (`74/74` tests) and build.
-- CI now runs the P3 gate independently from full-repository lint telemetry, so the 77 inherited findings remain visible without masking Reliable Knowledge regressions in the covered core path.
+- CI now runs the P3 gate independently from full-repository lint and Knip telemetry, so inherited findings remain visible without masking Reliable Knowledge regressions in the covered core path.
 - Closed the baseline-cleanup critical path without changing ESLint rules, ADR-029, retrieval strategy or frozen P2 evidence. The next Product Slice is Reliable Knowledge: `Captured → Parsed → Indexed → Published`.
 
 ### P3-T00 — PASS

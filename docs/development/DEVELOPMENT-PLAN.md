@@ -153,7 +153,7 @@ It runs, in order:
 3. `npm run test:p3` over the focused Source/ParsedArtifact/Evidence/FTS5/search/publication/retention/worker/import contract tests;
 4. `npm run build`.
 
-The existing `npm run lint` and `npm run verify` commands remain full-repository telemetry/full gates. CI runs `verify:p3` as the blocking Product Slice check and reports full-repository lint independently as non-blocking inherited debt. The scoped gate does not change ESLint rules, suppress findings or mutate P2 evidence.
+The existing `npm run lint` and `npm run verify` command definitions remain unchanged. CI runs `verify:p3` as the blocking Product Slice check and reports full-repository lint and Knip independently as non-blocking inherited-debt telemetry. The scoped gate does not change ESLint rules, suppress findings or mutate P2 evidence.
 
 Required exit:
 

@@ -39,6 +39,10 @@ jobs:
         continue-on-error: true
         run: npm run lint
 
+      - name: Full-repository Knip telemetry
+        continue-on-error: true
+        run: npm run knip
+
       - name: Smoke test npm 12 global package install
         if: runner.os == 'Linux'
         run: npm run smoke:package-install

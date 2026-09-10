@@ -37,9 +37,10 @@ introduced.
 | `npm run build` | PASS; server, plugins, packages and Vite client built |
 | `npm run verify:p3` | PASS; all four checks completed |
 | `npm run lint` | Non-zero, 77 inherited findings; diagnostic only |
+| `npm run knip` | Non-zero, 2 inherited findings plus 1 configuration hint; diagnostic only |
 
-The build emitted existing Vite advisories about future native config loading
-and chunk size. They did not affect the successful build result.
+The build emitted an existing Vite chunk-size advisory. It did not affect the
+successful build result.
 
 ## Exit audit
 

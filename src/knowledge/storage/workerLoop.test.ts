@@ -160,6 +160,33 @@ describe("DurableJobWorker", () => {
     expect(store.succeeded).toEqual([]);
   });
 
+  it("rejects a stale handler before its user-visible business commit", async () => {
+    const db = new ScriptedDatabase();
+    db.allRows = [[], [{ id: "job-1" }]];
+    db.runRows = [{ changes: 0, lastInsertRowid: 0 }];
+    const store = new FakeStore(db);
+    let businessWrites = 0;
+    const handlers = new Map<string, DurableJobHandler>([["import", ({ assertAuthority }) => {
+      store.current = job({
+        leaseOwner: "worker-b",
+        fencingToken: 2,
+        heartbeatAt: "2026-09-09T04:00:10.000Z",
+        leaseExpiresAt: "2026-09-09T04:00:40.000Z",
+      });
+      assertAuthority();
+      businessWrites += 1;
+      return Promise.resolve({ ignored: true });
+    }]]);
+
+    const result = await worker(db, store, handlers).runOnce();
+
+    expect(result.status).toBe("lost-lease");
+    expect(businessWrites).toBe(0);
+    expect(store.succeeded).toEqual([]);
+    expect(store.current.leaseOwner).toBe("worker-b");
+    expect(store.current.fencingToken).toBe(2);
+  });
+
   it("does not retry a terminal write after the lease/fencing token is lost", async () => {
     const db = new ScriptedDatabase();
     db.allRows = [[], [{ id: "job-1" }]];

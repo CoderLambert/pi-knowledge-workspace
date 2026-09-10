@@ -67,6 +67,7 @@
     "start": "tsx src/server/index.ts",
     "start:sessiond": "npm run build:plugins && tsx src/server/sessiond.ts",
     "start:knowledge": "tsx src/knowledge/service/main.ts",
+    "restart": "systemd-run --user --collect --unit=pi-web-restart -- systemctl --user restart pi-web-ui-dev.service pi-web-sessiond.service",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "prepack": "npm run build",
     "pack:dry": "npm pack --dry-run",

@@ -1,33 +1,40 @@
 # P3-T01S20 Verification — Golden Dataset Test-Harness Lint
 
-Status: **PARTIAL**
+Status: **PASS**
 
 ## Automated verification
 
-Required repository checks:
+Final S20 code head:
 
-```bash
-npm run typecheck
-npm run lint
-npm test -- src/knowledge/eval/goldenDataset.test.ts
+```text
+36a29e1d71cdf5ede054499ada7ac93fcbb1de9d
 ```
 
-Required result for task PASS:
+GitHub CI run `34451400177` established:
 
-- typecheck remains PASS;
-- the focused Golden Dataset schema test passes when reachable;
-- `src/knowledge/eval/goldenDataset.test.ts` disappears from authoritative ESLint output;
-- repository lint moves from the verified 77-error checkpoint to 68 unless a directly task-owned interaction is exposed and corrected within S20;
-- unrelated remaining failures remain classified as inherited baseline.
+```text
+npm run typecheck → PASS
+npm run lint      → 68 inherited repository errors
+```
 
-Frozen P2 regression workflows must also remain PASS:
+The verified parent checkpoint was 77, so S20 closed exactly nine task-owned findings:
 
-- P2 FTS Evidence;
-- P2 Lexical Evidence.
+```text
+77 → 68
+```
 
-## Semantic regression checks
+`src/knowledge/eval/goldenDataset.test.ts` no longer appears in authoritative ESLint output. The repository verify workflow remains globally red only because the remaining 68 inherited lint findings stop execution before knip/full tests.
 
-The test must continue proving:
+Frozen P2 regression workflows on the same final code head:
+
+```text
+P2 FTS Evidence     34451400086 → PASS
+P2 Lexical Evidence 34451400208 → PASS
+```
+
+## Semantic regression surface
+
+The unchanged test scenarios continue proving:
 
 1. Stable ParsedArtifact byte-range labels are accepted across development and holdout.
 2. A fixture containing persisted Chunk identity is rejected.
@@ -37,11 +44,11 @@ The test must continue proving:
 6. Unsafe corpus relative paths are rejected.
 7. Invalid canonical SHA-256 values are rejected.
 
-## Frozen boundaries
+## Frozen boundaries verified
 
-Do not modify or retune:
+S20 did not modify or retune:
 
-- `src/knowledge/eval/goldenDataset.ts` in this slice;
+- `src/knowledge/eval/goldenDataset.ts`;
 - `eval/**` committed corpus/query/label/evidence files;
 - ADR-029;
 - retrieval profile/compiler/Top-K settings;
@@ -49,4 +56,8 @@ Do not modify or retune:
 
 ## User verification debt
 
-None expected. This is repository-owned test-harness/static cleanup and should be fully verifiable through GitHub CI and focused automated tests.
+None. This repository-owned test-harness/static cleanup is fully evidenced by GitHub CI and the frozen P2 regression workflows.
+
+## Result
+
+**PASS.** S20 closed all task-owned findings without changing production validation behavior or frozen P2 evaluation boundaries.

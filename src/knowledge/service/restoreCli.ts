@@ -20,7 +20,8 @@ export async function runRestoreCli(argv: readonly string[]): Promise<KnowledgeR
 export function parseRestoreArgs(argv: readonly string[]): RestoreCliOptions {
   const values = new Map<string, string>();
   for (let index = 0; index < argv.length; index += 1) {
-    const flag = argv[index]!;
+    const flag = argv[index];
+    if (flag === undefined) throw new Error("Missing restore argument");
     if (flag !== "--backup" && flag !== "--target") throw new Error(`Unknown restore argument: ${flag}`);
     const value = argv[index + 1];
     if (value === undefined || value.startsWith("--")) throw new Error(`Missing value for ${flag}`);
@@ -36,6 +37,6 @@ export function parseRestoreArgs(argv: readonly string[]): RestoreCliOptions {
 
 function required(values: ReadonlyMap<string, string>, flag: string): string {
   const value = values.get(flag)?.trim();
-  if (!value) throw new Error(`pi-knowledge restore requires ${flag} <path>`);
+  if (value === undefined || value.length === 0) throw new Error(`pi-knowledge restore requires ${flag} <path>`);
   return value;
 }

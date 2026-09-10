@@ -1,6 +1,6 @@
 # P3-T01S12 — Restore Test Lint Verification
 
-Status: **PARTIAL — CI evidence pending**
+Status: **PARTIAL — follow-up CI evidence pending**
 
 ## Automated verification
 
@@ -12,18 +12,27 @@ npm run lint
 npm test -- src/knowledge/storage/restore.test.ts
 ```
 
-Expected static result:
+Initial GitHub CI run `34436851039` produced:
 
 ```text
 typecheck: PASS
-ESLint inherited baseline: 205 → 201
+ESLint inherited baseline: 205 → 202
 ```
 
-Confirm the four prior findings in `src/knowledge/storage/restore.test.ts` are gone:
+The first repair removed three task-owned findings but left one `strict-boolean-expressions` finding in the optional `blobHash` result guard. That guard is now explicit and requires follow-up CI confirmation.
+
+Expected corrected result:
+
+```text
+typecheck: PASS
+ESLint inherited baseline: 202 → 201
+```
+
+Confirm the four original findings in `src/knowledge/storage/restore.test.ts` are gone:
 
 1. empty snapshot-database `exec` method;
 2. empty snapshot-database `close` method;
-3. nullable blob fixture guard;
+3. nullable blob fixture/result guard;
 4. restored-blob non-null assertion.
 
 ## Behavioral assertions

@@ -1,6 +1,6 @@
 # P3-T01S11 — Backup Test Lint Baseline
 
-Status: **PARTIAL**
+Status: **PASS**
 
 Date: 2026-09-10
 
@@ -20,14 +20,18 @@ Only `src/knowledge/storage/backup.test.ts` is behaviorally touched:
 
 No production backup implementation is changed.
 
-## Expected verification
+## Automated verification
+
+GitHub CI run `34436345380` confirmed:
 
 ```text
 npm run typecheck → PASS
 ESLint 210 → 205
 ```
 
-The five targeted inherited findings in `backup.test.ts` should disappear. Remaining repository-wide lint findings are inherited baseline debt outside this slice.
+All five S11-owned findings are closed. The workflow remains red only because 205 inherited repository-wide ESLint findings remain and lint stops `npm run verify` before later knip/test/build steps.
+
+P2 FTS Evidence run `34436345425` and P2 Lexical Evidence run `34436345378` both completed successfully on the same task head. No frozen evidence or retrieval configuration was changed.
 
 ## Scope exclusions
 

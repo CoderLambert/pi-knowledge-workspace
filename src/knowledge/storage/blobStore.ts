@@ -83,7 +83,7 @@ export class ContentAddressedBlobStore {
 
     const tempPath = path.join(
       this.sha256Root,
-      `${TEMP_PREFIX}${process.pid}-${randomUUID()}`,
+      `${TEMP_PREFIX}${String(process.pid)}-${randomUUID()}`,
     );
     const handle = await open(tempPath, "wx", 0o600);
 
@@ -159,5 +159,5 @@ function assertHash(hash: string): void {
 }
 
 function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === code;
+  return error instanceof Error && "code" in error && error.code === code;
 }

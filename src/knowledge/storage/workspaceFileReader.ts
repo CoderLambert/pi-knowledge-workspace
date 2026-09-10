@@ -64,7 +64,7 @@ export async function captureWorkspaceFile(
   if (pathBefore.size > maxBytes) {
     throw new WorkspaceFileReadError(
       "FILE_TOO_LARGE",
-      `Selected Workspace file is ${pathBefore.size} bytes; maximum is ${maxBytes}`,
+      `Selected Workspace file is ${String(pathBefore.size)} bytes; maximum is ${String(maxBytes)}`,
     );
   }
 

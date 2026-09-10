@@ -71,7 +71,9 @@ describe("Grounded Ask Product Preview E2E", () => {
     const runtime = await startKnowledgeRuntime();
     const fixture = await createHostFixture(root, runtime.app);
     const container = document.createElement("div");
+    document.body.append(container);
     render(requiredPanel().render(fixture.panelContext), container);
+    await settleUi();
     const preview = container.querySelector("pi-web-knowledge-product-preview");
     if (!(preview instanceof HTMLElement) || preview.shadowRoot === null) {
       throw new Error("Grounded Ask Product Preview is missing");
@@ -80,6 +82,7 @@ describe("Grounded Ask Product Preview E2E", () => {
     click(preview, "[data-file-picker-trigger]");
     await settleUi();
     click(preview, "[data-file-picker-file='handbook.md']");
+    await settleUi();
     click(preview, "[data-import]");
     await fixture.bridge.waitForLastRequest();
     await settleUi();

@@ -88,8 +88,6 @@ describe("Grounded Ask canonical ownership", () => {
     const publication = await f.publish([matched, unmatched]);
     const artifact = publication.parsedArtifacts.find((item) => item.sourceVersionId === unmatched.id);
     if (artifact === undefined) throw new Error("Missing unmatched artifact");
-    // Model on-disk legacy/corrupt state. It must fail even though this artifact
-    // would never be found by the first retrieval query ("alpha").
     f.db.prepare(`UPDATE parsed_artifacts SET ${corruption} WHERE id=?`).run(artifact.parsedArtifactId);
     expect(() => f.begin()).toThrow(expected);
     expect(f.db.prepare("SELECT count(*) AS count FROM generation_runs").get()).toEqual({ count: 0 });
@@ -148,6 +146,27 @@ describe("Grounded Ask canonical ownership", () => {
     expect(() => f.db.prepare("UPDATE generation_runs SET model='rewritten' WHERE id=?").run(run.id)).toThrow(/immutable/);
     expect(() => f.db.prepare("UPDATE citation_refs SET evidence_id=? WHERE answer_id=?").run(unavailable.id, answer.id))
       .toThrow(/immutable/);
+  });
+
+  it("uses renewable GenerationRun pins and recovers an expired running lease after restart", async () => {
+    const f = await fixture();
+    await f.publish([await f.capture("alpha", "a")]);
+    const run = f.begin();
+    const pin = f.db.prepare("SELECT lease_expires_at FROM index_build_pins WHERE owner_type='generation-run' AND owner_id=?")
+      .get(run.id);
+    if (pin === undefined) throw new Error("Missing GenerationRun pin");
+    const leaseExpiresAt = recordField(pin, "lease_expires_at");
+    expect(typeof leaseExpiresAt).toBe("string");
+
+    f.db.prepare("UPDATE index_build_pins SET lease_expires_at='2000-01-01T00:00:00.000Z' WHERE owner_id=?").run(run.id);
+    expect(() => f.ask.search("workspace", run.id, "alpha")).toThrow(/lease expired/);
+
+    f.restart();
+    const recovered = f.ask.getRun("workspace", run.id);
+    expect(recovered.status).toBe("failed");
+    expect(recovered.error).toMatch(/lease expired before recovery/);
+    expect(f.db.prepare("SELECT count(*) AS count FROM index_build_pins WHERE owner_id=?").get(run.id))
+      .toEqual({ count: 0 });
   });
 
   it("keeps quoted-literal-or retrieval and the ten result limit", async () => {
@@ -214,6 +233,11 @@ class NodeDatabase implements KnowledgeDatabase {
       all: (...params) => statement.all(...sqlValues(params)),
     };
   }
+}
+
+function recordField(value: unknown, key: string): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("Invalid fixture row");
+  return Object.fromEntries(Object.entries(value))[key];
 }
 
 function sqlValues(values: unknown[]): SQLInputValue[] {

@@ -165,20 +165,17 @@ WHERE c.id = ?
 }
 
 function hydrateHit(hit: Fts5SearchHit, row: unknown): SearchQueryHit {
-  if (typeof row !== "object" || row === null || Array.isArray(row)) {
-    throw new Error(INVALID_SEARCH_METADATA);
-  }
-  const value = Object.fromEntries(Object.entries(row));
-  const chunkId = value["chunk_id"];
-  const sourceVersionId = value["source_version_id"];
-  const parsedArtifactId = value["parsed_artifact_id"];
-  const ordinal = value["ordinal"];
-  const startByte = value["start_byte"];
-  const endByte = value["end_byte"];
-  const sourceId = value["source_id"];
-  const sourceKind = value["source_kind"];
-  const sourceDisplayName = value["source_display_name"];
-  const sourceArchivedAt = value["source_archived_at"];
+  if (!isRecord(row)) throw new Error(INVALID_SEARCH_METADATA);
+  const chunkId = row["chunk_id"];
+  const sourceVersionId = row["source_version_id"];
+  const parsedArtifactId = row["parsed_artifact_id"];
+  const ordinal = row["ordinal"];
+  const startByte = row["start_byte"];
+  const endByte = row["end_byte"];
+  const sourceId = row["source_id"];
+  const sourceKind = row["source_kind"];
+  const sourceDisplayName = row["source_display_name"];
+  const sourceArchivedAt = row["source_archived_at"];
 
   if (
     chunkId !== hit.chunkId ||
@@ -255,4 +252,8 @@ function requireNonEmpty(value: string, name: string): string {
 function stableHandle(kind: "query" | "run", value: unknown): string {
   const digest = createHash("sha256").update(JSON.stringify(value)).digest("hex");
   return `search_${kind}_${digest}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

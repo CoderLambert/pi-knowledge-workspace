@@ -559,7 +559,7 @@ function isDocumentNode(value: unknown): value is DocumentNode {
 }
 
 function isBackupCapableDatabase(db: KnowledgeDatabase): db is KnowledgeDatabase & BackupCapableDatabase {
-  return "backup" in db && typeof db["backup"] === "function";
+  return "backup" in db && typeof db.backup === "function";
 }
 
 function parseRecordJson(raw: string, label: string): Record<string, unknown> {

@@ -207,7 +207,7 @@ Do not duplicate Machine/Workspace/federation infrastructure in P3.
 
 Current phase status: **PARTIAL**.
 
-Implementation progressed through the durable Source/SourceVersion, safe capture, ParsedArtifact, Evidence/viewer, FTS/index publication, durable-job and backup work. Individual tasks retain their recorded PARTIAL/PASS status in task reports/changelog/verification debt. P3 must reuse these foundations instead of rebuilding them as a second domain stack.
+Implementation progressed through the durable Source/SourceVersion, safe capture, ParsedArtifact, Evidence/viewer, FTS/index publication/retention work and backup work. Individual tasks retain their recorded PARTIAL/PASS status in task reports/changelog/verification debt. P3 must reuse these foundations instead of rebuilding them as a second domain stack.
 
 Known production gaps that ADR-029 explicitly promotes into P3 include:
 
@@ -287,6 +287,7 @@ P3-T01S7 Workspace-identity-test lint slice: 227 ESLint errors → 222
 P3-T01S8 selected-Machine-federation-test lint slice: 222 ESLint errors → 219
 P3-T01S9 Source-Evidence-Viewer-test lint slice: 219 ESLint errors → 215
 P3-T01S10 database-migration-test lint slice: 215 ESLint errors → 210
+P3-T01S11 backup-test lint slice: 210 ESLint errors → 205
 ```
 
 The remaining ESLint findings are inherited across pre-existing Knowledge/plugin code. They must be closed in bounded, subsystem-scoped support slices; do not turn P3-T01 into one repository-wide rewrite.
@@ -708,7 +709,7 @@ As of 2026-09-10:
 | P2-T12 | PASS | ADR-029 Accepted. |
 | P2 stack | PASS | Final ancestry restack is clean; #54 and #44 include latest #43 with task-only scopes. |
 | P3-T00 | PASS | Rebaseline plan to ADR-029. |
-| P3-T01 | PARTIAL | Typecheck is green; inherited ESLint baseline reduced from 261 to 210 through bounded support slices. |
+| P3-T01 | PARTIAL | Typecheck is green; inherited ESLint baseline reduced from 261 to 205 through bounded support slices. |
 
 Current architecture/development base:
 

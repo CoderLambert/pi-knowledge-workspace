@@ -1,6 +1,6 @@
 # P3-T01S22 — Storage Primitives Lint
 
-Status: **PARTIAL**
+Status: **PASS**
 
 ## Purpose
 
@@ -20,7 +20,7 @@ Support documentation:
 - this report;
 - `docs/development/verification/P3-T01S22-storage-primitives-lint.md`.
 
-The parent CI reports 12 inherited findings in these four files:
+The parent CI reported 12 inherited findings in these four files:
 
 ```text
 utf8Range.ts           6
@@ -29,7 +29,7 @@ workspaceFileReader.ts 2
 workspaceIdentity.ts   2
 ```
 
-Expected repository lint endpoint if all task-owned findings close cleanly:
+Verified repository lint endpoint:
 
 ```text
 65 → 53
@@ -70,20 +70,20 @@ No schema, migration, ADR, retrieval profile, P2 evaluation data/evidence, bench
 
 ## Verification state
 
-Initial GitHub CI run `34455969455` failed before lint in `npm run typecheck` with four S22-owned `TS4111` findings in the new `workspaceIdentity.ts` structural guards. The guards narrowed through `Record<string, unknown>`, so the repository's `noPropertyAccessFromIndexSignature` setting requires `value["id"]` / `value["external_binding"]` access. This is a task-owned implementation defect, not inherited baseline debt.
+Initial GitHub CI run `34455969455` failed before lint in `npm run typecheck` with four S22-owned `TS4111` findings in the new `workspaceIdentity.ts` structural guards. The guards narrowed through `Record<string, unknown>`, so the repository's `noPropertyAccessFromIndexSignature` setting requires bracket access. This was a task-owned implementation defect, not inherited baseline debt.
 
-Commit `d9944050229bd3368aaf108e555db531e4c75f54` fixes only those four accesses. The initial run's P2 FTS Evidence `34455969441` and P2 Lexical Evidence `34455969464` both passed.
+Commit `d9944050229bd3368aaf108e555db531e4c75f54` fixed only those accesses. The initial run's P2 FTS Evidence `34455969441` and P2 Lexical Evidence `34455969464` both passed.
 
-Status remains **PARTIAL** until follow-up GitHub CI establishes:
+Follow-up GitHub CI run `34461165544` on code head `731272e487d00f8408f48c0e96f05a12f4d7acc8` established:
 
 ```text
 npm run typecheck → PASS
 ESLint 65 → 53
 ```
 
-All four task-owned production files must disappear from authoritative lint output. Relevant focused tests should pass when reachable; unrelated failures remain inherited baseline.
+None of the four S22 production files appears in the authoritative lint output. The remaining 53 findings are inherited in other Knowledge/plugin/evaluation files; the global verify workflow remains red only because lint stops later stages.
 
-Because the task touches storage primitives used by P2 Evidence paths, path-triggered P2 FTS/Lexical workflows must remain green if triggered.
+P2 FTS Evidence run `34461166067` and P2 Lexical Evidence run `34461165563` both passed on the same code head. No frozen evidence/configuration was modified.
 
 ## Git discipline
 

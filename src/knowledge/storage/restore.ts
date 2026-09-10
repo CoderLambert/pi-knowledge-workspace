@@ -210,8 +210,8 @@ function assertManifestClosure(manifest: KnowledgeBackupManifest, closure: Snaps
     const row = closure.artifacts.get(entry.parsedArtifactId);
     if (
       row?.sourceVersionId !== entry.sourceVersionId
-      || row?.parserVersion !== entry.parserVersion
-      || row?.canonicalTextSha256 !== entry.canonicalTextSha256
+      || row.parserVersion !== entry.parserVersion
+      || row.canonicalTextSha256 !== entry.canonicalTextSha256
     ) {
       throw new Error(`Backup artifact closure mismatch: ${entry.parsedArtifactId}`);
     }

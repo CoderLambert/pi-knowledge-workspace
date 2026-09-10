@@ -6,6 +6,8 @@ import { ContentAddressedBlobStore } from "./blobStore.js";
 import {
   KNOWLEDGE_BACKUP_FORMAT_VERSION,
   type BackupManifestArtifact,
+  type BackupManifestBlob,
+  type BackupManifestFile,
   type KnowledgeBackupManifest,
 } from "./backup.js";
 import { KNOWLEDGE_SCHEMA_VERSION, type KnowledgeDatabase } from "./database.js";
@@ -58,9 +60,6 @@ export class KnowledgeRestore {
     const manifestBytes = await readFile(path.join(backup, "manifest.json"));
     await verifyManifestChecksum(backup, manifestBytes);
     const manifest = parseManifest(manifestBytes);
-    if (manifest.formatVersion !== KNOWLEDGE_BACKUP_FORMAT_VERSION) {
-      throw new Error(`Unsupported Knowledge backup format: ${String(manifest.formatVersion)}`);
-    }
     if (manifest.schemaVersion !== KNOWLEDGE_SCHEMA_VERSION) {
       throw new Error(
         `Backup schema ${String(manifest.schemaVersion)} does not match supported schema ${String(KNOWLEDGE_SCHEMA_VERSION)}`,
@@ -98,7 +97,8 @@ export class KnowledgeRestore {
     }
 
     const verifiedArtifacts = new Map<string, Buffer>();
-    if (manifest.artifacts.length > 0 && this.options.artifactSink === undefined) {
+    const artifactSink = this.options.artifactSink;
+    if (manifest.artifacts.length > 0 && artifactSink === undefined) {
       throw new Error("Restore requires a durable ParsedArtifact sink; refusing an incomplete restore");
     }
     for (const entry of manifest.artifacts) {
@@ -110,7 +110,8 @@ export class KnowledgeRestore {
       verifiedArtifacts.set(entry.parsedArtifactId, bytes);
     }
 
-    if (closure.evidenceCount > 0 && this.options.evidenceVerifier === undefined) {
+    const evidenceVerifier = this.options.evidenceVerifier;
+    if (closure.evidenceCount > 0 && evidenceVerifier === undefined) {
       throw new Error("Restore requires historical Evidence verification; refusing SQLite-only success");
     }
 
@@ -125,18 +126,25 @@ export class KnowledgeRestore {
       await writeFile(databasePath, databaseBytes, { flag: "wx", mode: 0o600 });
       const blobStore = new ContentAddressedBlobStore(temp);
       for (const entry of manifest.blobs) {
-        const bytes = verifiedBlobs.get(entry.contentSha256)!;
+        const bytes = requiredMapValue(verifiedBlobs, entry.contentSha256, `Verified blob ${entry.contentSha256}`);
         const result = await blobStore.put(bytes);
         if (result.hash !== entry.contentSha256 || result.size !== entry.size) {
           throw new Error(`Restored blob identity mismatch: ${entry.contentSha256}`);
         }
       }
-      for (const entry of manifest.artifacts) {
-        await this.options.artifactSink!.writeArtifactBundle(temp, entry, verifiedArtifacts.get(entry.parsedArtifactId)!);
+      if (artifactSink !== undefined) {
+        for (const entry of manifest.artifacts) {
+          const bytes = requiredMapValue(
+            verifiedArtifacts,
+            entry.parsedArtifactId,
+            `Verified ParsedArtifact ${entry.parsedArtifactId}`,
+          );
+          await artifactSink.writeArtifactBundle(temp, entry, bytes);
+        }
       }
 
-      if (closure.evidenceCount > 0) {
-        await this.options.evidenceVerifier!.verifyRestoredEvidence({ databasePath, dataRoot: temp });
+      if (closure.evidenceCount > 0 && evidenceVerifier !== undefined) {
+        await evidenceVerifier.verifyRestoredEvidence({ databasePath, dataRoot: temp });
       }
 
       // Preserve the exact source manifest for audit without making it runtime authority.
@@ -159,7 +167,7 @@ export class KnowledgeRestore {
 function readSnapshotClosure(db: KnowledgeDatabase): SnapshotClosure {
   const blobs = new Map<string, { byteLength: number }>();
   for (const raw of db.prepare(`SELECT DISTINCT content_sha256, blob_key, byte_length FROM source_versions ORDER BY content_sha256`).all()) {
-    const row = raw as Record<string, unknown>;
+    const row = recordValue(raw, "SourceVersion row");
     const hash = shaField(row, "content_sha256");
     if (stringField(row, "blob_key") !== hash) throw new Error(`Backup snapshot blob identity mismatch: ${hash}`);
     blobs.set(hash, { byteLength: integerField(row, "byte_length") });
@@ -167,7 +175,7 @@ function readSnapshotClosure(db: KnowledgeDatabase): SnapshotClosure {
 
   const artifacts = new Map<string, { sourceVersionId: string; parserVersion: string; canonicalTextSha256: string }>();
   for (const raw of db.prepare(`SELECT id, source_version_id, parser_version, canonical_text_sha256 FROM parsed_artifacts ORDER BY id`).all()) {
-    const row = raw as Record<string, unknown>;
+    const row = recordValue(raw, "ParsedArtifact row");
     artifacts.set(stringField(row, "id"), {
       sourceVersionId: stringField(row, "source_version_id"),
       parserVersion: stringField(row, "parser_version"),
@@ -175,8 +183,9 @@ function readSnapshotClosure(db: KnowledgeDatabase): SnapshotClosure {
     });
   }
 
-  const countRow = db.prepare(`SELECT COUNT(*) AS count FROM evidence`).get() as { count?: unknown } | undefined;
-  const evidenceCount = countRow?.count;
+  const rawCountRow = db.prepare(`SELECT COUNT(*) AS count FROM evidence`).get();
+  const countRow = rawCountRow === undefined ? undefined : recordValue(rawCountRow, "Evidence count row");
+  const evidenceCount = countRow?.["count"];
   if (typeof evidenceCount !== "number" || !Number.isSafeInteger(evidenceCount) || evidenceCount < 0) {
     throw new Error("Backup snapshot Evidence count is invalid");
   }
@@ -190,7 +199,7 @@ function assertManifestClosure(manifest: KnowledgeBackupManifest, closure: Snaps
     if (seenBlobs.has(entry.contentSha256)) throw new Error(`Duplicate backup blob manifest entry: ${entry.contentSha256}`);
     seenBlobs.add(entry.contentSha256);
     const row = closure.blobs.get(entry.contentSha256);
-    if (!row || row.byteLength !== entry.size) throw new Error(`Backup blob closure mismatch: ${entry.contentSha256}`);
+    if (row === undefined || row.byteLength !== entry.size) throw new Error(`Backup blob closure mismatch: ${entry.contentSha256}`);
   }
 
   if (manifest.artifacts.length !== closure.artifacts.size) throw new Error("Backup artifact manifest does not match SQLite closure");
@@ -200,7 +209,7 @@ function assertManifestClosure(manifest: KnowledgeBackupManifest, closure: Snaps
     seenArtifacts.add(entry.parsedArtifactId);
     const row = closure.artifacts.get(entry.parsedArtifactId);
     if (
-      !row || row.sourceVersionId !== entry.sourceVersionId || row.parserVersion !== entry.parserVersion
+      row === undefined || row.sourceVersionId !== entry.sourceVersionId || row.parserVersion !== entry.parserVersion
       || row.canonicalTextSha256 !== entry.canonicalTextSha256
     ) {
       throw new Error(`Backup artifact closure mismatch: ${entry.parsedArtifactId}`);
@@ -210,37 +219,97 @@ function assertManifestClosure(manifest: KnowledgeBackupManifest, closure: Snaps
 
 async function verifyManifestChecksum(backup: string, manifestBytes: Buffer): Promise<void> {
   const checksum = await readFile(path.join(backup, "manifest.sha256"), "utf8");
-  const match = /^([0-9a-f]{64})  manifest\.json\n$/.exec(checksum);
-  if (!match || match[1] !== sha256(manifestBytes)) throw new Error("Backup manifest checksum verification failed");
+  const match = /^([0-9a-f]{64}) {2}manifest\.json\n$/.exec(checksum);
+  if (match?.[1] !== sha256(manifestBytes)) throw new Error("Backup manifest checksum verification failed");
 }
 
 function parseManifest(bytes: Uint8Array): KnowledgeBackupManifest {
   let value: unknown;
-  try { value = JSON.parse(Buffer.from(bytes).toString("utf8")); } catch { throw new Error("Backup manifest is not valid JSON"); }
-  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("Backup manifest root is invalid");
-  const manifest = value as Partial<KnowledgeBackupManifest>;
-  if (manifest.formatVersion !== 1 || typeof manifest.createdAt !== "string" || !manifest.createdAt) throw new Error("Backup manifest metadata is invalid");
-  if (!Number.isSafeInteger(manifest.schemaVersion) || !manifest.database || !Array.isArray(manifest.blobs) || !Array.isArray(manifest.artifacts)) {
+  try {
+    value = JSON.parse(Buffer.from(bytes).toString("utf8"));
+  } catch {
+    throw new Error("Backup manifest is not valid JSON");
+  }
+  const manifest = recordValue(value, "manifest root");
+
+  const formatVersion = manifest["formatVersion"];
+  if (formatVersion !== KNOWLEDGE_BACKUP_FORMAT_VERSION) {
+    throw new Error(`Unsupported Knowledge backup format: ${String(formatVersion)}`);
+  }
+
+  const createdAt = manifest["createdAt"];
+  const schemaVersion = manifest["schemaVersion"];
+  const database = manifest["database"];
+  const blobs = manifest["blobs"];
+  const artifacts = manifest["artifacts"];
+
+  if (typeof createdAt !== "string" || createdAt.length === 0) throw new Error("Backup manifest metadata is invalid");
+  if (typeof schemaVersion !== "number" || !Number.isSafeInteger(schemaVersion)) {
     throw new Error("Backup manifest structure is invalid");
   }
-  validateFileEntry(manifest.database, "database");
-  for (const blob of manifest.blobs) {
-    validateFileEntry(blob, "blob");
-    if (typeof blob.contentSha256 !== "string" || !/^[0-9a-f]{64}$/.test(blob.contentSha256)) throw new Error("Backup blob content hash is invalid");
-  }
-  for (const artifact of manifest.artifacts) {
-    validateFileEntry(artifact, "artifact");
-    if (!artifact.parsedArtifactId || !artifact.sourceVersionId || !artifact.parserVersion || !/^[0-9a-f]{64}$/.test(artifact.canonicalTextSha256)) {
-      throw new Error("Backup artifact metadata is invalid");
-    }
-  }
-  return manifest as KnowledgeBackupManifest;
+  if (!Array.isArray(blobs) || !Array.isArray(artifacts)) throw new Error("Backup manifest structure is invalid");
+
+  const parsedDatabase = parseFileEntry(database, "database");
+  const parsedBlobs = blobs.map(parseBlobEntry);
+  const parsedArtifacts = artifacts.map(parseArtifactEntry);
+
+  return {
+    formatVersion: KNOWLEDGE_BACKUP_FORMAT_VERSION,
+    createdAt,
+    schemaVersion,
+    database: parsedDatabase,
+    blobs: parsedBlobs,
+    artifacts: parsedArtifacts,
+  };
 }
 
-function validateFileEntry(entry: { path?: unknown; size?: unknown; sha256?: unknown }, label: string): void {
-  if (typeof entry.path !== "string" || !entry.path || typeof entry.size !== "number" || !Number.isSafeInteger(entry.size) || entry.size < 0 || typeof entry.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(entry.sha256)) {
+function parseBlobEntry(value: unknown): BackupManifestBlob {
+  const row = recordValue(value, "blob manifest entry");
+  const file = parseFileEntry(row, "blob");
+  const contentSha256 = row["contentSha256"];
+  if (typeof contentSha256 !== "string" || !/^[0-9a-f]{64}$/.test(contentSha256)) {
+    throw new Error("Backup blob content hash is invalid");
+  }
+  return { ...file, contentSha256 };
+}
+
+function parseArtifactEntry(value: unknown): BackupManifestArtifact {
+  const row = recordValue(value, "artifact manifest entry");
+  const file = parseFileEntry(row, "artifact");
+  const parsedArtifactId = row["parsedArtifactId"];
+  const sourceVersionId = row["sourceVersionId"];
+  const parserVersion = row["parserVersion"];
+  const canonicalTextSha256 = row["canonicalTextSha256"];
+  if (
+    typeof parsedArtifactId !== "string" || parsedArtifactId.length === 0
+    || typeof sourceVersionId !== "string" || sourceVersionId.length === 0
+    || typeof parserVersion !== "string" || parserVersion.length === 0
+    || typeof canonicalTextSha256 !== "string" || !/^[0-9a-f]{64}$/.test(canonicalTextSha256)
+  ) {
+    throw new Error("Backup artifact metadata is invalid");
+  }
+  return {
+    ...file,
+    parsedArtifactId,
+    sourceVersionId,
+    parserVersion,
+    canonicalTextSha256,
+  };
+}
+
+function parseFileEntry(value: unknown, label: string): BackupManifestFile {
+  const entry = recordValue(value, `${label} file entry`);
+  const entryPath = entry["path"];
+  const size = entry["size"];
+  const sha256Value = entry["sha256"];
+  if (
+    typeof entryPath !== "string" || entryPath.length === 0
+    || typeof size !== "number" || !Number.isSafeInteger(size) || size < 0
+    || typeof sha256Value !== "string" || !/^[0-9a-f]{64}$/.test(sha256Value)
+  ) {
     throw new Error(`Backup ${label} file metadata is invalid`);
   }
+  return { path: entryPath, size, sha256: sha256Value };
 }
 
 async function verifyFile(filename: string, size: number, hash: string, label: string): Promise<Buffer> {
@@ -250,14 +319,23 @@ async function verifyFile(filename: string, size: number, hash: string, label: s
 }
 
 function assertSafeRelativePath(value: string): void {
-  if (path.posix.isAbsolute(value) || value.includes("\\") || value.split("/").some((part) => !part || part === "." || part === "..")) {
+  if (
+    path.posix.isAbsolute(value)
+    || value.includes("\\")
+    || value.split("/").some((part) => part.length === 0 || part === "." || part === "..")
+  ) {
     throw new Error(`Backup manifest contains unsafe path: ${value}`);
   }
 }
 
 async function assertDestinationAbsent(destination: string): Promise<void> {
-  try { await stat(destination); throw new Error(`Restore target already exists: ${destination}`); }
-  catch (error) { if (isNodeError(error, "ENOENT")) return; throw error; }
+  try {
+    await stat(destination);
+    throw new Error(`Restore target already exists: ${destination}`);
+  } catch (error) {
+    if (isNodeError(error, "ENOENT")) return;
+    throw error;
+  }
 }
 
 async function assertDirectoryExists(directory: string, label: string): Promise<void> {
@@ -269,9 +347,50 @@ function isInside(parent: string, child: string): boolean {
   const relative = path.relative(parent, child);
   return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
-function requireNonEmpty(value: string, name: string): string { const v = value.trim(); if (!v) throw new TypeError(`${name} must be non-empty`); return v; }
-function stringField(row: Record<string, unknown>, key: string): string { const v = row[key]; if (typeof v !== "string" || !v) throw new Error(`Backup snapshot ${key} is invalid`); return v; }
-function shaField(row: Record<string, unknown>, key: string): string { const v = stringField(row, key); if (!/^[0-9a-f]{64}$/.test(v)) throw new Error(`Backup snapshot ${key} is not a SHA-256 hash`); return v; }
-function integerField(row: Record<string, unknown>, key: string): number { const v = row[key]; if (typeof v !== "number" || !Number.isSafeInteger(v) || v < 0) throw new Error(`Backup snapshot ${key} is invalid`); return v; }
-function sha256(bytes: Uint8Array): string { return createHash("sha256").update(bytes).digest("hex"); }
-function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException { return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === code; }
+
+function requireNonEmpty(value: string, name: string): string {
+  const normalized = value.trim();
+  if (normalized.length === 0) throw new TypeError(`${name} must be non-empty`);
+  return normalized;
+}
+
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`Backup ${label} is invalid`);
+  }
+  return Object.fromEntries(Object.entries(value));
+}
+
+function stringField(row: Record<string, unknown>, key: string): string {
+  const value = row[key];
+  if (typeof value !== "string" || value.length === 0) throw new Error(`Backup snapshot ${key} is invalid`);
+  return value;
+}
+
+function shaField(row: Record<string, unknown>, key: string): string {
+  const value = stringField(row, key);
+  if (!/^[0-9a-f]{64}$/.test(value)) throw new Error(`Backup snapshot ${key} is not a SHA-256 hash`);
+  return value;
+}
+
+function integerField(row: Record<string, unknown>, key: string): number {
+  const value = row[key];
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`Backup snapshot ${key} is invalid`);
+  }
+  return value;
+}
+
+function requiredMapValue<K, V>(map: ReadonlyMap<K, V>, key: K, label: string): V {
+  const value = map.get(key);
+  if (value === undefined) throw new Error(`${label} is missing`);
+  return value;
+}
+
+function sha256(bytes: Uint8Array): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function isNodeError(error: unknown, code: string): error is Error & { code: unknown } {
+  return error instanceof Error && "code" in error && error.code === code;
+}

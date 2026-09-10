@@ -62,8 +62,8 @@ class FakeStore extends DurableJobStore {
     super(db);
   }
 
-  get(): DurableJob { return this.current; }
-  claim(jobId: string, workerId: string): JobLease {
+  override get(): DurableJob { return this.current; }
+  override claim(jobId: string, workerId: string): JobLease {
     if (this.claimFailuresRemaining > 0) {
       this.claimFailuresRemaining -= 1;
       throw new Error(`Job ${jobId} claim lost a race`);
@@ -73,24 +73,24 @@ class FakeStore extends DurableJobStore {
     this.current = job({ id: jobId, leaseOwner: workerId });
     return { job: this.current, workerId, fencingToken: this.current.fencingToken };
   }
-  recoverExpiredLease(jobId: string, token: number): DurableJob {
+  override recoverExpiredLease(jobId: string, token: number): DurableJob {
     this.recovered.push([jobId, token]);
     return job({ id: jobId, status: "queued", leaseOwner: null, leaseExpiresAt: null, heartbeatAt: null, fencingToken: token });
   }
-  heartbeat(): DurableJob { this.heartbeats += 1; return this.current; }
-  succeed(_jobId: string, _worker: string, _token: number, result: unknown): DurableJob {
+  override heartbeat(): DurableJob { this.heartbeats += 1; return this.current; }
+  override succeed(_jobId: string, _worker: string, _token: number, result: unknown): DurableJob {
     if (this.completionFailure !== undefined) throw this.completionFailure;
     this.succeeded.push(result);
     this.current = job({ status: "succeeded", result });
     return this.current;
   }
-  fail(_jobId: string, _worker: string, _token: number, error: unknown): DurableJob {
+  override fail(_jobId: string, _worker: string, _token: number, error: unknown): DurableJob {
     if (this.completionFailure !== undefined) throw this.completionFailure;
     this.failed.push(error);
     this.current = job({ status: "failed", error });
     return this.current;
   }
-  acknowledgeCancellation(): DurableJob {
+  override acknowledgeCancellation(): DurableJob {
     this.cancelled += 1;
     this.current = job({ status: "cancelled", cancelRequested: true });
     return this.current;

@@ -87,32 +87,39 @@ describe("P2 Golden Dataset schema", () => {
       exactQuote: "错误码 E123 表示权限不足",
     });
 
-    expect(() => validateGoldenDataset(dataset({
-      queries: [query(), holdout],
-      labels: [label(), holdoutLabel],
-    }))).not.toThrow();
+    expect(() => {
+      validateGoldenDataset(dataset({
+        queries: [query(), holdout],
+        labels: [label(), holdoutLabel],
+      }));
+    }).not.toThrow();
   });
 
   it("rejects persisted Chunk identity even if an untyped fixture injects it", () => {
-    const invalidLabel = {
+    const invalidLabel: GoldenEvidenceLabel & { chunkId: string } = {
       ...label(),
       chunkId: "chunk-derived-address-must-not-be-stable",
-    } as GoldenEvidenceLabel;
+    };
 
-    expect(() => validateGoldenDataset(dataset({ labels: [invalidLabel] })))
-      .toThrow("must not persist Chunk identity");
+    expect(() => {
+      validateGoldenDataset(dataset({ labels: [invalidLabel] }));
+    }).toThrow("must not persist Chunk identity");
   });
 
   it("rejects a label whose SourceVersion does not match ParsedArtifact lineage", () => {
-    expect(() => validateGoldenDataset(dataset({
-      labels: [label({ sourceVersionId: "source-version-current" })],
-    }))).toThrow("SourceVersion does not match its ParsedArtifact lineage");
+    expect(() => {
+      validateGoldenDataset(dataset({
+        labels: [label({ sourceVersionId: "source-version-current" })],
+      }));
+    }).toThrow("SourceVersion does not match its ParsedArtifact lineage");
   });
 
   it("requires at least one required Evidence label for every answerable query", () => {
-    expect(() => validateGoldenDataset(dataset({
-      labels: [label({ importance: "supporting" })],
-    }))).toThrow("must have at least one required Evidence label");
+    expect(() => {
+      validateGoldenDataset(dataset({
+        labels: [label({ importance: "supporting" })],
+      }));
+    }).toThrow("must have at least one required Evidence label");
   });
 
   it("represents no-answer queries with zero labels rather than a fabricated Evidence range", () => {
@@ -120,29 +127,37 @@ describe("P2 Golden Dataset schema", () => {
       categories: ["no-answer", "english"],
       text: "What is the undocumented secret value?",
     });
-    expect(() => validateGoldenDataset(dataset({
-      queries: [noAnswer],
-      labels: [],
-    }))).not.toThrow();
+    expect(() => {
+      validateGoldenDataset(dataset({
+        queries: [noAnswer],
+        labels: [],
+      }));
+    }).not.toThrow();
 
-    expect(() => validateGoldenDataset(dataset({
-      queries: [noAnswer],
-      labels: [label()],
-    }))).toThrow("must not have Evidence labels");
+    expect(() => {
+      validateGoldenDataset(dataset({
+        queries: [noAnswer],
+        labels: [label()],
+      }));
+    }).toThrow("must not have Evidence labels");
   });
 
   it("rejects unsafe corpus paths and invalid canonical hashes", () => {
-    expect(() => validateGoldenDataset(dataset({
-      corpus: [corpus({ relativePath: "../outside.md" })],
-    }))).toThrow("canonical safe relative path");
+    expect(() => {
+      validateGoldenDataset(dataset({
+        corpus: [corpus({ relativePath: "../outside.md" })],
+      }));
+    }).toThrow("canonical safe relative path");
 
-    expect(() => validateGoldenDataset(dataset({
-      corpus: [corpus({
-        parsedArtifact: {
-          ...corpus().parsedArtifact,
-          canonicalTextSha256: "not-a-hash",
-        },
-      })],
-    }))).toThrow("lowercase SHA-256 hash");
+    expect(() => {
+      validateGoldenDataset(dataset({
+        corpus: [corpus({
+          parsedArtifact: {
+            ...corpus().parsedArtifact,
+            canonicalTextSha256: "not-a-hash",
+          },
+        })],
+      }));
+    }).toThrow("lowercase SHA-256 hash");
   });
 });

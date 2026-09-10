@@ -85,14 +85,14 @@ export function resolveKnowledgeWorkspaceIdentity(
 }
 
 function isInstallationRow(value: unknown): value is InstallationRow {
-  return isRecord(value) && typeof value.id === "string";
+  return isRecord(value) && typeof value["id"] === "string";
 }
 
 function isWorkspaceRow(value: unknown): value is WorkspaceRow {
   return (
     isRecord(value) &&
-    typeof value.id === "string" &&
-    (typeof value.external_binding === "string" || value.external_binding === null)
+    typeof value["id"] === "string" &&
+    (typeof value["external_binding"] === "string" || value["external_binding"] === null)
   );
 }
 

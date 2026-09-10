@@ -112,10 +112,14 @@ function parseViewerRequest(
 }
 
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw invalid(`${label} must be an object`);
   }
-  return value as Record<string, unknown>;
+  return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function requireString(record: Record<string, unknown>, key: string, operation: string): string {
@@ -138,10 +142,10 @@ function optionalString(record: Record<string, unknown>, key: string, operation:
 function optionalPositiveInteger(record: Record<string, unknown>, key: string, operation: string): number | undefined {
   const value = record[key];
   if (value === undefined) return undefined;
-  if (!Number.isSafeInteger(value) || (value as number) <= 0) {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
     throw invalid(`${operation} ${key} must be a positive integer when supplied`);
   }
-  return value as number;
+  return value;
 }
 
 function invalid(message: string): KnowledgeServiceError {

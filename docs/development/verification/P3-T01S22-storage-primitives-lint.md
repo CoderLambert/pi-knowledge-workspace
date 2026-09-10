@@ -1,6 +1,6 @@
 # P3-T01S22 Verification — Storage Primitives Lint
 
-Status: **PARTIAL**
+Status: **PASS**
 
 ## Automated verification
 
@@ -11,19 +11,25 @@ npm run typecheck
 npm run lint
 ```
 
-Task PASS requires:
+Verified on code head `731272e487d00f8408f48c0e96f05a12f4d7acc8` by GitHub CI run `34461165544`:
 
-- typecheck remains PASS;
-- repository lint moves from 65 to 53 unless CI exposes a directly task-owned interaction corrected within S22;
-- `utf8Range.ts`, `blobStore.ts`, `workspaceFileReader.ts` and `workspaceIdentity.ts` disappear from authoritative ESLint output;
-- relevant focused tests pass when reachable;
-- unrelated remaining failures stay classified as inherited baseline.
+```text
+npm run typecheck → PASS
+ESLint 65 → 53
+```
 
-If path-triggered, P2 FTS Evidence and P2 Lexical Evidence must remain PASS because these primitives are consumed by canonical Evidence/storage paths.
+`utf8Range.ts`, `blobStore.ts`, `workspaceFileReader.ts` and `workspaceIdentity.ts` no longer appear in authoritative ESLint output. The remaining 53 findings are inherited outside S22.
+
+P2 regression evidence on the same code head:
+
+```text
+P2 FTS Evidence     34461166067 → PASS
+P2 Lexical Evidence 34461165563 → PASS
+```
 
 ## Semantic regression checks
 
-Preserve the following contracts:
+Preserved contracts:
 
 1. UTF-8 ranges remain safe-integer, half-open byte ranges over valid canonical UTF-8.
 2. Non-boundary offsets still fail; exact quote/hash verification stays byte-exact with no normalization.
@@ -35,7 +41,7 @@ Preserve the following contracts:
 
 ## Frozen boundaries
 
-Do not modify:
+Unchanged:
 
 - ADR-029;
 - database schema/migrations;
@@ -46,4 +52,4 @@ Do not modify:
 
 ## User verification debt
 
-None expected. These changes are repository-verifiable and do not require browser, Fleet, multi-instance, hardware, system-service or manual semantic acceptance for the S22 PASS decision.
+None. S22 is fully repository-verifiable and does not require browser, Fleet, multi-instance, hardware, system-service or manual semantic acceptance for PASS.

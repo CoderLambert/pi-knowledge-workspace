@@ -25,6 +25,10 @@ export interface IndexBuildPublisherOptions {
 
 export interface IndexBuildCandidateOptions {
   retrievalConfigRevision?: string;
+  expectedBase?: {
+    generation: number;
+    publicationId: string | null;
+  };
 }
 
 export class IndexBuildPublicationConflictError extends Error {}
@@ -53,6 +57,17 @@ export class IndexBuildPublisher {
     );
     return withTransaction(this.db, () => {
       const workspace = workspaceState(this.db, workspaceId);
+      if (
+        options.expectedBase !== undefined
+        && (
+          workspace.generation !== options.expectedBase.generation
+          || workspace.activePublicationId !== options.expectedBase.publicationId
+        )
+      ) {
+        throw new IndexBuildPublicationConflictError(
+          "Knowledge candidate was composed from a stale publication generation",
+        );
+      }
       const id = this.createId();
       const createdAt = this.now().toISOString();
       this.db.prepare(

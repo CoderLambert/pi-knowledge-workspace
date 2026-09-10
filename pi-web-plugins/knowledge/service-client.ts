@@ -14,7 +14,19 @@ const KNOWLEDGE_SERVICE_MAX_REQUEST_ID_LENGTH = 128;
 
 type FetchLike = typeof fetch;
 
-export type KnowledgeServiceOperation = "capabilities.get" | "workspace.echo";
+export type KnowledgeServiceOperation =
+  | "capabilities.get"
+  | "workspace.echo"
+  | "knowledge.import.submit"
+  | "knowledge.import.status"
+  | "knowledge.publish"
+  | "knowledge.ask"
+  | "knowledge.answer.get"
+  | "knowledge.answers.list"
+  | "knowledge.citation.open"
+  | "viewer.sources.list"
+  | "viewer.source.get"
+  | "viewer.artifact.open";
 
 export interface KnowledgeServiceClient {
   dispatch(operation: KnowledgeServiceOperation, input: unknown, signal: AbortSignal): Promise<Record<string, unknown>>;
@@ -99,7 +111,7 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
   const baseUrl = `http://${formatHost(host)}:${String(port)}`;
 
   return Object.freeze({
-    dispatch(
+    async dispatch(
       operation: KnowledgeServiceOperation,
       input: unknown,
       signal: AbortSignal,
@@ -128,6 +140,7 @@ export function createKnowledgeServiceClient(options: KnowledgeServiceClientOpti
             headers: {
               authorization: `Bearer ${token}`,
               "content-type": "application/json",
+              [KNOWLEDGE_SERVICE_REQUEST_ID_HEADER]: requestId,
             },
             body,
           },
@@ -274,7 +287,7 @@ async function readBoundedJsonBody(response: Response, maxBytes: number): Promis
   const chunks: Buffer[] = [];
   let totalBytes = 0;
   try {
-    while (true) {
+    for (;;) {
       const chunk = await reader.read();
       if (chunk.done) break;
       totalBytes += chunk.value.byteLength;

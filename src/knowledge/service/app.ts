@@ -12,6 +12,8 @@ import {
 import { createKnowledgeErrorEnvelope, parseKnowledgeDispatchRequest } from "../contracts/schemas.js";
 import { dispatchKnowledgeOperation } from "./dispatch.js";
 import { knowledgeHealth } from "./health.js";
+import type { GroundedAskDispatch } from "./groundedAsk.js";
+import type { KnowledgeImportDispatch, KnowledgePublishDispatch } from "./composition.js";
 import type { KnowledgeViewerDispatch } from "./viewerDispatch.js";
 
 export interface KnowledgeAppOptions {
@@ -20,6 +22,9 @@ export interface KnowledgeAppOptions {
   maxResponseBytes?: number;
   logger?: FastifyServerOptions["logger"];
   viewer?: KnowledgeViewerDispatch;
+  groundedAsk?: GroundedAskDispatch;
+  importJobs?: KnowledgeImportDispatch;
+  publish?: KnowledgePublishDispatch;
 }
 
 const MIN_RESPONSE_LIMIT = 512;
@@ -48,7 +53,7 @@ export async function buildKnowledgeApp(options: KnowledgeAppOptions): Promise<F
       return;
     }
     reply.header("www-authenticate", PI_KNOWLEDGE_AUTH_SCHEME);
-    sendKnowledgeError(reply, request.id, authError, maxResponseBytes);
+    sendKnowledgeError(reply, requestHeaderId(request.headers[PI_KNOWLEDGE_REQUEST_ID_HEADER]) ?? request.id, authError, maxResponseBytes);
   });
 
   app.setErrorHandler((error, request, reply) => {
@@ -100,7 +105,7 @@ export async function buildKnowledgeApp(options: KnowledgeAppOptions): Promise<F
     maxResponseBytes,
   ));
 
-  app.post("/v1/dispatch", (request, reply) => {
+  app.post("/v1/dispatch", async (request, reply) => {
     let requestId = request.id;
     try {
       const dispatchRequest = parseKnowledgeDispatchRequest(request.body);
@@ -122,11 +127,16 @@ export async function buildKnowledgeApp(options: KnowledgeAppOptions): Promise<F
         );
       }
 
-      const result = dispatchKnowledgeOperation(
+      const result = await dispatchKnowledgeOperation(
         dispatchRequest.operation,
         dispatchRequest.input,
         { maxRequestBytes, maxResponseBytes },
-        options.viewer === undefined ? {} : { viewer: options.viewer },
+        {
+          ...(options.viewer === undefined ? {} : { viewer: options.viewer }),
+          ...(options.groundedAsk === undefined ? {} : { groundedAsk: options.groundedAsk }),
+          ...(options.importJobs === undefined ? {} : { importJobs: options.importJobs }),
+          ...(options.publish === undefined ? {} : { publish: options.publish }),
+        },
       );
       const payload: Record<string, unknown> = {
         ok: true,
@@ -135,7 +145,7 @@ export async function buildKnowledgeApp(options: KnowledgeAppOptions): Promise<F
         operation: dispatchRequest.operation,
         result,
       };
-      return sendBoundedSuccess(reply, requestId, 200, payload, maxResponseBytes);
+      return await sendBoundedSuccess(reply, requestId, 200, payload, maxResponseBytes);
     } catch (error) {
       return sendKnowledgeError(reply, requestId, normalizeServiceError(error), maxResponseBytes);
     }
@@ -143,6 +153,13 @@ export async function buildKnowledgeApp(options: KnowledgeAppOptions): Promise<F
 
   await app.ready();
   return app;
+}
+
+function requestHeaderId(value: string | string[] | undefined): string | undefined {
+  if (typeof value !== "string" || value.length === 0 || value.length > 128 || !/^[A-Za-z0-9._:-]+$/u.test(value)) {
+    return undefined;
+  }
+  return value;
 }
 
 function authenticate(authorization: string | undefined, expectedToken: string): KnowledgeServiceError | undefined {

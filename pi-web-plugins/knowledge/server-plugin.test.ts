@@ -8,6 +8,7 @@ import type {
 } from "./service-client.js";
 import {
   createKnowledgeBackend,
+  KNOWLEDGE_ASK_OPERATION,
   KNOWLEDGE_STATUS_OPERATION,
 } from "./server-plugin.js";
 
@@ -155,5 +156,27 @@ describe("Knowledge paired backend", () => {
     await expect(request(context({ signal: controller.signal }), serviceClient))
       .rejects.toThrow("host request cancelled");
     expect(serviceClient.dispatchCalls).toHaveLength(0);
+  });
+
+  it("maps the host scope into a Knowledge ask without allowing browser authority", async () => {
+    const serviceClient = new RecordingKnowledgeServiceClient();
+    const requestContext = context({
+      operation: KNOWLEDGE_ASK_OPERATION,
+      input: { question: "How?" },
+    });
+
+    await request(requestContext, serviceClient);
+    expect(serviceClient.dispatchCalls[0]).toMatchObject({
+      operation: "knowledge.ask",
+      input: {
+        scope: {
+          projectId: "project-1",
+          workspaceId: "workspace-1",
+          workspacePath: "/work/project-one/worktree",
+        },
+        question: "How?",
+      },
+    });
+    expect(serviceClient.dispatchCalls[0]?.input).not.toHaveProperty("knowledgeWorkspaceId");
   });
 });

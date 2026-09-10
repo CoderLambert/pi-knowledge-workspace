@@ -108,7 +108,7 @@ export class SourceEvidenceViewer {
     ).all(workspaceId);
 
     return rows.map((row) => {
-      const value = row as Record<string, unknown>;
+      const value = recordValue(row, "Source summary row");
       return {
         id: requireDbString(value, "id"),
         displayName: requireDbString(value, "display_name"),
@@ -125,12 +125,13 @@ export class SourceEvidenceViewer {
   getSource(knowledgeWorkspaceId: string, sourceId: string): ViewerSourceDetail {
     const workspaceId = requireNonEmpty(knowledgeWorkspaceId, "knowledgeWorkspaceId");
     const id = requireNonEmpty(sourceId, "sourceId");
-    const sourceRow = this.db.prepare(
+    const sourceValue = this.db.prepare(
       `SELECT id, knowledge_workspace_id, display_name, kind, archived_at, created_at
        FROM sources
        WHERE id = ? AND knowledge_workspace_id = ?`,
-    ).get(id, workspaceId) as Record<string, unknown> | undefined;
-    if (sourceRow === undefined) throw new Error("Source is not available in the requested Knowledge Workspace");
+    ).get(id, workspaceId);
+    if (sourceValue === undefined) throw new Error("Source is not available in the requested Knowledge Workspace");
+    const sourceRow = recordValue(sourceValue, "Source detail row");
 
     const versionRows = this.db.prepare(
       `SELECT id, content_sha256, byte_length, created_at
@@ -140,7 +141,7 @@ export class SourceEvidenceViewer {
     ).all(id);
 
     const versions = versionRows.map((row) => {
-      const value = row as Record<string, unknown>;
+      const value = recordValue(row, "SourceVersion row");
       const versionId = requireDbString(value, "id");
       const artifactRows = this.db.prepare(
         `SELECT id, source_version_id, parser_version, canonical_text_sha256, created_at
@@ -182,7 +183,7 @@ export class SourceEvidenceViewer {
       MAX_ARTIFACT_BYTES,
     );
 
-    const lineage = this.db.prepare(
+    const lineageValue = this.db.prepare(
       `SELECT
          s.id AS source_id,
          s.display_name,
@@ -199,10 +200,11 @@ export class SourceEvidenceViewer {
        JOIN source_versions sv ON sv.id = pa.source_version_id
        JOIN sources s ON s.id = sv.source_id
        WHERE pa.id = ? AND s.knowledge_workspace_id = ?`,
-    ).get(parsedArtifactId, workspaceId) as Record<string, unknown> | undefined;
-    if (lineage === undefined) {
+    ).get(parsedArtifactId, workspaceId);
+    if (lineageValue === undefined) {
       throw new Error("ParsedArtifact is not available in the requested Knowledge Workspace");
     }
+    const lineage = recordValue(lineageValue, "ParsedArtifact lineage row");
 
     const artifact = this.artifacts.read(workspaceId, parsedArtifactId);
     const sourceVersionId = requireDbString(lineage, "source_version_id");
@@ -274,19 +276,18 @@ export class SourceEvidenceViewer {
   }
 
   private readEvidence(knowledgeWorkspaceId: string, evidenceId: string): StableEvidence {
-    const row = this.db.prepare(
+    const rowValue = this.db.prepare(
       `SELECT id, knowledge_workspace_id, parsed_artifact_id, start_byte, end_byte,
               exact_quote, quote_hash, locator_snapshot, created_at
        FROM evidence
        WHERE id = ? AND knowledge_workspace_id = ?`,
-    ).get(evidenceId, knowledgeWorkspaceId) as Record<string, unknown> | undefined;
-    if (row === undefined) throw new Error("Evidence is not available in the requested Knowledge Workspace");
+    ).get(evidenceId, knowledgeWorkspaceId);
+    if (rowValue === undefined) throw new Error("Evidence is not available in the requested Knowledge Workspace");
+    const row = recordValue(rowValue, "Evidence row");
 
     const locatorText = requireDbString(row, "locator_snapshot");
-    const locator: unknown = JSON.parse(locatorText);
-    if (locator === null || Array.isArray(locator) || typeof locator !== "object") {
-      throw new Error("Persisted Evidence locator_snapshot must be a JSON object");
-    }
+    const locatorValue: unknown = JSON.parse(locatorText);
+    const locatorSnapshot = recordValue(locatorValue, "Persisted Evidence locator_snapshot");
     return {
       id: requireDbString(row, "id"),
       knowledgeWorkspaceId: requireDbString(row, "knowledge_workspace_id"),
@@ -295,7 +296,7 @@ export class SourceEvidenceViewer {
       endByte: requireDbNonNegativeInteger(row, "end_byte"),
       exactQuote: requireDbString(row, "exact_quote"),
       quoteHash: requireDbString(row, "quote_hash"),
-      locatorSnapshot: locator as Record<string, unknown>,
+      locatorSnapshot,
       createdAt: requireDbString(row, "created_at"),
     };
   }
@@ -303,12 +304,17 @@ export class SourceEvidenceViewer {
 
 function utf8PrefixBoundary(bytes: Uint8Array, proposedEnd: number): number {
   let end = proposedEnd;
-  while (end > 0 && end < bytes.byteLength && (bytes[end]! & 0xc0) === 0x80) end -= 1;
+  while (end > 0 && end < bytes.byteLength) {
+    const byte = bytes[end];
+    if (byte === undefined) throw new RangeError("UTF-8 boundary lookup exceeded artifact bytes");
+    if ((byte & 0xc0) !== 0x80) break;
+    end -= 1;
+  }
   return end;
 }
 
 function mapArtifactSummary(row: unknown): ViewerParsedArtifactSummary {
-  const value = row as Record<string, unknown>;
+  const value = recordValue(row, "ParsedArtifact summary row");
   return {
     id: requireDbString(value, "id"),
     sourceVersionId: requireDbString(value, "source_version_id"),
@@ -316,6 +322,13 @@ function mapArtifactSummary(row: unknown): ViewerParsedArtifactSummary {
     canonicalTextSha256: requireDbString(value, "canonical_text_sha256"),
     createdAt: requireDbString(value, "created_at"),
   };
+}
+
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`${label} must be a database/object record`);
+  }
+  return Object.fromEntries(Object.entries(value));
 }
 
 function requireNonEmpty(value: string, name: string): string {

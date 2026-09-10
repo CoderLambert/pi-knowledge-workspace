@@ -12,9 +12,9 @@ class FakeDatabase implements MigrationDatabase {
   exec(sql: string): void {
     this.execLog.push(sql);
     if (sql === "BEGIN IMMEDIATE") this.transactionStartVersion = this.userVersion;
-    if (this.failOn && sql.includes(this.failOn)) throw new Error("injected failure");
+    if (this.failOn !== undefined && sql.includes(this.failOn)) throw new Error("injected failure");
     const version = /PRAGMA user_version = (\d+)/.exec(sql)?.[1];
-    if (version) this.userVersion = Number(version);
+    if (version !== undefined) this.userVersion = Number(version);
     if (sql === "ROLLBACK") this.userVersion = this.transactionStartVersion;
   }
 
@@ -95,12 +95,14 @@ describe("Knowledge database migrations", () => {
   it("fails closed when a database was written by a newer schema", () => {
     const db = new FakeDatabase();
     db.userVersion = KNOWLEDGE_SCHEMA_VERSION + 1;
-    expect(() => applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION)).toThrow(/newer than supported/);
+    expect(() => {
+      applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);
+    }).toThrow(/newer than supported/);
     expect(db.execLog).toEqual([]);
   });
 
   it("rolls back failed migrations and preserves the previously committed schema version", () => {
-    const cases: Array<[number, string, number]> = [
+    const cases: [number, string, number][] = [
       [0, "CREATE TABLE installations", 1],
       [1, "idempotency_key", 2],
       [2, "evidence_migration_guard", 3],
@@ -129,7 +131,9 @@ describe("withTransaction", () => {
   it("rolls back failed operations and preserves their error", () => {
     const db = new FakeDatabase();
     const failure = new Error("domain failure");
-    expect(() => withTransaction(db, () => { throw failure; })).toThrow(failure);
+    expect(() => {
+      withTransaction(db, () => { throw failure; });
+    }).toThrow(failure);
     expect(db.execLog).toEqual(["BEGIN IMMEDIATE", "ROLLBACK"]);
   });
 });

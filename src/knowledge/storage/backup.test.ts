@@ -19,7 +19,7 @@ class SnapshotDatabase implements KnowledgeDatabase {
     private readonly artifactRows: unknown[],
     private readonly schemaVersion = 7,
   ) {}
-  exec(): void {}
+  exec(): void { return; }
   close(): void { this.closed = true; }
   pragma(source: string): unknown { return source === "user_version" ? this.schemaVersion : undefined; }
   prepare(sql: string): SqliteStatement {
@@ -65,7 +65,7 @@ describe("KnowledgeBackupCreator", () => {
       now: () => new Date("2026-09-09T07:00:00.000Z"),
       createId: () => "backup-1",
       openSnapshotDatabase: () => snapshot,
-      artifactProvider: { readArtifactBundle: async () => artifactBundle },
+      artifactProvider: { readArtifactBundle: () => Promise.resolve(artifactBundle) },
     });
 
     const manifest = await creator.create(output);
@@ -76,9 +76,12 @@ describe("KnowledgeBackupCreator", () => {
     expect(manifest.blobs[0]?.contentSha256).toBe(written.hash);
     expect(manifest.artifacts[0]).toMatchObject({ parsedArtifactId: "artifact-1", sourceVersionId: "sv-1", canonicalTextSha256: HASH_A });
     expect(snapshot.closed).toBe(true);
-    expect(await readFile(path.join(output, manifest.blobs[0]!.path))).toEqual(raw);
-    expect(await readFile(path.join(output, manifest.artifacts[0]!.path))).toEqual(artifactBundle);
-    expect((await readFile(path.join(output, "manifest.sha256"), "utf8"))).toMatch(/^[0-9a-f]{64}  manifest\.json\n$/);
+    const manifestBlob = manifest.blobs[0];
+    const manifestArtifact = manifest.artifacts[0];
+    if (manifestBlob === undefined || manifestArtifact === undefined) throw new Error("Expected backup manifest fixtures");
+    expect(await readFile(path.join(output, manifestBlob.path))).toEqual(raw);
+    expect(await readFile(path.join(output, manifestArtifact.path))).toEqual(artifactBundle);
+    expect((await readFile(path.join(output, "manifest.sha256"), "utf8"))).toMatch(/^[0-9a-f]{64} {2}manifest\.json\n$/);
   });
 
   it("refuses to publish an incomplete backup when ParsedArtifacts exist without a provider", async () => {

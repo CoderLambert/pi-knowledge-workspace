@@ -17,8 +17,8 @@ class SnapshotDatabase implements KnowledgeDatabase {
     private readonly artifacts: unknown[] = [],
     private readonly evidenceCount = 0,
   ) {}
-  exec(): void {}
-  close(): void {}
+  exec(): void { return; }
+  close(): void { return; }
   pragma(source: string): unknown {
     if (source === "integrity_check") return "ok";
     if (source === "user_version") return 7;
@@ -58,7 +58,7 @@ async function writeBackup(
 
   let blobEntry: KnowledgeBackupManifest["blobs"][number] | undefined;
   let blobHash: string | undefined;
-  if (input.blob) {
+  if (input.blob !== undefined) {
     blobHash = sha(input.blob);
     const relative = `objects/blobs/sha256/${blobHash}`;
     await mkdir(path.join(backup, "objects/blobs/sha256"), { recursive: true });
@@ -103,8 +103,10 @@ describe("KnowledgeRestore", () => {
     const root = await tempRoot();
     const raw = Buffer.from("raw source bytes", "utf8");
     const fixture = await writeBackup(root, { blob: raw });
+    const blobHash = fixture.blobHash;
+    if (blobHash === undefined) throw new Error("expected backup blob hash");
     const snapshot = new SnapshotDatabase([
-      { content_sha256: fixture.blobHash, blob_key: fixture.blobHash, byte_length: raw.byteLength },
+      { content_sha256: blobHash, blob_key: blobHash, byte_length: raw.byteLength },
     ]);
     const target = path.join(root, "restored");
     const restore = new KnowledgeRestore({ createId: () => "restore-1", openSnapshotDatabase: () => snapshot });
@@ -113,7 +115,7 @@ describe("KnowledgeRestore", () => {
 
     expect(result).toMatchObject({ schemaVersion: 7, blobCount: 1, artifactCount: 0, evidenceCount: 0 });
     expect(await readFile(path.join(target, "knowledge.sqlite"), "utf8")).toBe("sqlite snapshot bytes");
-    expect(await readFile(path.join(target, "blobs/sha256", fixture.blobHash!))).toEqual(raw);
+    expect(await readFile(path.join(target, "blobs/sha256", blobHash))).toEqual(raw);
     expect(JSON.parse(await readFile(path.join(target, "restore-source-manifest.json"), "utf8"))).toEqual(fixture.manifest);
   });
 

@@ -278,8 +278,10 @@ function parsedNullable(row: Record<string, unknown>, key: string): unknown {
   return parsedValue;
 }
 function json(value: unknown, label: string, max: number): string {
+  if (value === undefined || typeof value === "function" || typeof value === "symbol") {
+    throw new TypeError(`${label} must be JSON-serializable`);
+  }
   const text = JSON.stringify(value);
-  if (text === undefined) throw new TypeError(`${label} must be JSON-serializable`);
   if (Buffer.byteLength(text, "utf8") > max) throw new RangeError(`${label} exceeds ${String(max)} bytes`);
   return text;
 }

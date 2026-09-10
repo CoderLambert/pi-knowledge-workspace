@@ -1,25 +1,17 @@
 # P3-T01S10 — Database Migration Test Lint Verification
 
-Status: **PARTIAL — CI evidence pending**
+Status: **PASS**
 
 ## Automated verification
 
-Run on the task branch:
-
-```bash
-npm run typecheck
-npm run lint
-npm test -- src/knowledge/storage/database.test.ts
-```
-
-Expected static result:
+GitHub CI run `34435790425` on the task branch confirmed:
 
 ```text
-typecheck: PASS
+npm run typecheck → PASS
 ESLint inherited baseline: 215 → 210
 ```
 
-Confirm the five prior findings in `src/knowledge/storage/database.test.ts` are gone:
+All five prior findings in `src/knowledge/storage/database.test.ts` are gone:
 
 1. nullable `failOn` strict-boolean finding;
 2. nullable regex-capture strict-boolean finding;
@@ -27,17 +19,19 @@ Confirm the five prior findings in `src/knowledge/storage/database.test.ts` are 
 4. `Array<T>` tuple-list syntax;
 5. second void-expression assertion callback.
 
+The workflow remains red only because 210 inherited repository-wide ESLint findings remain; lint stops `npm run verify` before knip/tests/build. P2 FTS Evidence and P2 Lexical Evidence both succeeded on the same head.
+
 ## Behavioral assertions
 
-The focused test must continue to prove:
+The changes preserve the existing test contract for:
 
-- migrations advance to the current Knowledge schema version;
-- existing databases upgrade without replaying migration 1;
-- current-schema migration is idempotent;
-- newer unsupported schemas fail closed;
-- failed migration steps roll back to the previously committed schema version;
-- `withTransaction` commits successful operations and rolls back failures while preserving the original error.
+- migrations advancing to the current Knowledge schema version;
+- existing databases upgrading without replaying migration 1;
+- current-schema migration idempotency;
+- newer unsupported schemas failing closed;
+- failed migration steps rolling back to the previously committed schema version;
+- `withTransaction` commit and rollback semantics.
 
 ## User verification
 
-None. This is repository test-harness/static debt and should be verified by CI; do not add user verification debt.
+None. This is repository test-harness/static debt and is covered by automated CI evidence; do not add user verification debt.

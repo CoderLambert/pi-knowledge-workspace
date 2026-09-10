@@ -68,7 +68,7 @@ Repository CI/typecheck/test failures that can be fixed autonomously are **imple
 3. Prefer upstream/public PI WEB seams over core patches.
 4. One task per branch and Draft PR; stacked PRs are allowed for unmerged dependencies.
 5. No automatic merge.
-6. No force-push or casual history rewrite; restacks use ordinary merge commits unless a later explicit exception is approved.
+6. No force-push, no casual rebase, and no autonomous merge. If safe continuation or stack maintenance requires a merge, rebase, destructive ref move or other history rewrite, stop and classify the task BLOCKED until explicit owner authority is given.
 7. Do not mutate frozen P2 evidence to improve scores.
 8. Holdout remains one-shot aggregate evidence; no holdout tuning or per-query diagnostics for optimization.
 9. Do not add framework abstractions without a concrete need.
@@ -273,7 +273,7 @@ Objective:
 
 > Remove the inherited Knowledge static/test debt from the P3 base so new regressions have a trustworthy signal.
 
-Current verified baseline:
+Verified baseline history through the latest execution rebaseline:
 
 ```text
 P3-T01 typecheck blocker: 12 errors → 0
@@ -288,9 +288,46 @@ P3-T01S8 selected-Machine-federation-test lint slice: 222 ESLint errors → 219
 P3-T01S9 Source-Evidence-Viewer-test lint slice: 219 ESLint errors → 215
 P3-T01S10 database-migration-test lint slice: 215 ESLint errors → 210
 P3-T01S11 backup-test lint slice: 210 ESLint errors → 205
+P3-T01S12 restore-test lint slice: 205 ESLint errors → 201
 ```
 
-The remaining ESLint findings are inherited across pre-existing Knowledge/plugin code. They must be closed in bounded, subsystem-scoped support slices; do not turn P3-T01 into one repository-wide rewrite.
+The remaining ESLint findings are inherited across pre-existing Knowledge/plugin code. Continue closing them in **subsystem-scoped bounded slices**, not one-file micro-slices and not one repository-wide rewrite.
+
+### P3-T01 execution policy from the 201 checkpoint
+
+A support slice should normally group one cohesive subsystem or test-harness concern and remove roughly **10–30 related findings** across approximately **2–6 closely related files** when that can be done without mixing independent semantics. These numbers are throughput guidance, not quotas: use a smaller slice when a risky production contract needs isolation, and a somewhat larger slice when changes are mechanical and share one verification surface.
+
+Preferred grouping order from the current baseline is:
+
+```text
+backup / restore production boundary
+source / evidence production boundary
+index / search publication boundary
+worker / import boundary
+evaluation and remaining test harnesses
+plugin / integration remainder
+```
+
+Within a slice:
+
+- fix only findings attributable to that cohesive subsystem;
+- preserve existing behavior unless the task explicitly declares a behavior change;
+- keep ADR-029 semantics and P2 retrieval evidence frozen;
+- run typecheck plus the relevant focused tests and use repository lint output to prove the delta;
+- classify unrelated remaining findings as inherited baseline rather than expanding scope;
+- include one development report and one verification guide for behavior-changing work.
+
+### Status/checkpoint synchronization
+
+`DEVELOPMENT-PLAN.md` no longer needs a docs-only PR after every successful child slice. Child-slice reports/PRs are authoritative for their exact CI delta between checkpoints. Update this plan with an independent docs-only synchronization when **any** of the following occurs:
+
+- P3-T01/P3/Slice status changes;
+- architecture/dependency order changes;
+- a verified milestone reduces the baseline by roughly 20+ findings since the last checkpoint;
+- 2–4 child slices have completed since the last checkpoint;
+- the recorded checkpoint would otherwise mislead task selection or acceptance.
+
+A checkpoint is a historical verified floor, not a claim that no later child slice has completed. During a run, always inspect the latest open PRs/reports/CI before selecting work. If the plan makes a materially false claim about current status or ordering, correct it with an independent minimal docs-only task before further behavior development.
 
 Scope rules:
 
@@ -306,6 +343,7 @@ Required exit:
 - inherited lint/static debt is reduced through reviewable support slices until Slice A gets a trustworthy regression signal;
 - focused Knowledge tests covering touched areas pass when reachable;
 - any remaining full-suite failure is classified against baseline;
+- before declaring P3-T01 PASS, explicitly audit whether the remaining baseline (if any) can still mask Slice A regressions; do not require zero ESLint findings merely as a numeric goal if a narrower, deterministic regression gate is demonstrably trustworthy;
 - report + verification guide are present for behavior-changing support work.
 
 ---
@@ -709,7 +747,7 @@ As of 2026-09-10:
 | P2-T12 | PASS | ADR-029 Accepted. |
 | P2 stack | PASS | Final ancestry restack is clean; #54 and #44 include latest #43 with task-only scopes. |
 | P3-T00 | PASS | Rebaseline plan to ADR-029. |
-| P3-T01 | PARTIAL | Typecheck is green; inherited ESLint baseline reduced from 261 to 205 through bounded support slices. |
+| P3-T01 | PARTIAL | Typecheck is green; verified execution checkpoint is 201 inherited ESLint findings after S12. Subsequent child-slice deltas are tracked in their task reports until the next milestone sync. |
 
 Current architecture/development base:
 
@@ -720,6 +758,6 @@ experiment/p2-retrieval-adr
 
 Current next implementation task:
 
-# **Continue P3-T01 bounded inherited lint closure**
+# **Continue P3-T01 with subsystem-scoped bounded inherited lint closure**
 
-No P3 production feature should bypass this task's regression-signal cleanup unless a new blocker/evidence requires the plan to be re-reviewed.
+Prefer cohesive 10–30-finding slices where risk permits. Do not let status-document churn dominate implementation, and do not enter P3 production features until the baseline provides a trustworthy regression signal.

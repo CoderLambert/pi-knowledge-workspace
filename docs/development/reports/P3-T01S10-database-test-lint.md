@@ -1,6 +1,6 @@
 # P3-T01S10 — Database Migration Test Lint Baseline
 
-Status: **PARTIAL**
+Status: **PASS**
 
 Date: 2026-09-10
 
@@ -19,14 +19,16 @@ Only `src/knowledge/storage/database.test.ts` is behaviorally touched:
 
 No production database or migration implementation is changed.
 
-## Expected verification
+## Verification evidence
+
+GitHub CI run `34435790425` confirmed:
 
 ```text
 npm run typecheck → PASS
 ESLint 215 → 210
 ```
 
-The five targeted inherited findings in `database.test.ts` should disappear. Remaining repository-wide lint findings are inherited baseline debt outside this slice.
+All five S10-owned findings disappeared. The CI workflow remains red only because 210 inherited repository-wide ESLint findings remain and `npm run verify` stops at lint before knip/tests/build. P2 FTS Evidence run `34435790418` and P2 Lexical Evidence run `34435790390` both succeeded on the same head.
 
 ## Scope exclusions
 

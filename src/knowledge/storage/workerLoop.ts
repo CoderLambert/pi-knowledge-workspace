@@ -108,7 +108,9 @@ export class DurableJobWorker {
       const result = await handler({
         job: lease.job,
         signal: abortController.signal,
-        assertAuthority: () => this.assertAuthority(jobId, lease.fencingToken, abortController.signal),
+        assertAuthority: () => {
+          this.assertAuthority(jobId, lease.fencingToken, abortController.signal);
+        },
       });
       if (heartbeatFailure !== undefined) {
         return { status: "lost-lease", jobId, recoveredLeases, expiredDeadlines };

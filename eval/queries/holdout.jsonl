@@ -1,0 +1,30 @@
+{"schemaVersion":1,"id":"holdout-001","text":"`ref()` 在 Vue 中返回什么？","split":"holdout","categories":["exact-api","chinese"]}
+{"schemaVersion":1,"id":"holdout-002","text":"Can a Vue ref's internal value be changed through `.value`?","split":"holdout","categories":["semantic","english"]}
+{"schemaVersion":1,"id":"holdout-003","text":"What field is declared by the captured `Ref<T>` interface?","split":"holdout","categories":["code-symbol","english"]}
+{"schemaVersion":1,"id":"holdout-004","text":"Vue ref 的 `.value` 读写会怎样影响响应式追踪？","split":"holdout","categories":["semantic","chinese"]}
+{"schemaVersion":1,"id":"holdout-005","text":"如何避免 `ref()` 对对象值进行深层响应式转换？","split":"holdout","categories":["semantic","chinese"]}
+{"schemaVersion":1,"id":"holdout-006","text":"`ref<T>` 的 return type 是否包含 `UnwrapRef<T>`？","split":"holdout","categories":["code-symbol","chinese-english-mixed"]}
+{"schemaVersion":1,"id":"holdout-007","text":"If an object becomes a ref value, which reactive API is involved?","split":"holdout","categories":["semantic","english"]}
+{"schemaVersion":1,"id":"holdout-008","text":"Does the captured Vue ref API define a `subscribe()` method?","split":"holdout","categories":["no-answer","exact-api","english"]}
+{"schemaVersion":1,"id":"holdout-009","text":"Does the captured Vue documentation guarantee that refs are thread-safe?","split":"holdout","categories":["no-answer","semantic","english"]}
+{"schemaVersion":1,"id":"holdout-010","text":"什么时候应该考虑 `shallowRef()`？","split":"holdout","categories":["chinese","semantic"]}
+{"schemaVersion":1,"id":"holdout-011","text":"What Node release first added the captured `fsPromises.cp` API?","split":"holdout","categories":["version-error-code","english"]}
+{"schemaVersion":1,"id":"holdout-012","text":"Was `fsPromises.cp` experimental in the captured Node v16.7.0 documentation?","split":"holdout","categories":["version-error-code","english"]}
+{"schemaVersion":1,"id":"holdout-013","text":"Is `fsPromises.cp` still experimental in the captured Node v22.3.0 documentation?","split":"holdout","categories":["version-error-code","english"]}
+{"schemaVersion":1,"id":"holdout-014","text":"Compare the stability status of `fsPromises.cp` in Node v16.7.0 and v22.3.0.","split":"holdout","categories":["conflict","multi-source","version-error-code","english"]}
+{"schemaVersion":1,"id":"holdout-015","text":"What scope of directory content can `fsPromises.cp` copy?","split":"holdout","categories":["semantic","english"]}
+{"schemaVersion":1,"id":"holdout-016","text":"What does the v16.7.0 snapshot say the `force` default is?","split":"holdout","categories":["exact-api","english"]}
+{"schemaVersion":1,"id":"holdout-017","text":"Can the v16.7.0 `filter` option return a Promise?","split":"holdout","categories":["exact-api","code-symbol","english"]}
+{"schemaVersion":1,"id":"holdout-018","text":"Compare the `recursive` default in the captured v16.7.0 and v22.3.0 docs.","split":"holdout","categories":["multi-source","version-error-code","english"]}
+{"schemaVersion":1,"id":"holdout-019","text":"What is the v22.3.0 default for the `mode` option?","split":"holdout","categories":["exact-api","version-error-code","english"]}
+{"schemaVersion":1,"id":"holdout-020","text":"What is `verbatimSymlinks` used for in the v22.3.0 snapshot?","split":"holdout","categories":["semantic","code-symbol","english"]}
+{"schemaVersion":1,"id":"holdout-021","text":"`verbatimSymlinks` 默认是 true 还是 false？","split":"holdout","categories":["chinese-english-mixed","exact-api"]}
+{"schemaVersion":1,"id":"holdout-022","text":"Node v22.3 中 `recursive` 默认开启吗？","split":"holdout","categories":["chinese-english-mixed","semantic"]}
+{"schemaVersion":1,"id":"holdout-023","text":"Which captured `fsPromises.cp` option has default value `0`?","split":"holdout","categories":["exact-api","code-symbol","english"]}
+{"schemaVersion":1,"id":"holdout-024","text":"哪个 v16.7.0 option 可以返回 `Promise<boolean>`？","split":"holdout","categories":["code-symbol","chinese-english-mixed"]}
+{"schemaVersion":1,"id":"holdout-025","text":"Is there a `preserveOwnership` option for `fsPromises.cp` in this corpus?","split":"holdout","categories":["no-answer","exact-api","english"]}
+{"schemaVersion":1,"id":"holdout-026","text":"Does `fsPromises.cp` expose a progress callback in the captured documentation?","split":"holdout","categories":["no-answer","exact-api","english"]}
+{"schemaVersion":1,"id":"holdout-027","text":"Can the captured v22.3.0 `fsPromises.cp` description cover nested subdirectories?","split":"holdout","categories":["semantic","english"]}
+{"schemaVersion":1,"id":"holdout-028","text":"Do the v16.7.0 and v22.3.0 snapshots agree on the overall directory-copy behavior?","split":"holdout","categories":["multi-source","english"]}
+{"schemaVersion":1,"id":"holdout-029","text":"Which API change is recorded specifically for Node v22.3.0 in the captured `fsPromises.cp` history?","split":"holdout","categories":["version-error-code","english"]}
+{"schemaVersion":1,"id":"holdout-030","text":"Give the captured `fsPromises.cp(src, dest[, options])` API signature context for v22.3.0.","split":"holdout","categories":["exact-api","code-symbol","english"]}

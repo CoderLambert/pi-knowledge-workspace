@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "corpus-node-fspromises-cp-v16-7-0",
+  "relativePath": "corpus/node-fspromises-cp-v16.7.0.md",
+  "mediaType": "text/markdown",
+  "language": "en",
+  "source": {
+    "title": "Node.js v16.7.0 File system promises — fsPromises.cp",
+    "uri": "https://github.com/nodejs/node/blob/v16.7.0/doc/api/fs.md",
+    "capturedAt": "2026-09-09T03:40:00.000Z",
+    "version": "tag:v16.7.0"
+  },
+  "parsedArtifact": {
+    "parsedArtifactId": "pa-0b58316aec095c52",
+    "sourceVersionId": "sv-38ec82d0f330f01a",
+    "parserFingerprint": "md-txt-parser-v1",
+    "normalizationFingerprint": "utf8-bom-strip+newline-lf-v1",
+    "canonicalTextSha256": "38ec82d0f330f01a0b58316aec095c5298325519933cfd02800cc5d318531619"
+  }
+}

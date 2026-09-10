@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "corpus-vue-reactivity-core-zh-20260907",
+  "relativePath": "corpus/vue-reactivity-core-zh.md",
+  "mediaType": "text/markdown",
+  "language": "zh",
+  "source": {
+    "title": "Vue 3 响应式 API：核心 — ref()",
+    "uri": "https://github.com/vuejs-translations/docs-zh-cn/blob/dda601fe33187dfd913641d58b6cefe829bf1a0d/src/api/reactivity-core.md",
+    "capturedAt": "2026-09-09T03:40:00.000Z",
+    "version": "git:dda601fe33187dfd913641d58b6cefe829bf1a0d"
+  },
+  "parsedArtifact": {
+    "parsedArtifactId": "pa-15e86aee62270b78",
+    "sourceVersionId": "sv-a4fd72f4157cca25",
+    "parserFingerprint": "md-txt-parser-v1",
+    "normalizationFingerprint": "utf8-bom-strip+newline-lf-v1",
+    "canonicalTextSha256": "a4fd72f4157cca2515e86aee62270b7858f4bafbe15bc214c2d47473f13895d5"
+  }
+}

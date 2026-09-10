@@ -1,0 +1,16 @@
+{
+  "name": "@pi-web/knowledge-plugin",
+  "private": true,
+  "type": "module",
+  "piWeb": {
+    "plugins": [
+      {
+        "id": "knowledge",
+        "browserRoot": "browser",
+        "module": "browser/pi-web-plugin.js",
+        "serverModule": "server-plugin.js",
+        "machineSpecific": true
+      }
+    ]
+  }
+}

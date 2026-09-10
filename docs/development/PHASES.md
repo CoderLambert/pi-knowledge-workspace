@@ -2,181 +2,170 @@
 
 ## Principle
 
-Each phase has an explicit exit condition. Dependencies may be explored in parallel, but a later product gate cannot be declared complete before the previous gate's evidence exists.
+Each phase has an explicit exit condition. Dependencies may be explored in parallel, but a later product gate cannot be declared complete before the previous gate's required evidence exists.
 
-## P0a — Thin Fork integration spike
+This file defines phase-level goals and gates. The authoritative forward-looking task breakdown is [`DEVELOPMENT-PLAN.md`](./DEVELOPMENT-PLAN.md).
 
-Goal: prove the fork can expose a first-class Knowledge surface without destabilizing existing PI WEB workspace behavior.
+Product Milestone reporting is part of the Definition of Done. Product Slice PRs carry integrated implementation and verification context; standalone reports and verification guides are created at milestone or Product Slice/user-journey boundaries when they provide durable value. Agent Work Units normally require only the concise handoff defined in [`REPORTING.md`](./REPORTING.md).
 
-Deliver:
+A verification guide documents how to test a feature; it is not itself proof that the feature passed.
 
-- empty Knowledge route/panel;
-- access to authoritative current Project/Workspace context;
-- thin server-side call path to a fake local `pi-knowledge` endpoint;
-- local + gateway/target routing behavior mapped;
-- no change to existing Git/Terminal/Session semantics.
+---
 
-Exit:
+## P0 — Integration / security / process boundary
 
-- Git and folder workspaces can open Knowledge;
-- workspace scope cannot be spoofed by browser JSON;
-- service-down/target-offline errors are explicit;
-- no scattered private-route hacks are required.
+Goal: prove Knowledge can exist as a first-class Workspace capability without replacing PI WEB's authoritative Project/Workspace/Machine routing or moving heavy Knowledge work into sessiond.
 
-Stop if the fork would require invasive changes across unrelated upstream subsystems.
+Accepted foundations include:
 
-## P0b — Restricted Ask/security spike
+- Knowledge Workspace surface;
+- host-authoritative Project / Workspace / Path;
+- standalone authenticated loopback `pi-knowledge` process boundary;
+- thin paired-plugin integration direction.
 
-Goal: prove Pi SDK can be instantiated as a genuinely restricted knowledge-only runtime.
+Current phase status: **PARTIAL**.
 
-Deliver:
+Mandatory P0-T04..T08 local/browser/Fleet/runtime verification debt remains recorded in `VERIFICATION-DEBT.md` and must close before release gates that depend on it.
 
-- empty/custom ResourceLoader;
-- explicit four-tool allowlist;
-- in-memory session/settings as applicable;
-- controlled credential/model configuration;
-- regression fixtures proving project/global resources cannot add tools/instructions;
-- no real private corpus sent to remote models during the spike.
+---
 
-Exit:
+## P1 — Stable Evidence Core
 
-- only `knowledge_sources/search/read/submit_answer` are model-visible;
-- reload/retry does not activate shell/read/write or arbitrary resources;
-- unsupported/unsafe provider configuration fails closed.
+Goal: build authoritative immutable Knowledge data and stable Evidence without relying on LLM quality.
 
-## P0c — Boundary/failure spike
-
-Goal: validate target routing and transport boundaries.
-
-Cover:
-
-- local target;
-- isolated gateway → target instance;
-- cancellation;
-- service disconnect/restart;
-- workspace switching;
-- request/response limits;
-- version/capability mismatch;
-- no fallback to gateway-local knowledge when target is unavailable.
-
-A two-local-instance setup proves routing contracts only; it is not called real remote Fleet validation.
-
-## P1 — Evidence vertical slice
+Core flow:
 
 ```text
 Select/import MD/TXT
-→ capture immutable bytes
-→ SourceVersion
+→ immutable SourceVersion
 → ParsedArtifact
-→ FTS baseline
-→ stable Evidence
+→ Stable Evidence
+→ retrieval projection
 → Source/Evidence Viewer
 ```
 
-Must include from the start:
+Foundations include durable jobs, Source/SourceVersion, content-addressed bytes, canonical MD/TXT parsing, Evidence/viewer work, SQLite FTS5/index publication/retention work and backup work.
 
-- durable job state;
-- retry/cancel/crash recovery;
-- migrations;
-- atomic index publication;
-- minimal backup/restore;
-- historical Evidence remains readable after reparse/rechunk/reindex.
+Current phase status: **PARTIAL**.
 
-Exit: authoritative data survives restart/rebuild/recovery tests without redirecting old citations to new content.
+P1 acceptance debt remains real. P3 may reuse implemented contracts where dependency-safe, but must not reinterpret PARTIAL work as fully accepted production evidence.
 
-## P2 — Retrieval evaluation
+---
 
-Build the first real corpus and Golden Dataset before selecting the final retrieval stack.
+## P2 — Retrieval evaluation + architecture decision
 
-Compare:
+Goal: select retrieval from evidence and determine what Pi should own vs reuse.
 
-- direct/full-context where applicable;
-- FTS;
-- Dense;
-- Hybrid + RRF.
-
-Starting dataset target: roughly 60–100 real queries with a holdout split.
-
-Required categories include:
-
-- Chinese;
-- English;
-- Chinese/English mixed;
-- exact API/code symbols;
-- versions/error codes;
-- multi-source evidence;
-- conflicts;
-- no-answer questions.
-
-Report at minimum:
-
-- Recall@K;
-- MRR;
-- failures by category;
-- p95 retrieval latency;
-- memory/index size.
-
-Also run a small same-task comparison against up to two mature existing local knowledge products before committing to unnecessary custom work.
-
-Exit: choose and document the actual retrieval stack from evidence, not preference.
-
-## P3 — Knowledge Ask + Notes = V1 feature completion
+Frozen development evidence supports:
 
 ```text
-fixed ScopeManifest
-→ controlled initial retrieval
-→ bounded Pi search/read loop
-→ submit_answer
-→ deterministic citation validation
-→ AnswerRevision
-→ Save Note
-→ edit/reopen/export
+SQLite FTS5
+unicode61
+lexicalProfile = baseline
+naturalLanguageCompiler = quoted-literal-or
+Top-K = 10 default
 ```
 
-Must include:
+Dense candidates did not establish material benefit. Qdrant / Dense / Hybrid / reranking are therefore not V1 dependencies without new frozen evidence.
 
-- delivered-evidence allowlist per run/attempt;
-- immutable answer revisions;
-- note revisions + optimistic concurrency;
-- evidence-insufficient behavior;
-- human grounding sample evaluation;
-- no claim that unchecked semantics are fact-verified.
+Mature-product evaluation established that generic local RAG is viable, while not establishing the canonical Knowledge identity/lifecycle contracts Pi needs to own.
 
-Exit: complete E2E passes, including source update/reindex while old note citations remain resolvable.
+Current phase status: **PASS for the P2 decision gate**.
 
-## P4 — Product validation/release gate
+Exit achieved:
 
-Validate real daily tasks against the direct-file baseline:
+- P2-T10 direct-file baseline PASS;
+- P2-T11 decision-sufficient mature-product evidence PASS;
+- P2-T12 PASS;
+- ADR-029 Accepted.
 
-- correct-version evidence discovery;
-- verification time;
-- reduced repeated lookup/copy-paste;
-- note reuse/reopen rate;
-- understandable source-version and insufficient-evidence UX.
+ADR-029 decision principle:
 
-Release requires:
+> **Pi owns the knowledge truth and long-lived lineage. Files, parsers, indexes, models and external RAG systems are replaceable inputs, projections or adapters.**
 
-- no known P0/P1 failure path in supported scope;
-- citation/scope/history recovery regression suite passing;
-- performance/data-quality report on the reference machine;
-- backup/restore and migration procedure tested;
-- installation/update/upstream-sync process documented;
-- observable value over simply handing files to Pi.
+---
 
-## P5 — V1.1 Course
+## P3 — Production Knowledge Closure + Grounded Generation + first Derived Resource
 
-Only after V1 knowledge usage is validated:
+P3 implements the accepted ADR instead of reopening it.
+
+### P3-T00 — Planning Rebaseline
+
+Docs-only transition task that aligns the development plan and phase gates with ADR-029.
+
+### P3-T01 — Regression gate / exit
+
+TypeScript is green and 77 inherited ESLint findings remain. Historical lint is maintenance debt, not a zero target. P3-T01 exits when touched/P3-critical lint, focused tests, typecheck and build provide a trustworthy Product Slice regression signal without disabling rules or mutating frozen P2 evidence.
+
+### Slice A — Reliable Knowledge through production lifecycle
+
+Build and verify these Product Slices in order:
 
 ```text
-Learning Goal
-→ editable OutlineRevision
-→ user confirmation
-→ generate one chapter
-→ citation checks
-→ candidate revision
-→ Accept / Discard / Compare
+Reliable Knowledge
+→ Grounded Ask Backend
+→ Grounded Ask UI
+→ PRODUCT PREVIEW
+→ Lifecycle Safety
+→ Production E2E / Backup Restore
+→ SLICE A PASS
 ```
 
-Coverage is an aid showing included / uncovered / unsupported material. It does not certify course completeness.
+Required contracts include captured-vs-published Source state, immutable SourceVersion/ParsedArtifact identity, consistent retrieval snapshot publication, frozen GenerationRun scope, DeliveredEvidence, durable Answer/CitationRef, historical citation reopening, business-commit fencing, `archive != purge`, canonical retention independent of index GC, crash/retry consistency, backup/restore and host-authoritative Workspace/worktree coverage.
 
-Do not add a Course microservice, graph database, workflow DSL, or multi-agent orchestration framework unless later evidence establishes a concrete need.
+### Quiz — First Derived Resource
+
+After Slice A PASS:
+
+```text
+Quiz Generate
+→ Quiz Lifecycle
+→ Quiz E2E
+→ P3 PASS
+```
+
+Quiz uses `DerivedArtifact` with immutable `ArtifactRevision`, `pinned | follow-current` dependency policy and `current | needs-review` freshness. It must preserve candidate/accept/edit history, reject stale overwrites, retain canonical Evidence/SourceVersion lineage and generator provenance, and reopen the same accepted revision/citations after restart.
+
+P3 PASS does not require every future Studio resource. It requires the supported Reliable Knowledge/Grounded Ask lifecycle and first Quiz resource to pass their integrated milestone gates.
+
+---
+
+## P4 — Product hardening / release gate
+
+Goal: make the supported P3 product loop dependable for daily personal use and prove value over direct-file Pi usage.
+
+Required themes:
+
+- explicit operational error UX;
+- installation/service lifecycle/update procedure;
+- observability without credential/source-body leakage;
+- representative performance/resource measurements;
+- failure injection;
+- schema migration rehearsal;
+- backup/restore rehearsal;
+- upstream PI WEB sync rehearsal;
+- user-value comparison against direct-file Pi;
+- closure of mandatory P0/P1 verification debt for release scope.
+
+Release requires no known correctness failure in supported scope and must not claim production readiness while mandatory acceptance debt remains unresolved. Inherited static/lint findings remain maintenance debt unless they mask release regressions, block required gates or represent correctness defects.
+
+---
+
+## P5 — Broader Derived Resources
+
+Only after P3/P4 prove the core Knowledge model useful and reliable.
+
+Candidate expansion:
+
+```text
+Quiz / Interview
+→ Flashcards
+→ Study Guide
+→ Summary / Report
+→ Learning/Course resources
+→ later Mind Map / Slides if justified
+```
+
+All resource types should reuse Pi-owned canonical SourceVersion/Evidence/ArtifactRevision lineage and replaceable parser/retrieval/model adapters.
+
+Do not add a graph database, generic workflow DSL, multi-agent orchestration framework, dedicated resource microservice or Qdrant dependency without concrete evidence establishing a need.

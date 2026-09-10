@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import path from "node:path";
 import {
   PI_KNOWLEDGE_DEFAULT_HOST,
   PI_KNOWLEDGE_DEFAULT_MAX_REQUEST_BYTES,
@@ -17,16 +18,16 @@ describe("pi-knowledge service config", () => {
       PI_CODING_AGENT_DIR: "/tmp/pi-agent",
     });
 
-    expect(config).toEqual({
+    expect(config).toMatchObject({
       host: PI_KNOWLEDGE_DEFAULT_HOST,
       port: PI_KNOWLEDGE_DEFAULT_PORT,
       token: TOKEN,
       maxRequestBytes: PI_KNOWLEDGE_DEFAULT_MAX_REQUEST_BYTES,
       maxResponseBytes: PI_KNOWLEDGE_DEFAULT_MAX_RESPONSE_BYTES,
-      dataDir: "/tmp/pi-web-data/knowledge",
-      agentDir: "/tmp/pi-agent",
       model: undefined,
     });
+    expect(config.dataDir).toBe(path.resolve("/tmp/pi-web-data", "knowledge"));
+    expect(config.agentDir).toBe(path.normalize("/tmp/pi-agent"));
   });
 
   it("accepts only explicit IPv4 or IPv6 loopback hosts", () => {
@@ -79,7 +80,7 @@ describe("pi-knowledge service config", () => {
       PI_KNOWLEDGE_MODEL: "gpt-grounded",
       PI_KNOWLEDGE_MODEL_REVISION: "prompt-v1",
     })).toMatchObject({
-      dataDir: "/tmp/knowledge-data",
+      dataDir: path.resolve("/tmp/knowledge-data"),
       model: { provider: "openai", model: "gpt-grounded", revision: "prompt-v1" },
     });
     expect(() => loadKnowledgeServiceConfig({

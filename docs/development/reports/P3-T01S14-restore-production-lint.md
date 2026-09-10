@@ -1,6 +1,6 @@
 # P3-T01S14 — Restore Production Lint Baseline
 
-Status: **PARTIAL — CI PENDING**
+Status: **PASS**
 
 Date: 2026-09-10
 
@@ -26,7 +26,7 @@ Inherited findings targeted from the 201-checkpoint lint output: **15**.
 
 ## Preserved contracts
 
-This task must preserve:
+This task preserves:
 
 - manifest checksum verification before restore publication;
 - exact backup format/schema gating;
@@ -37,9 +37,29 @@ This task must preserve:
 - temp-directory cleanup and atomic final rename;
 - no silent fallback to incomplete SQLite-only success.
 
-## Expected verification
+## Verification evidence
 
-S14 is stacked on S13. If S13 reaches its expected 191 baseline, S14 should reduce the repository baseline by the 15 task-owned findings to approximately **176** while keeping `npm run typecheck` green. The exact endpoint is determined by CI.
+Initial GitHub CI run `34438211673` confirmed:
+
+```text
+npm run typecheck → PASS
+ESLint 191 → 178
+```
+
+That removed 13 of the 15 task-owned findings. Two closure-comparison lint findings remained and were corrected without changing the `undefined => mismatch` behavior.
+
+A first follow-up run `34438491863` still reported 178 because TypeScript control-flow narrowing made two later optional chains unnecessary. The closure condition was then expressed with one optional-chain guard followed by directly narrowed properties.
+
+Final GitHub CI run `34438673519` confirmed:
+
+```text
+npm run typecheck → PASS
+ESLint 191 → 176
+```
+
+All 15 S14-owned findings are closed. The workflow remains red only because 176 inherited repository-wide ESLint findings remain and lint stops `npm run verify` before later knip/test/build steps.
+
+P2 FTS Evidence run `34438673523` and P2 Lexical Evidence run `34438673512` both succeeded on the final head. No frozen evidence was changed.
 
 ## Scope exclusions
 

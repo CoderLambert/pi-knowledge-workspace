@@ -136,13 +136,13 @@ export class DurableJobWorker {
 
   private claimNext(): JobLease | null {
     const now = this.now().toISOString();
-    const rows = this.db.prepare(
+    const rows: unknown[] = this.db.prepare(
       `SELECT id FROM jobs
        WHERE status='queued' AND cancel_requested=0
          AND (deadline_at IS NULL OR deadline_at>?)
        ORDER BY created_at ASC, id ASC
        LIMIT ?`,
-    ).all(now, this.candidateLimit) as unknown[];
+    ).all(now, this.candidateLimit);
 
     for (const row of rows) {
       const jobId = rowId(row);
@@ -158,12 +158,12 @@ export class DurableJobWorker {
 
   private recoverExpiredLeases(): number {
     const now = this.now().toISOString();
-    const rows = this.db.prepare(
+    const rows: unknown[] = this.db.prepare(
       `SELECT id, fencing_token FROM jobs
        WHERE status='running' AND lease_expires_at IS NOT NULL AND lease_expires_at<?
        ORDER BY lease_expires_at ASC, id ASC
        LIMIT ?`,
-    ).all(now, this.recoveryLimit) as unknown[];
+    ).all(now, this.recoveryLimit);
 
     let recovered = 0;
     for (const row of rows) {
@@ -207,7 +207,7 @@ function rowId(row: unknown): string {
 
 function requireRecord(value: unknown, name: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`${name} is invalid`);
-  return value as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(value));
 }
 
 function requireString(row: Record<string, unknown>, key: string): string {

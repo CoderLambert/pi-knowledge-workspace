@@ -18,8 +18,8 @@ export interface DurableJob {
   fencingToken: number;
   deadlineAt: string | null;
   cancelRequested: boolean;
-  result: unknown | null;
-  error: unknown | null;
+  result: unknown;
+  error: unknown;
   createdAt: string;
   updatedAt: string;
 }
@@ -67,12 +67,12 @@ export class DurableJobStore {
     const payloadJson = json(input.payload, "payload", 256 * 1024);
     const deadlineAt = input.deadlineAt === undefined ? null : timestamp(input.deadlineAt, "deadlineAt");
     const existing = this.find(workspaceId, kind, key);
-    if (existing) return existing;
+    if (existing !== null) return existing;
 
     try {
       return withTransaction(this.db, () => {
         const raced = this.find(workspaceId, kind, key);
-        if (raced) return raced;
+        if (raced !== null) return raced;
         const now = this.now().toISOString();
         const id = this.createId();
         this.db.prepare(
@@ -86,7 +86,7 @@ export class DurableJobStore {
       });
     } catch (error) {
       const raced = this.find(workspaceId, kind, key);
-      if (raced) return raced;
+      if (raced !== null) return raced;
       throw error;
     }
   }
@@ -94,7 +94,7 @@ export class DurableJobStore {
   get(jobId: string): DurableJob {
     const id = nonEmpty(jobId, "jobId");
     const row = this.db.prepare(`${JOB_SELECT} WHERE id = ?`).get(id);
-    if (!row) throw new Error(`Unknown durable job: ${id}`);
+    if (row === undefined) throw new Error(`Unknown durable job: ${id}`);
     return mapJob(row);
   }
 
@@ -244,7 +244,7 @@ export class DurableJobStore {
 
   private find(workspaceId: string, kind: string, key: string): DurableJob | null {
     const row = this.db.prepare(`${JOB_SELECT} WHERE knowledge_workspace_id=? AND kind=? AND idempotency_key=?`).get(workspaceId, kind, key);
-    return row ? mapJob(row) : null;
+    return row === undefined ? null : mapJob(row);
   }
 }
 
@@ -253,26 +253,35 @@ const JOB_SELECT = `SELECT id, knowledge_workspace_id, kind, status, payload_jso
  cancel_requested, result_json, error_json, created_at, updated_at FROM jobs`;
 
 function mapJob(row: unknown): DurableJob {
-  const r = row as Record<string, unknown>;
+  const r = recordValue(row, "durable job row");
   return {
     id: dbString(r, "id"), knowledgeWorkspaceId: dbString(r, "knowledge_workspace_id"), kind: dbString(r, "kind"),
-    status: jobStatus(r["status"]), payload: parsed(r, "payload_json", false), idempotencyKey: nullableString(r, "idempotency_key"),
+    status: jobStatus(r["status"]), payload: parsedRequired(r, "payload_json"), idempotencyKey: nullableString(r, "idempotency_key"),
     attempt: nonNegative(r, "attempt"), leaseOwner: nullableString(r, "lease_owner"), leaseExpiresAt: nullableString(r, "lease_expires_at"),
     heartbeatAt: nullableString(r, "heartbeat_at"), fencingToken: nonNegative(r, "fencing_token"), deadlineAt: nullableString(r, "deadline_at"),
-    cancelRequested: dbBoolean(r, "cancel_requested"), result: parsed(r, "result_json", true), error: parsed(r, "error_json", true),
+    cancelRequested: dbBoolean(r, "cancel_requested"), result: parsedNullable(r, "result_json"), error: parsedNullable(r, "error_json"),
     createdAt: dbString(r, "created_at"), updatedAt: dbString(r, "updated_at"),
   };
 }
 
-function parsed(row: Record<string, unknown>, key: string, nullable: boolean): unknown | null {
+function parsedRequired(row: Record<string, unknown>, key: string): unknown {
   const value = row[key];
-  if (nullable && value === null) return null;
   if (typeof value !== "string") throw new Error(`${key} must contain JSON text`);
-  return JSON.parse(value) as unknown;
+  const parsedValue: unknown = JSON.parse(value);
+  return parsedValue;
+}
+function parsedNullable(row: Record<string, unknown>, key: string): unknown {
+  const value = row[key];
+  if (value === null) return null;
+  if (typeof value !== "string") throw new Error(`${key} must contain JSON text`);
+  const parsedValue: unknown = JSON.parse(value);
+  return parsedValue;
 }
 function json(value: unknown, label: string, max: number): string {
+  if (value === undefined || typeof value === "function" || typeof value === "symbol") {
+    throw new TypeError(`${label} must be JSON-serializable`);
+  }
   const text = JSON.stringify(value);
-  if (text === undefined) throw new TypeError(`${label} must be JSON-serializable`);
   if (Buffer.byteLength(text, "utf8") > max) throw new RangeError(`${label} exceeds ${String(max)} bytes`);
   return text;
 }
@@ -299,8 +308,12 @@ function jobStatus(value: unknown): DurableJobStatus {
   if (value === "queued" || value === "running" || value === "succeeded" || value === "failed" || value === "cancelled") return value;
   throw new Error("job status is invalid");
 }
-function nonEmpty(value: string, name: string): string { const v = value.trim(); if (!v) throw new TypeError(`${name} must be non-empty`); return v; }
-function dbString(row: Record<string, unknown>, key: string): string { const v = row[key]; if (typeof v !== "string" || !v) throw new Error(`${key} is invalid`); return v; }
-function nullableString(row: Record<string, unknown>, key: string): string | null { const v = row[key]; if (v === null) return null; if (typeof v !== "string" || !v) throw new Error(`${key} is invalid`); return v; }
+function nonEmpty(value: string, name: string): string { const v = value.trim(); if (v.length === 0) throw new TypeError(`${name} must be non-empty`); return v; }
+function dbString(row: Record<string, unknown>, key: string): string { const v = row[key]; if (typeof v !== "string" || v.length === 0) throw new Error(`${key} is invalid`); return v; }
+function nullableString(row: Record<string, unknown>, key: string): string | null { const v = row[key]; if (v === null) return null; if (typeof v !== "string" || v.length === 0) throw new Error(`${key} is invalid`); return v; }
 function nonNegative(row: Record<string, unknown>, key: string): number { const v = row[key]; if (typeof v !== "number" || !Number.isSafeInteger(v) || v < 0) throw new Error(`${key} is invalid`); return v; }
 function dbBoolean(row: Record<string, unknown>, key: string): boolean { const v = row[key]; if (v === 0) return false; if (v === 1) return true; throw new Error(`${key} is invalid`); }
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`${label} is invalid`);
+  return Object.fromEntries(Object.entries(value));
+}

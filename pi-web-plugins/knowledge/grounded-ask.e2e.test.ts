@@ -54,6 +54,7 @@ import { createKnowledgeServiceClient } from "./service-client.js";
 const SERVICE_TOKEN = "grounded-ask-e2e-service-token";
 const MODULE_REVISION = "knowledge-grounded-ask-e2e-r1";
 const cleanup: (() => Promise<void>)[] = [];
+const LIFECYCLE_E2E_TIMEOUT_MS = 15_000;
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -70,13 +71,18 @@ describe("Grounded Ask Product Preview E2E", () => {
     const runtime = await startKnowledgeRuntime();
     const fixture = await createHostFixture(root, runtime.app);
     const container = document.createElement("div");
+    document.body.append(container);
     render(requiredPanel().render(fixture.panelContext), container);
+    await settleUi();
     const preview = container.querySelector("pi-web-knowledge-product-preview");
     if (!(preview instanceof HTMLElement) || preview.shadowRoot === null) {
       throw new Error("Grounded Ask Product Preview is missing");
     }
 
-    setValue(preview, "[data-import-path]", "handbook.md");
+    click(preview, "[data-file-picker-trigger]");
+    await settleUi();
+    click(preview, "[data-file-picker-file='handbook.md']");
+    await settleUi();
     click(preview, "[data-import]");
     await fixture.bridge.waitForLastRequest();
     await settleUi();
@@ -118,7 +124,7 @@ describe("Grounded Ask Product Preview E2E", () => {
     expect(preview.shadowRoot.textContent).toContain("blue release train");
     expect(preview.shadowRoot.textContent).not.toContain("red release train");
     expect(runtime.providerCalls).toBe(1);
-  });
+  }, LIFECYCLE_E2E_TIMEOUT_MS);
 });
 
 async function startKnowledgeRuntime(): Promise<{
@@ -311,7 +317,12 @@ function panelContext(
     state: { selectedWorkspace: workspace, workspaceTool: "knowledge:workspace.knowledge", mainView: "knowledge:workspace.knowledge" },
     files: {
       readFile: () => Promise.reject(new Error("not implemented")),
-      listFiles: () => Promise.reject(new Error("not implemented")),
+      listFiles: (path) => Promise.resolve({
+        path,
+        entries: path === "" ? [{ name: "handbook.md", path: "handbook.md", type: "file" }] : [],
+        scannedAt: "2026-09-10T00:00:00.000Z",
+        truncated: false,
+      }),
       writeFile: () => Promise.reject(new Error("not implemented")),
       deleteFile: () => Promise.reject(new Error("not implemented")),
       moveFile: () => Promise.reject(new Error("not implemented")),

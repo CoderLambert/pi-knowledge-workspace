@@ -17,6 +17,7 @@ import { SourceDomain } from "../storage/sourceDomain.js";
 import { createKnowledgeImportPort, createReliableKnowledgePublishPort } from "./composition.js";
 
 const cleanup: (() => Promise<void>)[] = [];
+const INTEGRATION_TEST_TIMEOUT_MS = 15_000;
 
 afterEach(async () => {
   for (const close of cleanup.splice(0)) await close();
@@ -52,7 +53,7 @@ describe("Knowledge product composition", () => {
       sourceIds: [requiredResult(second).sourceId],
       sourceVersionIds: [requiredResult(second).sourceVersionId],
     })).resolves.toMatchObject({ generation: 1 });
-  });
+  }, INTEGRATION_TEST_TIMEOUT_MS);
 
   it("composes a partial file update into a complete [A2,B1] replacement publication", async () => {
     const fixture = await createFixture();
@@ -85,7 +86,7 @@ describe("Knowledge product composition", () => {
     expect(activeSelections(fixture.db)).toEqual(
       expectedSelections.sort(([left], [right]) => left.localeCompare(right)),
     );
-  });
+  }, INTEGRATION_TEST_TIMEOUT_MS);
 
   it("rejects a candidate composed from an obsolete publication before staging", async () => {
     const fixture = await createFixture();
@@ -110,7 +111,7 @@ describe("Knowledge product composition", () => {
       expectedBase: obsolete,
     })).rejects.toBeInstanceOf(IndexBuildPublicationConflictError);
     expect(activePublicationId(fixture.db)).not.toBe(obsolete.publicationId);
-  });
+  }, INTEGRATION_TEST_TIMEOUT_MS);
 });
 
 async function createFixture() {

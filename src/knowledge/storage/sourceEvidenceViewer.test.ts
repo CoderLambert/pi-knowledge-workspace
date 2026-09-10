@@ -18,8 +18,8 @@ function fakeDatabase(rows: {
   evidence: Record<string, unknown>[];
 }): KnowledgeDatabase {
   return {
-    exec() {},
-    close() {},
+    exec() { return; },
+    close() { return; },
     pragma() { return undefined; },
     prepare(sql: string): SqliteStatement {
       return {
@@ -97,7 +97,9 @@ function fixture() {
   const oldBytes = encoder.encode(oldText);
   const newBytes = encoder.encode(newText);
   const quote = "Historical evidence";
-  const quoteStart = oldBytes.indexOf(encoder.encode(quote)[0]!);
+  const firstQuoteByte = encoder.encode(quote)[0];
+  if (firstQuoteByte === undefined) throw new Error("Expected a non-empty Evidence quote fixture");
+  const quoteStart = oldBytes.indexOf(firstQuoteByte);
   const quoteEnd = quoteStart + encoder.encode(quote).byteLength;
 
   const rows = {
@@ -146,7 +148,7 @@ function fixture() {
   const store: ParsedArtifactReadStore = {
     read(workspaceId, artifactId) {
       const artifact = artifacts.get(artifactId);
-      if (artifact === undefined || artifact.knowledgeWorkspaceId !== workspaceId) throw new Error("missing artifact");
+      if (artifact?.knowledgeWorkspaceId !== workspaceId) throw new Error("missing artifact");
       return artifact;
     },
   };

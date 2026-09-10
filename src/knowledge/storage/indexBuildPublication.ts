@@ -106,25 +106,29 @@ export class IndexBuildPublisher {
               base_active_build_id, created_at, validated_at, published_at
        FROM index_builds WHERE id=?`,
     ).get(id);
-    if (!row) throw new Error(`Unknown IndexBuild: ${id}`);
+    if (row === undefined) throw new Error(`Unknown IndexBuild: ${id}`);
     return mapBuild(row);
   }
 }
 
 function workspaceState(db: KnowledgeDatabase, workspaceId: string): { generation: number; activeBuildId: string | null } {
-  const row = db.prepare(
+  const raw = db.prepare(
     `SELECT index_generation, active_index_build_id FROM knowledge_workspaces WHERE id=?`,
-  ).get(workspaceId) as Record<string, unknown> | undefined;
-  if (!row) throw new Error(`Unknown Knowledge Workspace: ${workspaceId}`);
+  ).get(workspaceId);
+  if (raw === undefined) throw new Error(`Unknown Knowledge Workspace: ${workspaceId}`);
+  const row = recordValue(raw, "Knowledge Workspace index state");
   const generation = row["index_generation"];
-  if (typeof generation !== "number" || !Number.isSafeInteger(generation) || generation < 0) throw new Error("Workspace index generation is invalid");
+  if (typeof generation !== "number" || !Number.isSafeInteger(generation) || generation < 0) {
+    throw new Error("Workspace index generation is invalid");
+  }
   const active = row["active_index_build_id"];
-  if (active !== null && (typeof active !== "string" || active.length === 0)) throw new Error("Workspace active IndexBuild is invalid");
-  return { generation, activeBuildId: active as string | null };
+  if (active === null) return { generation, activeBuildId: null };
+  if (typeof active !== "string" || active.length === 0) throw new Error("Workspace active IndexBuild is invalid");
+  return { generation, activeBuildId: active };
 }
 
 function mapBuild(row: unknown): IndexBuildRecord {
-  const r = row as Record<string, unknown>;
+  const r = recordValue(row, "IndexBuild row");
   return {
     id: str(r, "id"),
     knowledgeWorkspaceId: str(r, "knowledge_workspace_id"),
@@ -140,7 +144,7 @@ function mapBuild(row: unknown): IndexBuildRecord {
 
 function nonEmpty(value: string, name: string): string {
   const normalized = value.trim();
-  if (!normalized) throw new TypeError(`${name} must be non-empty`);
+  if (normalized.length === 0) throw new TypeError(`${name} must be non-empty`);
   return normalized;
 }
 function one(changes: number | bigint, message: string): void {
@@ -148,17 +152,23 @@ function one(changes: number | bigint, message: string): void {
 }
 function str(row: Record<string, unknown>, key: string): string {
   const value = row[key];
-  if (typeof value !== "string" || !value) throw new Error(`${key} is invalid`);
+  if (typeof value !== "string" || value.length === 0) throw new Error(`${key} is invalid`);
   return value;
 }
 function nullable(row: Record<string, unknown>, key: string): string | null {
   const value = row[key];
   if (value === null) return null;
-  if (typeof value !== "string" || !value) throw new Error(`${key} is invalid`);
+  if (typeof value !== "string" || value.length === 0) throw new Error(`${key} is invalid`);
   return value;
 }
 function integer(row: Record<string, unknown>, key: string): number {
   const value = row[key];
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) throw new Error(`${key} is invalid`);
   return value;
+}
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`${label} must be an object record`);
+  }
+  return Object.fromEntries(Object.entries(value));
 }

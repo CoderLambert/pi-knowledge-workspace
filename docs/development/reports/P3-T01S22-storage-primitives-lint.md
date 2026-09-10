@@ -23,8 +23,8 @@ Support documentation:
 The parent CI reports 12 inherited findings in these four files:
 
 ```text
-utf8Range.ts          6
-blobStore.ts          2
+utf8Range.ts           6
+blobStore.ts           2
 workspaceFileReader.ts 2
 workspaceIdentity.ts   2
 ```
@@ -54,7 +54,8 @@ Expected repository lint endpoint if all task-owned findings close cleanly:
 ### Workspace identity
 
 - replace SQLite row type assertions with explicit structural row guards;
-- malformed installation/workspace rows now fail closed with an explicit error rather than being trusted through a compile-time assertion.
+- malformed installation/workspace rows now fail closed with an explicit error rather than being trusted through a compile-time assertion;
+- use bracket access inside `Record<string, unknown>` guards so `noPropertyAccessFromIndexSignature` remains satisfied without weakening the runtime guard.
 
 ## Contract preservation
 
@@ -69,7 +70,11 @@ No schema, migration, ADR, retrieval profile, P2 evaluation data/evidence, bench
 
 ## Verification state
 
-Status remains **PARTIAL** until GitHub CI establishes:
+Initial GitHub CI run `34455969455` failed before lint in `npm run typecheck` with four S22-owned `TS4111` findings in the new `workspaceIdentity.ts` structural guards. The guards narrowed through `Record<string, unknown>`, so the repository's `noPropertyAccessFromIndexSignature` setting requires `value["id"]` / `value["external_binding"]` access. This is a task-owned implementation defect, not inherited baseline debt.
+
+Commit `d9944050229bd3368aaf108e555db531e4c75f54` fixes only those four accesses. The initial run's P2 FTS Evidence `34455969441` and P2 Lexical Evidence `34455969464` both passed.
+
+Status remains **PARTIAL** until follow-up GitHub CI establishes:
 
 ```text
 npm run typecheck → PASS

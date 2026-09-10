@@ -38,8 +38,8 @@ class ImportDatabase implements KnowledgeDatabase {
   readonly jobs: JobRow[] = [];
   readonly attempts: AttemptRow[] = [];
   readonly workspaces = new Map<string, string>();
-  exec(): void {}
-  close(): void {}
+  exec(): void { /* no-op test double */ }
+  close(): void { /* no-op test double */ }
   pragma(): unknown { return undefined; }
 
   prepare(sql: string): SqliteStatement {
@@ -135,7 +135,7 @@ class ImportDatabase implements KnowledgeDatabase {
     }
     if (sql.includes("SELECT canonical_realpath FROM knowledge_workspaces")) {
       const root = this.workspaces.get(String(p[0]));
-      return root ? { canonical_realpath: root } : undefined;
+      return root !== undefined ? { canonical_realpath: root } : undefined;
     }
     throw new Error(`unexpected get SQL: ${sql}`);
   }
@@ -155,18 +155,18 @@ class SourceStub implements ImportSourceDomain {
   failCaptures = 0;
 
   createSource(input: { knowledgeWorkspaceId: string; kind: string; displayName: string }): KnowledgeSource {
-    const source: KnowledgeSource = { id: `source-${this.sources.length + 1}`, knowledgeWorkspaceId: input.knowledgeWorkspaceId, kind: input.kind, displayName: input.displayName, archivedAt: null, createdAt: "2026-09-09T00:00:00.000Z" };
+    const source: KnowledgeSource = { id: `source-${String(this.sources.length + 1)}`, knowledgeWorkspaceId: input.knowledgeWorkspaceId, kind: input.kind, displayName: input.displayName, archivedAt: null, createdAt: "2026-09-09T00:00:00.000Z" };
     this.sources.push(source); return source;
   }
 
-  async captureSourceVersion(sourceId: string, rawBytes: Uint8Array): Promise<KnowledgeSourceVersion> {
-    if (this.failCaptures-- > 0) throw new Error("injected persistence failure");
+  captureSourceVersion(sourceId: string, rawBytes: Uint8Array): Promise<KnowledgeSourceVersion> {
+    if (this.failCaptures-- > 0) return Promise.reject(new Error("injected persistence failure"));
     const bytes = Buffer.from(rawBytes); this.captured.push(bytes);
     const hash = createHash("sha256").update(bytes).digest("hex");
     const existing = this.versions.find((v) => v.sourceId === sourceId && v.contentSha256 === hash);
-    if (existing) return existing;
-    const version: KnowledgeSourceVersion = { id: `version-${this.versions.length + 1}`, sourceId, contentSha256: hash, blobKey: hash, byteLength: bytes.byteLength, createdAt: "2026-09-09T00:00:00.000Z" };
-    this.versions.push(version); return version;
+    if (existing !== undefined) return Promise.resolve(existing);
+    const version: KnowledgeSourceVersion = { id: `version-${String(this.versions.length + 1)}`, sourceId, contentSha256: hash, blobKey: hash, byteLength: bytes.byteLength, createdAt: "2026-09-09T00:00:00.000Z" };
+    this.versions.push(version); return Promise.resolve(version);
   }
 }
 
@@ -180,7 +180,7 @@ async function fixture(options: ConstructorParameters<typeof MdTextImportJobs>[2
   const root = await mkdtemp(path.join(os.tmpdir(), "pi-knowledge-import-job-")); roots.push(root);
   const db = new ImportDatabase(); db.workspaces.set("workspace-1", root);
   const sources = new SourceStub(); let id = 0;
-  const jobs = new MdTextImportJobs(db, sources, { createId: () => `id-${++id}`, now: () => new Date(`2026-09-09T00:00:${String(id).padStart(2, "0")}.000Z`), ...options });
+  const jobs = new MdTextImportJobs(db, sources, { createId: () => `id-${String(++id)}`, now: () => new Date(`2026-09-09T00:00:${String(id).padStart(2, "0")}.000Z`), ...options });
   return { root, db, sources, jobs };
 }
 
@@ -214,28 +214,33 @@ describe("MdTextImportJobs", () => {
   });
 
   it("cancels a queued job without reading or persisting bytes", async () => {
-    let captures = 0; const { jobs, sources } = await fixture({ captureFile: async () => { captures += 1; throw new Error("should not run"); } });
+    let captures = 0; const { jobs, sources } = await fixture({ captureFile: () => { captures += 1; return Promise.reject(new Error("should not run")); } });
     const job = jobs.submit({ knowledgeWorkspaceId: "workspace-1", relativePath: "cancel.md", idempotencyKey: "cancel" });
     expect(jobs.requestCancel(job.id).status).toBe("cancelled");
     expect((await jobs.run(job.id)).status).toBe("cancelled"); expect(captures).toBe(0); expect(sources.versions).toHaveLength(0);
   });
 
   it("observes in-flight cancellation after safe capture and before SourceVersion persistence", async () => {
-    const bytes = Buffer.from("captured but cancelled"); let jobs!: MdTextImportJobs; let submittedId = "";
-    const fx = await fixture({ captureFile: async (_root, relativePath) => {
-      jobs.requestCancel(submittedId);
-      return { relativePath, canonicalPath: `/fake/${relativePath}`, bytes, byteLength: bytes.byteLength, contentSha256: createHash("sha256").update(bytes).digest("hex") };
+    const bytes = Buffer.from("captured but cancelled");
+    let activeJobs: MdTextImportJobs | undefined;
+    let submittedId = "";
+    const fx = await fixture({ captureFile: (_root, relativePath) => {
+      if (activeJobs === undefined) throw new Error("import jobs fixture not initialized");
+      activeJobs.requestCancel(submittedId);
+      return Promise.resolve({ relativePath, canonicalPath: `/fake/${relativePath}`, bytes, byteLength: bytes.byteLength, contentSha256: createHash("sha256").update(bytes).digest("hex") });
     }});
-    jobs = fx.jobs;
-    const submitted = jobs.submit({ knowledgeWorkspaceId: "workspace-1", relativePath: "cancel.txt", idempotencyKey: "cancel-running" }); submittedId = submitted.id;
-    const done = await jobs.run(submitted.id);
+    activeJobs = fx.jobs;
+    const submitted = fx.jobs.submit({ knowledgeWorkspaceId: "workspace-1", relativePath: "cancel.txt", idempotencyKey: "cancel-running" }); submittedId = submitted.id;
+    const done = await fx.jobs.run(submitted.id);
     expect(done.status).toBe("cancelled"); expect(fx.sources.versions).toHaveLength(0); expect(fx.db.attempts[0]?.status).toBe("cancelled");
   });
 
   it("recovers interrupted running imports to queued state for restart-safe replay", async () => {
     const { jobs, db } = await fixture();
     const job = jobs.submit({ knowledgeWorkspaceId: "workspace-1", relativePath: "restart.md", idempotencyKey: "restart" });
-    const row = db.jobs.find((j) => j.id === job.id)!; row.status = "running";
+    const row = db.jobs.find((candidate) => candidate.id === job.id);
+    if (row === undefined) throw new Error("submitted import job fixture is missing");
+    row.status = "running";
     db.attempts.push({ id: "attempt-crashed", job_id: job.id, attempt: 1, status: "running", started_at: "2026-09-09T00:00:00.000Z", finished_at: null, error_json: null });
     expect(jobs.recoverInterrupted()).toBe(1); expect(jobs.get(job.id).status).toBe("queued"); expect(db.attempts[0]?.status).toBe("failed");
   });

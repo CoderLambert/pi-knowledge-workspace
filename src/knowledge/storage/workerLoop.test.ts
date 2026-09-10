@@ -58,10 +58,6 @@ class FakeStore extends DurableJobStore {
   claimFailuresRemaining = 0;
   completionFailure: Error | undefined;
 
-  constructor(db: KnowledgeDatabase) {
-    super(db);
-  }
-
   override get(): DurableJob { return this.current; }
   override claim(jobId: string, workerId: string): JobLease {
     if (this.claimFailuresRemaining > 0) {

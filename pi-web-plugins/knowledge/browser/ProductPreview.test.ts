@@ -152,16 +152,19 @@ describe("Knowledge product preview", () => {
     expect(listFiles.mock.calls.every(([, options]) => options?.signal instanceof AbortSignal)).toBe(true);
   });
 
-  it("preserves question value, DOM identity and focus across same-workspace host rerenders", async () => {
+  it("preserves input DOM identity, focus and selection across same-workspace host rerenders", async () => {
     const request = vi.fn(() => Promise.resolve({}));
     const element = await mount(context(request, "focus-workspace"));
     const question = element.shadowRoot?.querySelector<HTMLTextAreaElement>("[data-question]");
+    const displayName = element.shadowRoot?.querySelector<HTMLInputElement>("[data-display-name]");
     if (question === null || question === undefined) throw new Error("question input is missing");
+    if (displayName === null || displayName === undefined) throw new Error("display name input is missing");
 
     question.focus();
     question.value = "部署应该怎么做？";
     question.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(element.shadowRoot?.activeElement).toBe(question);
+    question.setSelectionRange(2, 2);
+    question.dispatchEvent(new Event("compositionstart", { bubbles: true }));
 
     element.context = context(request, "focus-workspace");
     await element.updateComplete;
@@ -169,7 +172,25 @@ describe("Knowledge product preview", () => {
     const rerenderedQuestion = element.shadowRoot?.querySelector<HTMLTextAreaElement>("[data-question]");
     expect(rerenderedQuestion).toBe(question);
     expect(rerenderedQuestion?.value).toBe("部署应该怎么做？");
+    expect(rerenderedQuestion?.selectionStart).toBe(2);
+    expect(rerenderedQuestion?.selectionEnd).toBe(2);
     expect(element.shadowRoot?.activeElement).toBe(question);
+    question.dispatchEvent(new Event("compositionend", { bubbles: true }));
+
+    displayName.focus();
+    displayName.value = "deployment-handbook.md";
+    displayName.dispatchEvent(new Event("input", { bubbles: true }));
+    displayName.setSelectionRange(10, 10);
+
+    element.context = context(request, "focus-workspace");
+    await element.updateComplete;
+
+    const rerenderedDisplayName = element.shadowRoot?.querySelector<HTMLInputElement>("[data-display-name]");
+    expect(rerenderedDisplayName).toBe(displayName);
+    expect(rerenderedDisplayName?.value).toBe("deployment-handbook.md");
+    expect(rerenderedDisplayName?.selectionStart).toBe(10);
+    expect(rerenderedDisplayName?.selectionEnd).toBe(10);
+    expect(element.shadowRoot?.activeElement).toBe(displayName);
   });
 
   it("normalizes supported source names without weakening the extension allowlist", () => {

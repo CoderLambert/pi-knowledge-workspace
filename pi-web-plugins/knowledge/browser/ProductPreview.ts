@@ -1,4 +1,5 @@
 import { LitElement, css, html, nothing, type TemplateResult } from "lit";
+import { live } from "lit/directives/live.js";
 import type { FileTreeEntry, JsonValue, WorkspacePanelContext } from "@jmfederico/pi-web/plugin-api";
 
 export const knowledgeProductPreviewTagName = "pi-web-knowledge-product-preview";
@@ -246,7 +247,7 @@ export class KnowledgeProductPreview extends LitElement {
             </button>
           </label>
           <label>Display name <span class="optional">(from filename; editable)</span>
-            <input data-display-name type="text" .value=${state.displayName} placeholder="handbook.md"
+            <input data-display-name type="text" .value=${live(state.displayName)} placeholder="handbook.md"
               @input=${this.onDisplayNameInput}>
           </label>
           <button class="primary" type="button" data-import
@@ -302,7 +303,7 @@ export class KnowledgeProductPreview extends LitElement {
         </div>
         <label>Question
           <textarea data-question rows="3" placeholder="What does the handbook say about deployment?"
-            .value=${state.question} @input=${this.onQuestionInput}></textarea>
+            .value=${live(state.question)} @input=${this.onQuestionInput}></textarea>
         </label>
         <p class="muted">The top matching excerpts from this frozen publication are sent to the server-configured model provider.</p>
         <button class="primary" type="button" data-ask

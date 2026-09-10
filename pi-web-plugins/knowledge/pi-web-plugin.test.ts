@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { html, render, svg } from "lit";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type {
   JsonValue,
   PluginRuntimeContext,
@@ -28,6 +28,10 @@ function activate(runtimePluginId = "knowledge") {
   }).contributions;
 }
 
+afterEach(() => {
+  document.body.replaceChildren();
+});
+
 describe("Knowledge browser plugin", () => {
   it("contributes one Knowledge workspace panel without a core navigation patch", () => {
     const panel = activate().workspacePanels?.[0];
@@ -49,12 +53,14 @@ describe("Knowledge browser plugin", () => {
     expect(selected).toBe(`${runtimePluginId}:workspace.knowledge`);
   });
 
-  it("renders the Product Preview inside the Knowledge panel", () => {
+  it("renders the Product Preview inside the Knowledge panel", async () => {
     const context = panelContext();
     const panel = requiredPanel();
     const container = document.createElement("div");
+    document.body.append(container);
 
     render(panel.render(context), container);
+    await settleBackend();
     const preview = container.querySelector("pi-web-knowledge-product-preview");
     expect(preview).not.toBeNull();
     expect(preview?.shadowRoot?.textContent).toContain("Grounded Ask");
@@ -64,9 +70,11 @@ describe("Knowledge browser plugin", () => {
     const context = panelContext();
     const panel = requiredPanel();
     const container = document.createElement("div");
+    document.body.append(container);
 
     expect(panel.visible).toBeUndefined();
     render(panel.render(context), container);
+    await settleBackend();
     const preview = container.querySelector("pi-web-knowledge-product-preview");
     const filePicker = preview?.shadowRoot?.querySelector<HTMLButtonElement>("[data-file-picker-trigger]");
     const importButton = preview?.shadowRoot?.querySelector<HTMLButtonElement>("[data-import]");
@@ -76,6 +84,7 @@ describe("Knowledge browser plugin", () => {
     const file = preview?.shadowRoot?.querySelector<HTMLButtonElement>("[data-file-picker-file='docs/readme.md']");
     if (file === null || file === undefined) throw new Error("Workspace source file is missing");
     file.click();
+    await settleBackend();
     const selectedImportButton = preview?.shadowRoot?.querySelector<HTMLButtonElement>("[data-import]");
     if (selectedImportButton === null || selectedImportButton === undefined) throw new Error("Product Preview import action is missing");
     selectedImportButton.click();

@@ -1,25 +1,17 @@
 # P3-T01S11 — Backup Test Lint Verification
 
-Status: **PARTIAL — CI evidence pending**
+Status: **PASS**
 
 ## Automated verification
 
-Run on the task branch:
-
-```bash
-npm run typecheck
-npm run lint
-npm test -- src/knowledge/storage/backup.test.ts
-```
-
-Expected static result:
+GitHub CI run `34436345380` on the task head confirmed:
 
 ```text
-typecheck: PASS
+npm run typecheck → PASS
 ESLint inherited baseline: 210 → 205
 ```
 
-Confirm the five prior findings in `src/knowledge/storage/backup.test.ts` are gone:
+The five prior findings in `src/knowledge/storage/backup.test.ts` are gone:
 
 1. empty snapshot-database `exec` method;
 2. `readArtifactBundle` fixture with `async` but no `await`;
@@ -27,9 +19,11 @@ Confirm the five prior findings in `src/knowledge/storage/backup.test.ts` are go
 4. second manifest-entry non-null assertion;
 5. hard-to-count two-space regex literal.
 
+P2 FTS Evidence run `34436345425` and P2 Lexical Evidence run `34436345378` also passed on the same head. The remaining repository-wide lint errors are inherited baseline debt outside this task.
+
 ## Behavioral assertions
 
-The focused test must continue to prove:
+The focused test continues to prove:
 
 - backup publication is based on a consistent SQLite snapshot;
 - referenced SourceVersion blobs and ParsedArtifact bundles are copied and hashed;
@@ -39,4 +33,4 @@ The focused test must continue to prove:
 
 ## User verification
 
-None. This is repository test-harness/static debt and should be verified by CI; do not add user verification debt.
+None. This is repository test-harness/static debt and is covered by CI; no user verification debt is added.

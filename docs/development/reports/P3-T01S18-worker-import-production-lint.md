@@ -1,6 +1,6 @@
 # P3-T01S18 — Worker / Import Production Lint
 
-Status: **PARTIAL — CI EVIDENCE PENDING**
+Status: **PASS**
 
 Date: 2026-09-10
 
@@ -23,7 +23,8 @@ Targeted inherited findings: **26** (8 + 13 + 5).
 - remove redundant `unknown | null` unions while preserving runtime null values;
 - replace worker row type assertions with explicit record validation;
 - make optional display-name/cancellation-attempt handling explicit without changing fallback behavior;
-- preserve existing lease, heartbeat, cancellation, retry and recovery state transitions.
+- preserve existing lease, heartbeat, cancellation, retry and recovery state transitions;
+- reject non-JSON top-level `undefined`/function/symbol values explicitly before serialization, preserving the existing fail-closed JSON contract without relying on a lint-redundant post-`JSON.stringify` check.
 
 ## Preserved contracts
 
@@ -37,14 +38,16 @@ Targeted inherited findings: **26** (8 + 13 + 5).
 - once SourceVersion persistence begins, import continues to finish atomically/idempotently rather than report cancellation after durable persistence;
 - worker handler success is not redefined as P3-A04 business-commit authority.
 
-## Expected verification
+## Verification evidence
+
+GitHub CI run `34441857553` on production code head `2a121385e754bb0f00dd7a11cae7d07d241ee539` confirmed:
 
 ```text
 npm run typecheck → PASS
-ESLint baseline: 126 → expected 100
+ESLint baseline: 126 → 100
 ```
 
-CI determines the authoritative endpoint. Focused durable job/import/worker tests should retain existing behavior when reachable.
+All 26 task-owned findings are closed. The repository-wide CI remains red only because 100 inherited P3-T01 ESLint findings remain outside this slice. P2 FTS Evidence passed on the same production head; P2 Lexical Evidence is tracked independently by its workflow and does not require any frozen-evidence mutation from this task.
 
 ## Scope exclusions
 

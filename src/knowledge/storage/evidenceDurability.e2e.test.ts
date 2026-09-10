@@ -245,8 +245,9 @@ describe("P1-T22 Evidence durability E2E", () => {
     expect(restartedRead.sourceVersionId).toBe(originalVersion.id);
 
     // Backup the consistent SQLite/blob/artifact closure.
+    if (!isBackupCapableDatabase(db)) throw new Error("Knowledge database does not support backup");
     const backup = new KnowledgeBackupCreator(
-      db as KnowledgeDatabase & BackupCapableDatabase,
+      db,
       blobs,
       {
         openSnapshotDatabase: openKnowledgeDatabaseReadOnly,
@@ -362,7 +363,7 @@ function publishIndex(
   canonical: ParsedArtifactCanonical,
   targetBytes: number,
 ): string {
-  const staging = publisher.createStaging(WORKSPACE_ID, `fts5-e2e-${targetBytes}`);
+  const staging = publisher.createStaging(WORKSPACE_ID, `fts5-e2e-${String(targetBytes)}`);
   fts.replaceArtifactChunks({
     knowledgeWorkspaceId: WORKSPACE_ID,
     indexBuildId: staging.id,
@@ -398,8 +399,9 @@ function loadEvidence(db: KnowledgeDatabase, evidenceId: string): StableEvidence
     `SELECT id, knowledge_workspace_id, parsed_artifact_id, start_byte, end_byte,
             exact_quote, quote_hash, locator_snapshot, created_at
      FROM evidence WHERE id=?`,
-  ).get(evidenceId) as Record<string, unknown> | undefined;
-  if (!row) throw new Error(`Missing Evidence: ${evidenceId}`);
+  ).get(evidenceId);
+  if (!isRecord(row)) throw new Error(`Missing or invalid Evidence: ${evidenceId}`);
+  const locatorSnapshot = parseRecordJson(requireString(row, "locator_snapshot"), "Evidence locator_snapshot");
   return {
     id: requireString(row, "id"),
     knowledgeWorkspaceId: requireString(row, "knowledge_workspace_id"),
@@ -408,7 +410,7 @@ function loadEvidence(db: KnowledgeDatabase, evidenceId: string): StableEvidence
     endByte: requireInteger(row, "end_byte"),
     exactQuote: requireString(row, "exact_quote"),
     quoteHash: requireString(row, "quote_hash"),
-    locatorSnapshot: JSON.parse(requireString(row, "locator_snapshot")) as Record<string, unknown>,
+    locatorSnapshot,
     createdAt: requireString(row, "created_at"),
   };
 }
@@ -449,7 +451,7 @@ class FixtureArtifactStore implements ParsedArtifactReadStore, BackupArtifactPro
 
   private readSync(parsedArtifactId: string): ArtifactBundle {
     const raw = readFileSync(this.filename(parsedArtifactId), "utf8");
-    const bundle = JSON.parse(raw) as ArtifactBundle;
+    const bundle = parseArtifactBundle(raw, parsedArtifactId);
     verifyBundle(bundle, parsedArtifactId);
     return bundle;
   }
@@ -465,7 +467,7 @@ class FixtureArtifactSink implements RestoreArtifactSink {
     artifact: BackupManifestArtifact,
     bytes: Uint8Array,
   ): Promise<void> {
-    const bundle = JSON.parse(Buffer.from(bytes).toString("utf8")) as ArtifactBundle;
+    const bundle = parseArtifactBundle(Buffer.from(bytes).toString("utf8"), artifact.parsedArtifactId);
     verifyBundle(bundle, artifact.parsedArtifactId);
     if (
       bundle.sourceVersionId !== artifact.sourceVersionId ||
@@ -485,13 +487,14 @@ class FixtureArtifactSink implements RestoreArtifactSink {
 }
 
 class FixtureEvidenceVerifier implements RestoreEvidenceVerifier {
-  async verifyRestoredEvidence(input: { databasePath: string; dataRoot: string }): Promise<void> {
+  verifyRestoredEvidence(input: { databasePath: string; dataRoot: string }): Promise<void> {
     const db = openKnowledgeDatabaseReadOnly(input.databasePath);
     try {
-      const rows = db.prepare("SELECT id FROM evidence ORDER BY id").all() as Array<{ id: string }>;
+      const rows = db.prepare("SELECT id FROM evidence ORDER BY id").all();
       const artifacts = new FixtureArtifactStore(input.dataRoot);
       for (const row of rows) {
-        const evidence = loadEvidence(db, row.id);
+        if (!isRecord(row)) throw new Error("Invalid restored Evidence row");
+        const evidence = loadEvidence(db, requireString(row, "id"));
         const artifact = artifacts.read(
           evidence.knowledgeWorkspaceId,
           evidence.parsedArtifactId,
@@ -508,6 +511,7 @@ class FixtureEvidenceVerifier implements RestoreEvidenceVerifier {
     } finally {
       db.close();
     }
+    return Promise.resolve();
   }
 }
 
@@ -520,6 +524,52 @@ function verifyBundle(bundle: ArtifactBundle, parsedArtifactId: string): void {
   if (hash !== bundle.canonicalTextSha256) {
     throw new Error(`Fixture ParsedArtifact hash mismatch: ${parsedArtifactId}`);
   }
+}
+
+function parseArtifactBundle(raw: string, parsedArtifactId: string): ArtifactBundle {
+  const value: unknown = JSON.parse(raw);
+  if (!isRecord(value)) throw new Error(`Invalid fixture ParsedArtifact bundle: ${parsedArtifactId}`);
+  const documentStructure = value["documentStructure"];
+  if (!Array.isArray(documentStructure) || !documentStructure.every(isDocumentNode)) {
+    throw new Error(`Invalid fixture ParsedArtifact structure: ${parsedArtifactId}`);
+  }
+  return {
+    knowledgeWorkspaceId: requireString(value, "knowledgeWorkspaceId"),
+    parsedArtifactId: requireString(value, "parsedArtifactId"),
+    sourceVersionId: requireString(value, "sourceVersionId"),
+    parserVersion: requireString(value, "parserVersion"),
+    canonicalTextSha256: requireString(value, "canonicalTextSha256"),
+    canonicalBytesBase64: requireString(value, "canonicalBytesBase64"),
+    documentStructure,
+  };
+}
+
+function isDocumentNode(value: unknown): value is DocumentNode {
+  if (!isRecord(value)) return false;
+  const kind = value["kind"];
+  const startByte = value["startByte"];
+  const endByte = value["endByte"];
+  const level = value["level"];
+  return (
+    (kind === "heading" || kind === "paragraph" || kind === "list-item" || kind === "code-block" || kind === "table-row") &&
+    typeof startByte === "number" && Number.isSafeInteger(startByte) &&
+    typeof endByte === "number" && Number.isSafeInteger(endByte) &&
+    (level === undefined || (typeof level === "number" && Number.isSafeInteger(level)))
+  );
+}
+
+function isBackupCapableDatabase(db: KnowledgeDatabase): db is KnowledgeDatabase & BackupCapableDatabase {
+  return "backup" in db && typeof db.backup === "function";
+}
+
+function parseRecordJson(raw: string, label: string): Record<string, unknown> {
+  const value: unknown = JSON.parse(raw);
+  if (!isRecord(value)) throw new Error(`${label} must be an object`);
+  return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function artifactFilename(parsedArtifactId: string): string {

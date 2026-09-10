@@ -56,11 +56,8 @@ WHERE kw.id=?
   AND ib.status='active'
   AND ib.published_at IS NOT NULL
 LIMIT 1
-`).get(workspaceId) as { id?: unknown } | undefined;
-      const buildId = row?.id;
-      if (typeof buildId !== "string" || buildId.length === 0) {
-        throw new Error(`No active IndexBuild is published for Knowledge Workspace: ${workspaceId}`);
-      }
+`).get(workspaceId);
+      const buildId = rowId(row, "active IndexBuild");
       return this.pin(buildId, type, owner, duration);
     });
 
@@ -86,7 +83,7 @@ LIMIT 1
       ? null
       : new Date(nowDate.getTime() + leaseDuration(leaseMs)).toISOString();
     const existing = this.find(buildId, type, owner);
-    if (existing) return existing;
+    if (existing !== null) return existing;
 
     const id = this.createId();
     try {
@@ -97,11 +94,11 @@ LIMIT 1
          WHERE EXISTS (SELECT 1 FROM index_builds WHERE id=?)`,
       ).run(id, buildId, type, owner, leaseExpiresAt, now, now, buildId);
       const created = this.find(buildId, type, owner);
-      if (!created) throw new Error(`Unknown IndexBuild: ${buildId}`);
+      if (created === null) throw new Error(`Unknown IndexBuild: ${buildId}`);
       return created;
     } catch (error) {
       const raced = this.find(buildId, type, owner);
-      if (raced) return raced;
+      if (raced !== null) return raced;
       throw error;
     }
   }
@@ -132,7 +129,7 @@ LIMIT 1
       `SELECT id FROM index_build_pins
        WHERE lease_expires_at IS NOT NULL AND lease_expires_at<=?
        ORDER BY lease_expires_at ASC, id ASC LIMIT ?`,
-    ).all(now, bounded) as unknown[];
+    ).all(now, bounded);
     let removed = 0;
     for (const row of rows) {
       const id = rowId(row, "expired pin");
@@ -162,7 +159,7 @@ WHERE ib.knowledge_workspace_id=?
   )
 ORDER BY ib.published_at ASC, ib.created_at ASC, ib.id ASC
 LIMIT ?
-`).all(workspaceId, now, bounded) as unknown[];
+`).all(workspaceId, now, bounded);
 
       const deleted: string[] = [];
       for (const row of rows) {
@@ -181,7 +178,7 @@ WHERE ib.id=? AND ib.knowledge_workspace_id=? AND ib.status='retained'
       AND (p.lease_expires_at IS NULL OR p.lease_expires_at>?)
   )
 `).get(buildId, workspaceId, now);
-        if (!eligible) continue;
+        if (eligible === undefined) continue;
 
         this.db.prepare(`DELETE FROM chunk_fts WHERE index_build_id=?`).run(buildId);
         this.db.prepare(`DELETE FROM chunks WHERE index_build_id=?`).run(buildId);
@@ -206,7 +203,7 @@ WHERE ib.id=? AND ib.knowledge_workspace_id=? AND ib.status='retained'
       `SELECT id, index_build_id, owner_type, owner_id, lease_expires_at, created_at, updated_at
        FROM index_build_pins WHERE id=?`,
     ).get(id);
-    if (!row) throw new Error(`Unknown IndexBuild pin: ${id}`);
+    if (row === undefined) throw new Error(`Unknown IndexBuild pin: ${id}`);
     return mapPin(row);
   }
 
@@ -215,12 +212,12 @@ WHERE ib.id=? AND ib.knowledge_workspace_id=? AND ib.status='retained'
       `SELECT id, index_build_id, owner_type, owner_id, lease_expires_at, created_at, updated_at
        FROM index_build_pins WHERE index_build_id=? AND owner_type=? AND owner_id=?`,
     ).get(buildId, ownerType, ownerId);
-    return row ? mapPin(row) : null;
+    return row === undefined ? null : mapPin(row);
   }
 }
 
 function mapPin(row: unknown): IndexBuildPin {
-  const r = row as Record<string, unknown>;
+  const r = recordValue(row, "IndexBuild pin row");
   return {
     id: str(r, "id"),
     indexBuildId: str(r, "index_build_id"),
@@ -231,9 +228,39 @@ function mapPin(row: unknown): IndexBuildPin {
     updatedAt: str(r, "updated_at"),
   };
 }
-function nonEmpty(value: string, name: string): string { const v = value.trim(); if (!v) throw new TypeError(`${name} must be non-empty`); return v; }
-function leaseDuration(value: number): number { if (!Number.isSafeInteger(value) || value <= 0 || value > MAX_LEASE_MS) throw new TypeError("leaseMs is invalid"); return value; }
-function boundedLimit(value: number): number { if (!Number.isSafeInteger(value) || value <= 0 || value > 1_000) throw new TypeError("limit is invalid"); return value; }
-function str(row: Record<string, unknown>, key: string): string { const v = row[key]; if (typeof v !== "string" || !v) throw new Error(`${key} is invalid`); return v; }
-function nullable(row: Record<string, unknown>, key: string): string | null { const v = row[key]; if (v === null) return null; if (typeof v !== "string" || !v) throw new Error(`${key} is invalid`); return v; }
-function rowId(value: unknown, label: string): string { if (typeof value !== "object" || value === null || !("id" in value)) throw new Error(`${label} is invalid`); const id = (value as { id?: unknown }).id; if (typeof id !== "string" || !id) throw new Error(`${label} id is invalid`); return id; }
+function nonEmpty(value: string, name: string): string {
+  const v = value.trim();
+  if (v.length === 0) throw new TypeError(`${name} must be non-empty`);
+  return v;
+}
+function leaseDuration(value: number): number {
+  if (!Number.isSafeInteger(value) || value <= 0 || value > MAX_LEASE_MS) throw new TypeError("leaseMs is invalid");
+  return value;
+}
+function boundedLimit(value: number): number {
+  if (!Number.isSafeInteger(value) || value <= 0 || value > 1_000) throw new TypeError("limit is invalid");
+  return value;
+}
+function str(row: Record<string, unknown>, key: string): string {
+  const v = row[key];
+  if (typeof v !== "string" || v.length === 0) throw new Error(`${key} is invalid`);
+  return v;
+}
+function nullable(row: Record<string, unknown>, key: string): string | null {
+  const v = row[key];
+  if (v === null) return null;
+  if (typeof v !== "string" || v.length === 0) throw new Error(`${key} is invalid`);
+  return v;
+}
+function rowId(value: unknown, label: string): string {
+  const row = recordValue(value, label);
+  const id = row["id"];
+  if (typeof id !== "string" || id.length === 0) throw new Error(`${label} id is invalid`);
+  return id;
+}
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`${label} must be an object record`);
+  }
+  return Object.fromEntries(Object.entries(value));
+}

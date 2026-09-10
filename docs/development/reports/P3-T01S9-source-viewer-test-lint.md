@@ -1,6 +1,6 @@
 # P3-T01S9 — Source Evidence Viewer Test Lint Baseline
 
-Status: **PARTIAL**
+Status: **PASS**
 
 Date: 2026-09-10
 
@@ -19,14 +19,18 @@ Only `src/knowledge/storage/sourceEvidenceViewer.test.ts` is behaviorally touche
 
 No production Source/Evidence viewer implementation is changed.
 
-## Expected verification
+## Verification evidence
+
+GitHub CI run `34434199519` confirmed:
 
 ```text
 npm run typecheck → PASS
 ESLint 219 → 215
 ```
 
-The focused `sourceEvidenceViewer.test.ts` scenarios must remain unchanged. Any remaining repository-wide lint findings are inherited baseline debt outside this slice.
+All four task-owned lint findings are closed. The CI workflow still concludes failure because the remaining 215 repository-wide ESLint findings are inherited P3-T01 baseline debt outside this slice; lint stops the workflow before later `knip`/test/build steps. P2 FTS Evidence run `34434199488` and P2 Lexical Evidence run `34434199733` both completed successfully on the same head, without evidence/configuration mutation or retuning.
+
+The focused behavioral scenarios in this test file are unchanged by the lint-only edits.
 
 ## Scope exclusions
 

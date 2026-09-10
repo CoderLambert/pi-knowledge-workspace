@@ -80,10 +80,12 @@ export interface CompleteGroundedAnswerInput {
 export interface GroundedAskStoreOptions {
   now?: () => Date;
   createId?: () => string;
+  runPinLeaseMs?: number;
 }
 
 const RENDERING_VERSION = "grounded-evidence-json-v1";
 const RUN_PIN_OWNER = "generation-run";
+const DEFAULT_RUN_PIN_LEASE_MS = 5 * 60_000;
 
 /** Canonical run/evidence/answer ownership; transport and model invocation live outside storage. */
 export class GroundedAskStore {
@@ -91,15 +93,19 @@ export class GroundedAskStore {
   private readonly retention: IndexBuildRetention;
   private readonly now: () => Date;
   private readonly createId: () => string;
+  private readonly runPinLeaseMs: number;
 
   constructor(private readonly db: KnowledgeDatabase, options: GroundedAskStoreOptions = {}) {
     this.artifacts = new SqliteParsedArtifactStore(db);
     this.retention = new IndexBuildRetention(db, options);
     this.now = options.now ?? (() => new Date());
     this.createId = options.createId ?? randomUUID;
+    this.runPinLeaseMs = positiveLeaseMs(options.runPinLeaseMs ?? DEFAULT_RUN_PIN_LEASE_MS);
+    this.recoverExpiredRuns();
   }
 
   begin(input: BeginGenerationRunInput): GenerationRun {
+    this.recoverExpiredRuns();
     const workspaceId = nonEmpty(input.knowledgeWorkspaceId, "knowledgeWorkspaceId");
     const question = nonEmpty(input.question, "question");
     const provider = nonEmpty(input.provider, "provider");
@@ -147,9 +153,10 @@ export class GroundedAskStore {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'running', NULL, ?, NULL)`)
           .run(id, workspaceId, scope.publicationId, scope.indexBuildId, JSON.stringify(scope), question,
             provider, model, modelRevision, createdAt);
-        // Durable protection belongs to the running aggregate, not to a query or
-        // browser connection. A terminal transition releases only this run's pin.
-        this.retention.pin(scope.indexBuildId, RUN_PIN_OWNER, id);
+        // A running GenerationRun owns a renewable lease instead of a permanent pin.
+        // Crash recovery can therefore release projection retention without touching
+        // the immutable Answer -> CitationRef -> Evidence historical lineage.
+        this.retention.pin(scope.indexBuildId, RUN_PIN_OWNER, id, this.runPinLeaseMs);
       });
       return this.getRun(workspaceId, id);
     } finally {
@@ -202,6 +209,7 @@ export class GroundedAskStore {
     const contextSha256 = createHash("sha256").update(serializedContext).digest("hex");
     withTransaction(this.db, () => {
       this.requireRunning(run.knowledgeWorkspaceId, run.id);
+      this.requireSnapshot(run);
       this.db.prepare(`INSERT INTO delivered_evidence
         (id, generation_run_id, invocation_id, attempt, rendering_version, serialized_context, context_sha256, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -331,11 +339,16 @@ export class GroundedAskStore {
   private requireSnapshot(run: GenerationRun) {
     const row = this.db.prepare(`SELECT p.id FROM index_build_pins p
       JOIN index_builds b ON b.id=p.index_build_id
-      WHERE p.index_build_id=? AND p.owner_type=? AND p.owner_id=? AND p.lease_expires_at IS NULL
+      WHERE p.index_build_id=? AND p.owner_type=? AND p.owner_id=?
         AND b.knowledge_workspace_id=? AND b.status IN ('active', 'retained')`)
       .get(run.scope.indexBuildId, RUN_PIN_OWNER, run.id, run.knowledgeWorkspaceId);
     if (row === undefined) throw new Error("Frozen GenerationRun retrieval snapshot is unavailable; refusing current publication");
-    return this.retention.get(stringField(record(row), "id"));
+    const pinId = stringField(record(row), "id");
+    try {
+      return this.retention.renew(pinId, this.runPinLeaseMs);
+    } catch {
+      throw new Error("Frozen GenerationRun retrieval snapshot lease expired; refusing current publication");
+    }
   }
 
   private requireScopedHit(run: GenerationRun, hit: SearchQueryHit): void {
@@ -356,12 +369,41 @@ export class GroundedAskStore {
     if (Number(result.changes) !== 1) throw new Error("GenerationRun terminal transition lost ownership");
     this.db.prepare("DELETE FROM index_build_pins WHERE owner_type=? AND owner_id=?").run(RUN_PIN_OWNER, run.id);
   }
+
+  private recoverExpiredRuns(): number {
+    const at = this.now().toISOString();
+    const rows = this.db.prepare(`SELECT r.id FROM generation_runs r
+      LEFT JOIN index_build_pins p ON p.index_build_id=r.index_build_id
+        AND p.owner_type=? AND p.owner_id=r.id
+        AND (p.lease_expires_at IS NULL OR p.lease_expires_at>?)
+      WHERE r.status='running' AND p.id IS NULL`).all(RUN_PIN_OWNER, at);
+    let recovered = 0;
+    withTransaction(this.db, () => {
+      for (const raw of rows) {
+        const runId = stringField(record(raw), "id");
+        const result = this.db.prepare(`UPDATE generation_runs
+          SET status='failed', error=?, finished_at=? WHERE id=? AND status='running'`)
+          .run("GenerationRun retrieval lease expired before recovery", at, runId);
+        if (Number(result.changes) === 1) recovered += 1;
+        this.db.prepare("DELETE FROM index_build_pins WHERE owner_type=? AND owner_id=?")
+          .run(RUN_PIN_OWNER, runId);
+      }
+    });
+    return recovered;
+  }
 }
 
 function nonEmpty(value: string, label: string): string {
   const normalized = value.trim();
   if (normalized.length === 0) throw new TypeError(`${label} must be non-empty`);
   return normalized;
+}
+
+function positiveLeaseMs(value: number): number {
+  if (!Number.isSafeInteger(value) || value <= 0 || value > 60 * 60_000) {
+    throw new TypeError("runPinLeaseMs must be a positive duration no greater than one hour");
+  }
+  return value;
 }
 
 function record(value: unknown): Record<string, unknown> {

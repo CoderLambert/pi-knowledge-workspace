@@ -132,7 +132,9 @@ describe("Knowledge selected-machine federation contract", () => {
         reject(new Error("Expected federation cancellation signal"));
         return;
       }
-      const failOnAbort = () => reject(new RemoteMachineRequestError("request cancelled", 502));
+      const failOnAbort = (): void => {
+        reject(new RemoteMachineRequestError("request cancelled", 502));
+      };
       if (observedSignal.aborted) {
         failOnAbort();
       } else {

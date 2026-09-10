@@ -235,10 +235,14 @@ function requireNonEmpty(value: string, name: string): string {
 }
 
 function recordValue(value: unknown, label: string): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new Error(`Backup snapshot ${label} is invalid`);
   }
   return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function stringField(row: Record<string, unknown>, key: string): string {

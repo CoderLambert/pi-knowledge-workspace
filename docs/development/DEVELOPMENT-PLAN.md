@@ -291,6 +291,8 @@ P3-T01S11 backup-test lint slice: 210 ESLint errors → 205
 P3-T01S12 restore-test lint slice: 205 ESLint errors → 201
 P3-T01S13 backup/restore-entry production lint slice: 201 ESLint errors → 191
 P3-T01S14 restore-production lint slice: 191 ESLint errors → 176
+P3-T01S15 Evidence-read/viewer production lint slice: 176 ESLint errors → 162
+P3-T01S16 canonical-lineage-core production lint slice: 162 ESLint errors → 152
 ```
 
 The remaining ESLint findings are inherited across pre-existing Knowledge/plugin code. Continue closing them in **subsystem-scoped bounded slices**, not one-file micro-slices and not one repository-wide rewrite.
@@ -749,7 +751,7 @@ As of 2026-09-10:
 | P2-T12 | PASS | ADR-029 Accepted. |
 | P2 stack | PASS | Final ancestry restack is clean; #54 and #44 include latest #43 with task-only scopes. |
 | P3-T00 | PASS | Rebaseline plan to ADR-029. |
-| P3-T01 | PARTIAL | Typecheck is green; verified execution checkpoint is 176 inherited ESLint findings after S14 (S13 201 → 191; S14 191 → 176). |
+| P3-T01 | PARTIAL | Typecheck is green; verified execution checkpoint is 152 inherited ESLint findings after S16. |
 
 Current architecture/development base:
 

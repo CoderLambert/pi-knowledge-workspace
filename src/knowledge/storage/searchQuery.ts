@@ -164,37 +164,38 @@ WHERE c.id = ?
 }
 
 function hydrateHit(hit: Fts5SearchHit, row: unknown): SearchQueryHit {
-  const value = row as {
-    chunk_id?: unknown;
-    source_version_id?: unknown;
-    parsed_artifact_id?: unknown;
-    ordinal?: unknown;
-    start_byte?: unknown;
-    end_byte?: unknown;
-    source_id?: unknown;
-    source_kind?: unknown;
-    source_display_name?: unknown;
-    source_archived_at?: unknown;
-  } | undefined;
+  const value = recordValue(row, "search metadata row");
+  const chunkId = value["chunk_id"];
+  const sourceVersionId = value["source_version_id"];
+  const parsedArtifactId = value["parsed_artifact_id"];
+  const ordinal = value["ordinal"];
+  const startByte = value["start_byte"];
+  const endByte = value["end_byte"];
+  const sourceId = value["source_id"];
+  const sourceKind = value["source_kind"];
+  const sourceDisplayName = value["source_display_name"];
+  const sourceArchivedAt = value["source_archived_at"];
 
   if (
-    !value ||
-    value.chunk_id !== hit.chunkId ||
-    value.source_version_id !== hit.sourceVersionId ||
-    value.parsed_artifact_id !== hit.parsedArtifactId ||
-    !Number.isSafeInteger(value.ordinal) ||
-    !Number.isSafeInteger(value.start_byte) ||
-    !Number.isSafeInteger(value.end_byte) ||
-    Number(value.ordinal) < 0 ||
-    Number(value.start_byte) < 0 ||
-    Number(value.end_byte) <= Number(value.start_byte) ||
-    typeof value.source_id !== "string" ||
-    value.source_id.length === 0 ||
-    typeof value.source_kind !== "string" ||
-    value.source_kind.length === 0 ||
-    typeof value.source_display_name !== "string" ||
-    value.source_display_name.length === 0 ||
-    !(value.source_archived_at === null || typeof value.source_archived_at === "string")
+    chunkId !== hit.chunkId ||
+    sourceVersionId !== hit.sourceVersionId ||
+    parsedArtifactId !== hit.parsedArtifactId ||
+    typeof ordinal !== "number" ||
+    !Number.isSafeInteger(ordinal) ||
+    typeof startByte !== "number" ||
+    !Number.isSafeInteger(startByte) ||
+    typeof endByte !== "number" ||
+    !Number.isSafeInteger(endByte) ||
+    ordinal < 0 ||
+    startByte < 0 ||
+    endByte <= startByte ||
+    typeof sourceId !== "string" ||
+    sourceId.length === 0 ||
+    typeof sourceKind !== "string" ||
+    sourceKind.length === 0 ||
+    typeof sourceDisplayName !== "string" ||
+    sourceDisplayName.length === 0 ||
+    (sourceArchivedAt !== null && typeof sourceArchivedAt !== "string")
   ) {
     throw new Error("Search metadata is missing or inconsistent with the scoped lexical hit");
   }
@@ -203,19 +204,19 @@ function hydrateHit(hit: Fts5SearchHit, row: unknown): SearchQueryHit {
     chunkId: hit.chunkId,
     sourceVersionId: hit.sourceVersionId,
     source: {
-      id: value.source_id,
-      kind: value.source_kind,
-      displayName: value.source_display_name,
-      archivedAt: value.source_archived_at,
+      id: sourceId,
+      kind: sourceKind,
+      displayName: sourceDisplayName,
+      archivedAt: sourceArchivedAt,
     },
     snippet: hit.text,
     locator: {
       parsedArtifactId: hit.parsedArtifactId,
-      startByte: Number(value.start_byte),
-      endByte: Number(value.end_byte),
+      startByte,
+      endByte,
     },
     rank: hit.rank,
-    ordinal: Number(value.ordinal),
+    ordinal,
   };
 }
 
@@ -236,18 +237,25 @@ function normalizeAllowedSourceVersions(values: readonly string[] | undefined): 
 
 function validateLimit(value: number, name: string): number {
   if (!Number.isSafeInteger(value) || value <= 0 || value > MAX_LIMIT) {
-    throw new TypeError(`${name} must be an integer between 1 and ${MAX_LIMIT}`);
+    throw new TypeError(`${name} must be an integer between 1 and ${String(MAX_LIMIT)}`);
   }
   return value;
 }
 
 function requireNonEmpty(value: string, name: string): string {
   const normalized = value.trim();
-  if (!normalized) throw new TypeError(`${name} must be non-empty`);
+  if (normalized.length === 0) throw new TypeError(`${name} must be non-empty`);
   return normalized;
 }
 
 function stableHandle(kind: "query" | "run", value: unknown): string {
   const digest = createHash("sha256").update(JSON.stringify(value)).digest("hex");
   return `search_${kind}_${digest}`;
+}
+
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`${label} must be an object record`);
+  }
+  return Object.fromEntries(Object.entries(value));
 }

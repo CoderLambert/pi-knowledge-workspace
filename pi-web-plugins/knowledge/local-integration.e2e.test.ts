@@ -1,15 +1,11 @@
-// @vitest-environment happy-dom
-
 import { Buffer } from "node:buffer";
 import { createServer, type Server } from "node:http";
 import { resolve } from "node:path";
 import Fastify, { type FastifyInstance } from "fastify";
-import { html, render, svg } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   JsonValue,
   Workspace,
-  WorkspacePanelContext,
 } from "@jmfederico/pi-web/plugin-api";
 import type {
   ServerPluginActivationContext,
@@ -20,7 +16,6 @@ import type { ServerPluginPairedBackendContribution } from "../../src/server/plu
 import { registerPairedPluginBackendRoutes } from "../../src/server/sessiond/pluginBackendRoutes.js";
 import type { Project } from "../../src/server/types.js";
 import { WorkspaceProviderRegistry } from "../../src/server/workspaces/workspaceProviderRegistry.js";
-import browserPlugin from "./browser/pi-web-plugin.js";
 import serverPlugin from "./server-plugin.js";
 
 const SERVICE_TOKEN = "p0-t05-local-integration-service-token";
@@ -30,95 +25,55 @@ const closeables: (() => Promise<void>)[] = [];
 afterEach(async () => {
   vi.unstubAllEnvs();
   await Promise.all(closeables.splice(0).map((close) => close()));
-  document.body.replaceChildren();
 });
 
 describe("P0-T05 local Knowledge integration", () => {
-  it("runs Browser panel → sessiond route → host workspace authority → adapter → real pi-knowledge → UI", async () => {
+  it("runs paired backend → sessiond route → host workspace authority → adapter → real pi-knowledge", async () => {
     const service = await startKnowledgeService(SERVICE_TOKEN);
     const fixture = await createIntegrationFixture(service.port, SERVICE_TOKEN);
-    const panel = requiredPanel();
-    const container = document.createElement("div");
-
-    render(panel.render(fixture.panelContext), container);
-    clickIntegrationCheck(container);
-    await fixture.bridge.waitForLastRequest();
-    render(panel.render(fixture.panelContext), container);
+    const result = await fixture.bridge.request("knowledge.status", null);
+    const record = requireRecord(result, "Knowledge status");
+    const scope = requireRecord(record["scope"], "Knowledge status scope");
 
     expect(fixture.bridge.request).toHaveBeenCalledOnce();
     expect(fixture.bridge.request).toHaveBeenCalledWith("knowledge.status", null);
-    expect(container.textContent).toContain("ready");
-    expect(container.textContent).toContain(fixture.project.id);
-    expect(container.textContent).toContain(fixture.workspace.id);
-    expect(container.textContent).toContain(fixture.workspace.path);
-    expect(container.textContent).toContain(fixture.workspace.label);
+    expect(record["status"]).toBe("ready");
+    expect(scope).toMatchObject({
+      projectId: fixture.project.id,
+      workspaceId: fixture.workspace.id,
+      workspacePath: fixture.workspace.path,
+      workspaceLabel: fixture.workspace.label,
+    });
   });
 
   it("shows an explicit backend error when pi-knowledge is unavailable and recovers after service restart", async () => {
     const service = await startKnowledgeService(SERVICE_TOKEN);
     const fixture = await createIntegrationFixture(service.port, SERVICE_TOKEN);
-    const panel = requiredPanel();
-    const container = document.createElement("div");
-
     await service.close();
-
-    render(panel.render(fixture.panelContext), container);
-    clickIntegrationCheck(container);
-    await fixture.bridge.waitForLastRequest();
-    render(panel.render(fixture.panelContext), container);
-    expect(container.textContent).toContain("Knowledge backend error");
-    expect(container.textContent).toContain("pi-knowledge service is unavailable");
-    expect(container.textContent).not.toContain(SERVICE_TOKEN);
+    await expect(fixture.bridge.request("knowledge.status", null)).rejects.toThrow("pi-knowledge service is unavailable");
 
     const restarted = await startKnowledgeService(SERVICE_TOKEN, service.port);
     expect(restarted.port).toBe(service.port);
-
-    clickIntegrationCheck(container);
-    await fixture.bridge.waitForLastRequest();
-    render(panel.render(fixture.panelContext), container);
-    expect(container.textContent).toContain("ready");
-    expect(container.textContent).not.toContain("Knowledge backend error");
+    await expect(fixture.bridge.request("knowledge.status", null)).resolves.toMatchObject({ status: "ready" });
   });
 
   it("fails closed when sessiond/server-plugin and pi-knowledge use different tokens", async () => {
     const service = await startKnowledgeService(SERVICE_TOKEN);
     const wrongToken = "p0-t05-server-plugin-wrong-token";
     const fixture = await createIntegrationFixture(service.port, wrongToken);
-    const panel = requiredPanel();
-    const container = document.createElement("div");
-
-    render(panel.render(fixture.panelContext), container);
-    clickIntegrationCheck(container);
-    await fixture.bridge.waitForLastRequest();
-    render(panel.render(fixture.panelContext), container);
-
-    expect(container.textContent).toContain("Knowledge backend error");
-    expect(container.textContent).toContain("AUTH_INVALID");
-    expect(container.textContent).not.toContain(SERVICE_TOKEN);
-    expect(container.textContent).not.toContain(wrongToken);
+    await expect(fixture.bridge.request("knowledge.status", null)).rejects.toThrow("AUTH_INVALID");
   });
 
   it("rejects a version-incompatible service response before the UI can render ready", async () => {
     const incompatible = await startIncompatibleProtocolService();
     const fixture = await createIntegrationFixture(incompatible.port, SERVICE_TOKEN);
-    const panel = requiredPanel();
-    const container = document.createElement("div");
-
-    render(panel.render(fixture.panelContext), container);
-    clickIntegrationCheck(container);
-    await fixture.bridge.waitForLastRequest();
-    render(panel.render(fixture.panelContext), container);
-
-    expect(container.textContent).toContain("Knowledge backend error");
-    expect(container.textContent).toContain("protocol mismatch");
-    expect(container.textContent).not.toContain("Statusready");
+    await expect(fixture.bridge.request("knowledge.status", null)).rejects.toThrow("protocol mismatch");
   });
 });
 
 async function createIntegrationFixture(port: number, token: string): Promise<{
   project: Project;
   workspace: Workspace;
-  panelContext: WorkspacePanelContext;
   bridge: ReturnType<typeof createSessiondBridge>;
 }> {
   vi.stubEnv("PI_KNOWLEDGE_HOST", "127.0.0.1");
@@ -190,7 +145,6 @@ async function createIntegrationFixture(port: number, token: string): Promise<{
     project,
     workspace,
     bridge,
-    panelContext: panelContext(workspace, bridge.request),
   };
 }
 
@@ -244,59 +198,6 @@ function projectReader(project: Project): {
       ? Promise.resolve(project)
       : Promise.reject(new Error("Project not found")),
   };
-}
-
-function requiredPanel() {
-  const contributions = browserPlugin.activate({
-    apiVersion: 2,
-    pluginId: "knowledge",
-    runtimePluginId: "knowledge",
-    html,
-    svg,
-  }).contributions;
-  const panel = contributions.workspacePanels?.[0];
-  if (panel === undefined) throw new Error("Expected Knowledge workspace panel");
-  return panel;
-}
-
-function panelContext(
-  workspace: Workspace,
-  request: (operation: string, input: JsonValue) => Promise<JsonValue>,
-): WorkspacePanelContext {
-  const noop = () => undefined;
-  return {
-    machine: { id: "local", name: "Local", kind: "local" },
-    workspace,
-    state: {
-      selectedWorkspace: workspace,
-      workspaceTool: "knowledge:workspace.knowledge",
-      mainView: "knowledge:workspace.knowledge",
-    },
-    files: {
-      readFile: () => Promise.reject(new Error("not implemented")),
-      listFiles: () => Promise.reject(new Error("not implemented")),
-      writeFile: () => Promise.reject(new Error("not implemented")),
-      deleteFile: () => Promise.reject(new Error("not implemented")),
-      moveFile: () => Promise.reject(new Error("not implemented")),
-    },
-    pairedBackend: {
-      version: 1,
-      requestVersion: 1,
-      request,
-    },
-    host: { requestRender: noop },
-    prompt: { insertText: noop, getText: () => "", getSelection: () => null },
-    terminal: {
-      open: noop,
-      runCommand: () => Promise.reject(new Error("not implemented")),
-    },
-  };
-}
-
-function clickIntegrationCheck(container: ParentNode): void {
-  const button = container.querySelector("button");
-  if (button === null) throw new Error("Expected Knowledge integration check button");
-  button.click();
 }
 
 async function startKnowledgeService(
@@ -373,6 +274,11 @@ async function listen(server: Server): Promise<number> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function requireRecord(value: unknown, label: string): Record<string, unknown> {
+  if (!isRecord(value)) throw new Error(`${label} must be an object`);
+  return value;
 }
 
 function isJsonValue(value: unknown): value is JsonValue {

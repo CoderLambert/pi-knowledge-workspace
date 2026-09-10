@@ -174,6 +174,8 @@ Rows with JSON key `—` are runtime-only environment variables, not config-file
 | **Runtime-only environment variables** |  |  |  |  |  |
 | Global config file path | — | `PI_WEB_CONFIG` (`XDG_CONFIG_HOME` affects the default path) | Process/env | Selects the global config file; not a project config | Restart services/processes after changing env |
 | Managed data directory | — | `PI_WEB_DATA_DIR` | Process/env | Not supported locally | Restart web/API and session daemon |
+| Knowledge data directory | — | `PI_KNOWLEDGE_DATA_DIR` | Standalone `pi-knowledge` process | Not supported locally; defaults to `$PI_WEB_DATA_DIR/knowledge` | Restart `pi-knowledge` |
+| Grounded Ask model identity | — | `PI_KNOWLEDGE_PROVIDER`, `PI_KNOWLEDGE_MODEL`, `PI_KNOWLEDGE_MODEL_REVISION` | Standalone `pi-knowledge` process | Not supported locally; all three must be set together | Restart `pi-knowledge` |
 | Session daemon socket | — | `PI_WEB_SESSIOND_SOCKET` | Web/API + session daemon env | Not supported locally | Restart daemon and web/API; both must match |
 | Session daemon TCP port | — | `PI_WEB_SESSIOND_PORT` | Session daemon env | Not supported locally | Restart session daemon; set `PI_WEB_SESSIOND_URL` for web/API too |
 | Session daemon TCP host | — | `PI_WEB_SESSIOND_HOST` | Session daemon env | Not supported locally | Restart session daemon |
@@ -196,6 +198,20 @@ Each data directory is independent: after pointing PI WEB at a new root, it star
 One live session daemon owns each data directory. At startup the daemon records its ownership in `sessiond-owner.json` inside the data directory; a second session daemon pointed at the same directory while the first is still running fails loudly at startup with an error naming the owning process and the distinct `PI_WEB_DATA_DIR`, `PI_WEB_SESSIOND_SOCKET` (or `PI_WEB_SESSIOND_PORT` / `PI_WEB_SESSIOND_HOST`), and `PI_WEB_PORT` values a second instance needs. The web/API process of the same instance shares the data directory without claiming it, and a short startup grace covers ordinary service restarts. A marker left behind by a daemon that is no longer running is taken over automatically; if startup still refuses because of a marker whose owner is gone, delete the stale `sessiond-owner.json` as the error message suggests.
 
 This setting does not change the PI WEB config file selected by `PI_WEB_CONFIG` or Pi-owned state such as the active session files selected by `PI_CODING_AGENT_SESSION_DIR`.
+
+### Grounded Ask service data and model
+
+The standalone `pi-knowledge` process stores its SQLite database and content-addressed blobs under `PI_KNOWLEDGE_DATA_DIR`. When that variable is unset, the default is the `knowledge/` child of `PI_WEB_DATA_DIR` (normally `~/.pi-web/knowledge`). This is PI WEB-managed state, not a user-editable configuration file.
+
+Grounded Ask uses the server-side Pi model runtime and its credentials. Configure the exact durable model identity together:
+
+```bash
+export PI_KNOWLEDGE_PROVIDER='openai'
+export PI_KNOWLEDGE_MODEL='gpt-5'
+export PI_KNOWLEDGE_MODEL_REVISION='grounded-ask-prompt-v1'
+```
+
+`PI_KNOWLEDGE_MODEL_REVISION` identifies the deployed model/prompt configuration recorded on each GenerationRun; change it whenever that material interpretation changes. The process fails closed on an incomplete triple or an unavailable model. If the triple is omitted, import, publication and historical viewing remain available, while `knowledge.ask` reports that Grounded Ask is not configured. Credentials remain in the Pi agent directory selected by `PI_CODING_AGENT_DIR`; they are never sent by the browser.
 
 ### Agent process environment
 

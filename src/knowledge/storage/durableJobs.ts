@@ -170,6 +170,40 @@ export class DurableJobStore {
     return this.finish(jobId, workerId, fencingToken, "cancelled", null, null, true);
   }
 
+  /**
+   * Runs a synchronous user-visible business commit while this lease still owns
+   * the job. BEGIN IMMEDIATE and the guarded UPDATE serialize takeover against
+   * the callback, so authority validation and writes through the supplied
+   * database share one atomic commit boundary.
+   *
+   * Business stores must use the supplied database and retain their own
+   * expected-generation/current-state CAS where that aggregate requires one.
+   */
+  commitWithAuthority<T>(
+    jobId: string,
+    workerId: string,
+    fencingToken: number,
+    operation: (db: KnowledgeDatabase) => T,
+  ): T {
+    const id = nonEmpty(jobId, "jobId");
+    const worker = nonEmpty(workerId, "workerId");
+    const token = positiveInteger(fencingToken, "fencingToken");
+    return withTransaction(this.db, () => {
+      const now = this.now().toISOString();
+      const authority = this.db.prepare(
+        `UPDATE jobs SET updated_at=updated_at
+         WHERE id=? AND status='running' AND lease_owner=? AND fencing_token=?
+           AND cancel_requested=0 AND lease_expires_at>=?`,
+      ).run(id, worker, token, now);
+      one(authority.changes, `Job ${id} business commit rejected stale, expired, cancelled, or non-owner lease`);
+      const result = operation(this.db);
+      if (isPromiseLike(result)) {
+        throw new TypeError("Fenced business commit must be synchronous");
+      }
+      return result;
+    });
+  }
+
   retry(jobId: string): DurableJob {
     const id = nonEmpty(jobId, "jobId");
     return withTransaction(this.db, () => {
@@ -304,6 +338,11 @@ function positiveInteger(value: number, name: string): number {
 }
 function one(changes: number | bigint, message: string): void { if (Number(changes) !== 1) throw new Error(message); }
 function terminal(status: DurableJobStatus): boolean { return status === "succeeded" || status === "failed" || status === "cancelled"; }
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (typeof value === "object" && value !== null) || typeof value === "function"
+    ? "then" in value && typeof value.then === "function"
+    : false;
+}
 function jobStatus(value: unknown): DurableJobStatus {
   if (value === "queued" || value === "running" || value === "succeeded" || value === "failed" || value === "cancelled") return value;
   throw new Error("job status is invalid");

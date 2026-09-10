@@ -93,6 +93,12 @@ ORDER BY selection.source_id
     if (selectionRows.length === 0) {
       throw new Error("Knowledge publication has no canonical Source selection");
     }
+    const selectionCount = recordValue(db.prepare(
+      "SELECT COUNT(*) AS count FROM knowledge_publication_selections WHERE publication_id = ?",
+    ).get(publicationId), "Knowledge selection count")["count"];
+    if (selectionCount !== selectionRows.length) {
+      throw new Error("Knowledge publication contains unavailable or cross-workspace canonical selections");
+    }
     const selections = selectionRows.map((row) => Object.freeze(mapSelection(row)));
     if (new Set(selections.map((selection) => selection.sourceId)).size !== selections.length) {
       throw new Error("Knowledge publication contains duplicate Source selections");

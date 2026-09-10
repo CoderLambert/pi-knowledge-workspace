@@ -409,6 +409,80 @@ SET active_knowledge_publication_id = 'legacy-publication:' || id || ':' || inde
 WHERE active_index_build_id IS NOT NULL;
 `,
   },
+  {
+    version: 9,
+    name: "grounded-ask-frozen-runs-and-historical-answers",
+    sql: `
+CREATE TABLE generation_runs (
+  id TEXT PRIMARY KEY,
+  knowledge_workspace_id TEXT NOT NULL REFERENCES knowledge_workspaces(id),
+  publication_id TEXT NOT NULL REFERENCES knowledge_publications(id),
+  index_build_id TEXT NOT NULL,
+  scope_json TEXT NOT NULL CHECK (json_valid(scope_json)),
+  question TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  model_revision TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed')),
+  error TEXT,
+  created_at TEXT NOT NULL,
+  finished_at TEXT
+);
+CREATE INDEX generation_runs_workspace_idx ON generation_runs(knowledge_workspace_id, created_at);
+CREATE TRIGGER generation_runs_frozen_scope BEFORE UPDATE ON generation_runs
+WHEN NEW.id IS NOT OLD.id OR NEW.knowledge_workspace_id IS NOT OLD.knowledge_workspace_id
+  OR NEW.publication_id IS NOT OLD.publication_id OR NEW.index_build_id IS NOT OLD.index_build_id
+  OR NEW.scope_json IS NOT OLD.scope_json OR NEW.question IS NOT OLD.question
+  OR NEW.provider IS NOT OLD.provider OR NEW.model IS NOT OLD.model
+  OR NEW.model_revision IS NOT OLD.model_revision OR NEW.created_at IS NOT OLD.created_at
+  OR OLD.status <> 'running' OR NEW.status = 'running'
+BEGIN SELECT RAISE(ABORT, 'GenerationRun scope and terminal state are immutable'); END;
+CREATE TABLE delivered_evidence (
+  id TEXT PRIMARY KEY,
+  generation_run_id TEXT NOT NULL REFERENCES generation_runs(id),
+  invocation_id TEXT NOT NULL,
+  attempt INTEGER NOT NULL CHECK (attempt > 0),
+  rendering_version TEXT NOT NULL,
+  serialized_context TEXT NOT NULL,
+  context_sha256 TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE (generation_run_id, invocation_id, attempt)
+);
+CREATE TABLE delivered_evidence_items (
+  delivered_evidence_id TEXT NOT NULL REFERENCES delivered_evidence(id),
+  ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+  evidence_id TEXT NOT NULL REFERENCES evidence(id),
+  PRIMARY KEY (delivered_evidence_id, ordinal),
+  UNIQUE (delivered_evidence_id, evidence_id)
+);
+CREATE TABLE answers (
+  id TEXT PRIMARY KEY,
+  generation_run_id TEXT NOT NULL UNIQUE REFERENCES generation_runs(id),
+  delivered_evidence_id TEXT NOT NULL REFERENCES delivered_evidence(id),
+  text TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE citation_refs (
+  id TEXT PRIMARY KEY,
+  answer_id TEXT NOT NULL REFERENCES answers(id),
+  label TEXT NOT NULL,
+  evidence_id TEXT NOT NULL REFERENCES evidence(id),
+  UNIQUE (answer_id, label)
+);
+CREATE TRIGGER delivered_evidence_immutable BEFORE UPDATE ON delivered_evidence
+BEGIN SELECT RAISE(ABORT, 'DeliveredEvidence is immutable'); END;
+CREATE TRIGGER delivered_evidence_items_immutable BEFORE UPDATE ON delivered_evidence_items
+BEGIN SELECT RAISE(ABORT, 'DeliveredEvidence items are immutable'); END;
+CREATE TRIGGER answers_immutable BEFORE UPDATE ON answers
+BEGIN SELECT RAISE(ABORT, 'Answer is immutable'); END;
+CREATE TRIGGER citation_refs_immutable BEFORE UPDATE ON citation_refs
+BEGIN SELECT RAISE(ABORT, 'CitationRef is immutable'); END;
+CREATE TRIGGER retained_evidence_immutable BEFORE UPDATE ON evidence
+WHEN EXISTS (SELECT 1 FROM delivered_evidence_items WHERE evidence_id=OLD.id)
+  OR EXISTS (SELECT 1 FROM citation_refs WHERE evidence_id=OLD.id)
+BEGIN SELECT RAISE(ABORT, 'Retained Evidence is immutable'); END;
+`,
+  },
 ];
 
 function readUserVersion(db: MigrationDatabase): number {

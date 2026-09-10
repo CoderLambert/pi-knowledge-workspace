@@ -17,10 +17,15 @@ export interface ReliableKnowledgeCandidateSource {
 
 export interface PublishReliableKnowledgeInput {
   knowledgeWorkspaceId: string;
+  /** Complete replacement selection, including unchanged Sources; never an incremental patch. */
   sources: readonly ReliableKnowledgeCandidateSource[];
   retrievalConfigRevision: string;
   strategy?: string;
   chunking?: ChunkerOptions;
+  expectedBase?: {
+    generation: number;
+    publicationId: string | null;
+  };
 }
 
 export interface ReliableKnowledgePublicationResult {
@@ -57,6 +62,7 @@ export class ReliableKnowledgePublisher {
 
     const build = this.builds.createStaging(workspaceId, input.strategy ?? "fts5", {
       retrievalConfigRevision,
+      ...(input.expectedBase === undefined ? {} : { expectedBase: input.expectedBase }),
     });
     for (const artifact of parsedArtifacts) {
       this.index.replaceArtifactChunks({

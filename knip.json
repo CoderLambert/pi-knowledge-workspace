@@ -17,5 +17,8 @@
     "pi-web-plugins/**/*.ts",
     "pi-packages/**/*.ts"
   ],
+  "ignoreBinaries": [
+    "systemd-run"
+  ],
   "ignoreExportsUsedInFile": true
 }

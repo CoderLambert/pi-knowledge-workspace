@@ -4,6 +4,14 @@ import {
   PI_KNOWLEDGE_DEFAULT_MAX_RESPONSE_BYTES,
   PI_KNOWLEDGE_DEFAULT_PORT,
 } from "../contracts/protocol.js";
+import { effectiveAgentConfig, piWebDataDir } from "../../config.js";
+import { join, resolve } from "node:path";
+
+export interface KnowledgeModelConfig {
+  provider: string;
+  model: string;
+  revision: string;
+}
 
 export interface KnowledgeServiceConfig {
   host: "127.0.0.1" | "::1";
@@ -11,6 +19,9 @@ export interface KnowledgeServiceConfig {
   token: string;
   maxRequestBytes: number;
   maxResponseBytes: number;
+  dataDir: string;
+  agentDir: string;
+  model: KnowledgeModelConfig | undefined;
 }
 
 const MIN_TOKEN_LENGTH = 16;
@@ -43,7 +54,29 @@ export function loadKnowledgeServiceConfig(env: NodeJS.ProcessEnv = process.env)
       MAX_BODY_LIMIT,
       "PI_KNOWLEDGE_MAX_RESPONSE_BYTES",
     ),
+    dataDir: resolve(env["PI_KNOWLEDGE_DATA_DIR"] ?? join(piWebDataDir(env), "knowledge")),
+    agentDir: effectiveAgentConfig(env).dir,
+    model: parseModelConfig(env),
   };
+}
+
+function parseModelConfig(env: NodeJS.ProcessEnv): KnowledgeModelConfig | undefined {
+  const values = [
+    env["PI_KNOWLEDGE_PROVIDER"],
+    env["PI_KNOWLEDGE_MODEL"],
+    env["PI_KNOWLEDGE_MODEL_REVISION"],
+  ];
+  if (values.every((value) => value === undefined || value.trim().length === 0)) return undefined;
+  if (values.some((value) => value === undefined || value.trim().length === 0)) {
+    throw new Error(
+      "PI_KNOWLEDGE_PROVIDER, PI_KNOWLEDGE_MODEL and PI_KNOWLEDGE_MODEL_REVISION must be configured together",
+    );
+  }
+  const [provider, model, revision] = values;
+  if (provider === undefined || model === undefined || revision === undefined) {
+    throw new Error("Knowledge model configuration is incomplete");
+  }
+  return { provider: provider.trim(), model: model.trim(), revision: revision.trim() };
 }
 
 function parseLoopbackHost(value: string | undefined): "127.0.0.1" | "::1" {

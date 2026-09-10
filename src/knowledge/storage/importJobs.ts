@@ -81,6 +81,7 @@ export class MdTextImportJobs {
     relativePath: string;
     idempotencyKey: string;
     displayName?: string;
+    sourceId?: string;
   }): ImportJob {
     const workspaceId = requireNonEmpty(input.knowledgeWorkspaceId, "knowledgeWorkspaceId");
     const relativePath = requireSupportedRelativePath(input.relativePath);
@@ -94,22 +95,16 @@ export class MdTextImportJobs {
         const raced = this.findByIdempotency(workspaceId, idempotencyKey);
         if (raced !== null) return raced;
 
-        const requestedDisplayName = input.displayName?.trim();
-        const displayName = requestedDisplayName === undefined || requestedDisplayName.length === 0
-          ? path.basename(relativePath)
-          : requestedDisplayName;
-        const source = this.sources.createSource({
-          knowledgeWorkspaceId: workspaceId,
-          kind: "workspace-file",
-          displayName,
-        });
+        const sourceId = input.sourceId === undefined
+          ? this.createImportedSource(workspaceId, relativePath, input.displayName).id
+          : this.requireReusableSource(workspaceId, input.sourceId);
         const now = this.now().toISOString();
         const job: ImportJob = {
           id: this.createId(),
           knowledgeWorkspaceId: workspaceId,
           status: "queued",
           idempotencyKey,
-          payload: { sourceId: source.id, relativePath },
+          payload: { sourceId, relativePath },
           cancelRequested: false,
           result: null,
           createdAt: now,
@@ -139,6 +134,33 @@ export class MdTextImportJobs {
       if (raced !== null) return raced;
       throw error;
     }
+  }
+
+  private createImportedSource(
+    knowledgeWorkspaceId: string,
+    relativePath: string,
+    requestedDisplayName: string | undefined,
+  ): KnowledgeSource {
+    const normalizedDisplayName = requestedDisplayName?.trim();
+    return this.sources.createSource({
+      knowledgeWorkspaceId,
+      kind: "workspace-file",
+      displayName: normalizedDisplayName === undefined || normalizedDisplayName.length === 0
+        ? path.basename(relativePath)
+        : normalizedDisplayName,
+    });
+  }
+
+  private requireReusableSource(knowledgeWorkspaceId: string, sourceId: string): string {
+    const id = requireNonEmpty(sourceId, "sourceId");
+    const row = this.db.prepare(
+      `SELECT id FROM sources
+       WHERE id=? AND knowledge_workspace_id=? AND kind='workspace-file' AND archived_at IS NULL`,
+    ).get(id, knowledgeWorkspaceId);
+    if (row === undefined) {
+      throw new Error("Import update Source is unavailable in the requested Knowledge Workspace");
+    }
+    return id;
   }
 
   get(jobId: string): ImportJob {

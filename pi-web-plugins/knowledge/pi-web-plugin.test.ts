@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { html, render, svg } from "lit";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type {
   JsonValue,
   PluginRuntimeContext,
@@ -28,6 +28,10 @@ function activate(runtimePluginId = "knowledge") {
   }).contributions;
 }
 
+afterEach(() => {
+  document.body.replaceChildren();
+});
+
 describe("Knowledge browser plugin", () => {
   it("contributes one Knowledge workspace panel without a core navigation patch", () => {
     const panel = activate().workspacePanels?.[0];
@@ -49,50 +53,44 @@ describe("Knowledge browser plugin", () => {
     expect(selected).toBe(`${runtimePluginId}:workspace.knowledge`);
   });
 
-  it("checks integration through the paired backend and renders host scope", async () => {
-    const request = vi.fn((operation: string, input: JsonValue): Promise<JsonValue> => {
-      expect(operation).toBe("knowledge.status");
-      expect(input).toBeNull();
-      return Promise.resolve({
-        version: 1,
-        status: "ready",
-        scope: {
-          projectId: "project-1",
-          workspaceId: "workspace-1",
-          workspacePath: "/work/project-one/worktree",
-          workspaceLabel: "feature/p0",
-        },
-      });
-    });
-    const context = panelContext(request);
-    const panel = requiredPanel();
-    const container = document.createElement("div");
-
-    render(panel.render(context), container);
-    clickIntegrationCheck(container);
-    await settleBackend();
-    render(panel.render(context), container);
-
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(request).toHaveBeenCalledWith("knowledge.status", null);
-    expect(container.textContent).toContain("ready");
-    expect(container.textContent).toContain("project-1");
-    expect(container.textContent).toContain("workspace-1");
-    expect(container.textContent).toContain("/work/project-one/worktree");
-  });
-
-  it("keeps the panel visible and reports a missing paired backend capability", async () => {
+  it("renders the Product Preview inside the Knowledge panel", async () => {
     const context = panelContext();
     const panel = requiredPanel();
     const container = document.createElement("div");
+    document.body.append(container);
+
+    render(panel.render(context), container);
+    await settleBackend();
+    const preview = container.querySelector("pi-web-knowledge-product-preview");
+    expect(preview).not.toBeNull();
+    expect(preview?.shadowRoot?.textContent).toContain("Grounded Ask");
+  });
+
+  it("keeps the panel actionable when the paired backend is unavailable", async () => {
+    const context = panelContext();
+    const panel = requiredPanel();
+    const container = document.createElement("div");
+    document.body.append(container);
 
     expect(panel.visible).toBeUndefined();
     render(panel.render(context), container);
-    clickIntegrationCheck(container);
     await settleBackend();
-    render(panel.render(context), container);
+    const preview = container.querySelector("pi-web-knowledge-product-preview");
+    const filePicker = preview?.shadowRoot?.querySelector<HTMLButtonElement>("[data-file-picker-trigger]");
+    const importButton = preview?.shadowRoot?.querySelector<HTMLButtonElement>("[data-import]");
+    if (filePicker === null || filePicker === undefined || importButton === null || importButton === undefined) throw new Error("Product Preview import controls are missing");
+    filePicker.click();
+    await settleBackend();
+    const file = preview?.shadowRoot?.querySelector<HTMLButtonElement>("[data-file-picker-file='docs/readme.md']");
+    if (file === null || file === undefined) throw new Error("Workspace source file is missing");
+    file.click();
+    await settleBackend();
+    const selectedImportButton = preview?.shadowRoot?.querySelector<HTMLButtonElement>("[data-import]");
+    if (selectedImportButton === null || selectedImportButton === undefined) throw new Error("Product Preview import action is missing");
+    selectedImportButton.click();
+    await settleBackend();
 
-    expect(container.textContent).toContain("Paired backend request capability is unavailable");
+    expect(preview?.shadowRoot?.textContent).toContain("Paired backend request capability is unavailable");
   });
 });
 
@@ -100,12 +98,6 @@ function requiredPanel() {
   const panel = activate().workspacePanels?.[0];
   if (panel === undefined) throw new Error("Expected Knowledge workspace panel");
   return panel;
-}
-
-function clickIntegrationCheck(container: ParentNode): void {
-  const button = container.querySelector("button");
-  if (button === null) throw new Error("Expected Knowledge integration check button");
-  button.click();
 }
 
 function runtimeContext(selectWorkspaceTool: PluginRuntimeContext["selectWorkspaceTool"]): PluginRuntimeContext {
@@ -147,7 +139,12 @@ function panelContext(
     },
     files: {
       readFile: () => Promise.reject(new Error("not implemented")),
-      listFiles: () => Promise.reject(new Error("not implemented")),
+      listFiles: (path) => Promise.resolve({
+        path,
+        entries: path === "" ? [{ name: "readme.md", path: "docs/readme.md", type: "file" }] : [],
+        scannedAt: "2026-09-10T00:00:00.000Z",
+        truncated: false,
+      }),
       writeFile: () => Promise.reject(new Error("not implemented")),
       deleteFile: () => Promise.reject(new Error("not implemented")),
       moveFile: () => Promise.reject(new Error("not implemented")),

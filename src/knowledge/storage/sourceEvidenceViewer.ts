@@ -232,7 +232,7 @@ export class SourceEvidenceViewer {
         knowledgeWorkspaceId: workspaceId,
         evidence,
         mode: "context",
-        contextBytes: Math.floor(Math.max(0, maxBytes - (evidence.endByte - evidence.startByte)) / 2),
+        contextBytes: Math.min(32 * 1024, Math.floor(Math.max(0, maxBytes - (evidence.endByte - evidence.startByte)) / 2)),
         maxReadBytes: maxBytes,
       });
       windowStart = read.range.startByte;

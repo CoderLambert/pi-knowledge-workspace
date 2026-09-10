@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
-import { KNOWLEDGE_SCHEMA_VERSION, withTransaction } from "./database.js";
+import { KNOWLEDGE_SCHEMA_VERSION, openKnowledgeRuntimeDatabase, withTransaction } from "./database.js";
 import { applyMigrations, type MigrationDatabase } from "./migrations.js";
 
 class FakeDatabase implements MigrationDatabase {
@@ -25,6 +28,17 @@ class FakeDatabase implements MigrationDatabase {
 }
 
 describe("Knowledge database migrations", () => {
+  it("opens the production service database with the bundled SQLite runtime", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "knowledge-runtime-db-"));
+    try {
+      const db = openKnowledgeRuntimeDatabase(path.join(root, "knowledge.sqlite"));
+      expect(db.pragma("user_version", { simple: true })).toBe(KNOWLEDGE_SCHEMA_VERSION);
+      db.close();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("creates Evidence Core and advances through IndexBuild pin/lease retention", () => {
     const db = new FakeDatabase();
     applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);
@@ -75,6 +89,13 @@ describe("Knowledge database migrations", () => {
     expect(reliableKnowledgeMigration).toContain("index_build_selections");
     expect(reliableKnowledgeMigration).toContain("active_knowledge_publication_id");
     expect(reliableKnowledgeMigration).toContain("active_publication_migration_guard");
+
+    const groundedAskMigration = db.execLog.find((sql) => sql.includes("CREATE TABLE generation_runs")) ?? "";
+    expect(groundedAskMigration).toContain("CREATE TABLE delivered_evidence");
+    expect(groundedAskMigration).toContain("CREATE TABLE answers");
+    expect(groundedAskMigration).toContain("CREATE TABLE citation_refs");
+    expect(groundedAskMigration).toContain("generation_runs_frozen_scope");
+    expect(groundedAskMigration).toContain("retained_evidence_immutable");
     expect(db.execLog.at(-1)).toBe("COMMIT");
   });
 
@@ -91,6 +112,7 @@ describe("Knowledge database migrations", () => {
     expect(db.execLog.some((sql) => sql.includes("index_publication_migration_guard"))).toBe(true);
     expect(db.execLog.some((sql) => sql.includes("CREATE TABLE index_build_pins"))).toBe(true);
     expect(db.execLog.some((sql) => sql.includes("knowledge_publications"))).toBe(true);
+    expect(db.execLog.some((sql) => sql.includes("CREATE TABLE generation_runs"))).toBe(true);
   });
 
   it("is idempotent when the database is already current", () => {
@@ -119,6 +141,7 @@ describe("Knowledge database migrations", () => {
       [5, "index_publication_migration_guard", 6],
       [6, "CREATE TABLE index_build_pins", 7],
       [7, "reliable_knowledge_migration_guard", 8],
+      [8, "CREATE TABLE generation_runs", 9],
     ];
     for (const [version, failOn, migration] of cases) {
       const db = new FakeDatabase();

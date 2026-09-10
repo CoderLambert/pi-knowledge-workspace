@@ -2,6 +2,7 @@ import type { KnowledgeDatabase } from "../storage/database.js";
 import type { ParsedArtifactReadStore } from "../storage/evidenceRead.js";
 import { SourceEvidenceViewer } from "../storage/sourceEvidenceViewer.js";
 import { resolveKnowledgeWorkspaceIdentity } from "../storage/workspaceIdentity.js";
+import type { GroundedAskHostScope, GroundedAskScopeResolver } from "./groundedAsk.js";
 
 export interface ViewerHostScope {
   projectId: string;
@@ -19,6 +20,18 @@ export interface KnowledgeViewerDispatch {
   ): Record<string, unknown>;
 }
 
+/** Reuses the same host-authoritative Workspace → Knowledge identity mapping as the viewer. */
+export function createKnowledgeWorkspaceScopeResolver(db: KnowledgeDatabase): GroundedAskScopeResolver {
+  return Object.freeze({
+    resolveKnowledgeWorkspaceId(scope: GroundedAskHostScope): string {
+      return resolveKnowledgeWorkspaceIdentity(db, {
+        workspacePath: scope.workspacePath,
+        externalBinding: JSON.stringify({ projectId: scope.projectId, workspaceId: scope.workspaceId }),
+      }).knowledgeWorkspaceId;
+    },
+  });
+}
+
 const DEFAULT_VIEWER_ARTIFACT_BYTES = 40 * 1024;
 const MAX_VIEWER_ARTIFACT_BYTES = 48 * 1024;
 
@@ -32,10 +45,8 @@ export function createKnowledgeViewerDispatch(
 ): KnowledgeViewerDispatch {
   const viewer = new SourceEvidenceViewer(db, artifacts);
 
-  const resolveWorkspace = (scope: ViewerHostScope): string => resolveKnowledgeWorkspaceIdentity(db, {
-    workspacePath: scope.workspacePath,
-    externalBinding: JSON.stringify({ projectId: scope.projectId, workspaceId: scope.workspaceId }),
-  }).knowledgeWorkspaceId;
+  const scopeResolver = createKnowledgeWorkspaceScopeResolver(db);
+  const resolveWorkspace = (scope: ViewerHostScope): string => scopeResolver.resolveKnowledgeWorkspaceId(scope);
 
   const dispatch: KnowledgeViewerDispatch = {
     listSources(scope) {

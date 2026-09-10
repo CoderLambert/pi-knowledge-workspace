@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { KnowledgeDatabase, SqliteStatement } from "./database.js";
+import { openKnowledgeRuntimeDatabase, type KnowledgeDatabase, type SqliteStatement } from "./database.js";
 import { DurableJobStore, type DurableJob, type JobLease } from "./durableJobs.js";
 import { DurableJobWorker, type DurableJobHandler } from "./workerLoop.js";
 
@@ -158,6 +158,95 @@ describe("DurableJobWorker", () => {
     expect(result.status).toBe("cancelled");
     expect(store.cancelled).toBe(1);
     expect(store.succeeded).toEqual([]);
+  });
+
+  it("rejects a stale handler before its user-visible business commit", async () => {
+    const db = new ScriptedDatabase();
+    db.allRows = [[], [{ id: "job-1" }]];
+    db.runRows = [{ changes: 0, lastInsertRowid: 0 }];
+    const store = new FakeStore(db);
+    let businessWrites = 0;
+    const handlers = new Map<string, DurableJobHandler>([["import", (context) => {
+      store.current = job({
+        leaseOwner: "worker-b",
+        fencingToken: 2,
+        heartbeatAt: "2026-09-09T04:00:10.000Z",
+        leaseExpiresAt: "2026-09-09T04:00:40.000Z",
+      });
+      context.assertAuthority();
+      businessWrites += 1;
+      return Promise.resolve({ ignored: true });
+    }]]);
+
+    const result = await worker(db, store, handlers).runOnce();
+
+    expect(result.status).toBe("lost-lease");
+    expect(businessWrites).toBe(0);
+    expect(store.succeeded).toEqual([]);
+    expect(store.current.leaseOwner).toBe("worker-b");
+    expect(store.current.fencingToken).toBe(2);
+  });
+
+  it("atomically fences the business commit after worker B takes over", async () => {
+    const db = openKnowledgeRuntimeDatabase(":memory:");
+    let now = new Date(NOW);
+    const clock = () => new Date(now);
+    try {
+      db.prepare("INSERT INTO installations (id, created_at) VALUES ('installation', ?)").run(NOW);
+      db.prepare(`INSERT INTO knowledge_workspaces
+        (id, installation_id, canonical_realpath, created_at)
+        VALUES ('kw-1', 'installation', '/workspace', ?)`).run(NOW);
+      db.exec("CREATE TABLE visible_state (id TEXT PRIMARY KEY, value TEXT NOT NULL, fencing_token INTEGER NOT NULL)");
+      db.prepare("INSERT INTO visible_state (id, value, fencing_token) VALUES ('publication', 'initial', 0)").run();
+
+      const storeA = new DurableJobStore(db, { now: clock });
+      const storeB = new DurableJobStore(db, { now: clock });
+      const submitted = storeA.submit({
+        knowledgeWorkspaceId: "kw-1",
+        kind: "import",
+        payload: { path: "guide.md" },
+        idempotencyKey: "takeover-race",
+      });
+      let preWorkAuthorityPassed = false;
+      const handlers = new Map<string, DurableJobHandler>([["import", (context) => {
+        context.assertAuthority();
+        preWorkAuthorityPassed = true;
+
+        now = new Date("2026-09-09T04:00:31.000Z");
+        storeB.recoverExpiredLease(submitted.id, 1);
+        const leaseB = storeB.claim(submitted.id, "worker-b", 30_000);
+        storeB.commitWithAuthority(submitted.id, "worker-b", leaseB.fencingToken, (authorityDb) => {
+          authorityDb.prepare("UPDATE visible_state SET value='worker-b', fencing_token=? WHERE id='publication'")
+            .run(leaseB.fencingToken);
+        });
+
+        context.commitWithAuthority((authorityDb) => {
+          authorityDb.prepare("UPDATE visible_state SET value='stale-worker-a', fencing_token=1 WHERE id='publication'").run();
+        });
+        return Promise.resolve({ published: true });
+      }]]);
+      const workerA = new DurableJobWorker(db, storeA, handlers, {
+        workerId: "worker-a",
+        leaseMs: 30_000,
+        heartbeatMs: 10_000,
+        now: clock,
+      });
+
+      const result = await workerA.runOnce();
+
+      expect(preWorkAuthorityPassed).toBe(true);
+      expect(result).toMatchObject({ status: "lost-lease", jobId: submitted.id });
+      expect(db.prepare("SELECT value, fencing_token FROM visible_state WHERE id='publication'").get())
+        .toEqual({ value: "worker-b", fencing_token: 2 });
+      expect(storeA.get(submitted.id)).toMatchObject({
+        status: "running",
+        leaseOwner: "worker-b",
+        fencingToken: 2,
+        result: null,
+      });
+    } finally {
+      db.close();
+    }
   });
 
   it("does not retry a terminal write after the lease/fencing token is lost", async () => {

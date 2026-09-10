@@ -20,6 +20,13 @@ export const KNOWLEDGE_STATUS_OPERATION = "knowledge.status";
 export const KNOWLEDGE_SOURCES_LIST_OPERATION = "knowledge.viewer.sources.list";
 export const KNOWLEDGE_SOURCE_GET_OPERATION = "knowledge.viewer.source.get";
 export const KNOWLEDGE_ARTIFACT_OPEN_OPERATION = "knowledge.viewer.artifact.open";
+export const KNOWLEDGE_IMPORT_OPERATION = "knowledge.import.submit";
+export const KNOWLEDGE_IMPORT_STATUS_OPERATION = "knowledge.import.status";
+export const KNOWLEDGE_PUBLISH_OPERATION = "knowledge.publish";
+export const KNOWLEDGE_ASK_OPERATION = "knowledge.ask";
+export const KNOWLEDGE_ANSWER_GET_OPERATION = "knowledge.answer.get";
+export const KNOWLEDGE_ANSWERS_LIST_OPERATION = "knowledge.answers.list";
+export const KNOWLEDGE_CITATION_OPEN_OPERATION = "knowledge.citation.open";
 
 const plugin: PiWebServerPlugin = {
   apiVersion: 1,
@@ -93,6 +100,66 @@ async function knowledgeRequest(
     }, context.signal);
   }
 
+  if (context.operation === KNOWLEDGE_IMPORT_OPERATION) {
+    const input = requireViewerInput(context.input, context.operation, ["relativePath", "idempotencyKey"], ["displayName", "sourceId"]);
+    const displayName = optionalNonEmptyString(input, "displayName", context.operation);
+    const sourceId = optionalNonEmptyString(input, "sourceId", context.operation);
+    return await dispatchKnowledge(serviceClient, "knowledge.import.submit", {
+      scope,
+      relativePath: requireNonEmptyString(input, "relativePath", context.operation),
+      idempotencyKey: requireNonEmptyString(input, "idempotencyKey", context.operation),
+      ...(displayName === undefined ? {} : { displayName }),
+      ...(sourceId === undefined ? {} : { sourceId }),
+    }, context.signal);
+  }
+
+  if (context.operation === KNOWLEDGE_IMPORT_STATUS_OPERATION) {
+    const input = requireViewerInput(context.input, context.operation, ["jobId"]);
+    return await dispatchKnowledge(serviceClient, "knowledge.import.status", {
+      scope,
+      jobId: requireNonEmptyString(input, "jobId", context.operation),
+    }, context.signal);
+  }
+
+  if (context.operation === KNOWLEDGE_PUBLISH_OPERATION) {
+    const input = requireViewerInput(context.input, context.operation, [], ["sourceIds", "sourceVersionIds"]);
+    return await dispatchKnowledge(serviceClient, "knowledge.publish", {
+      scope,
+      sourceIds: requireStringArray(input, "sourceIds", context.operation),
+      sourceVersionIds: requireStringArray(input, "sourceVersionIds", context.operation),
+    }, context.signal);
+  }
+
+  if (context.operation === KNOWLEDGE_ASK_OPERATION) {
+    const input = requireViewerInput(context.input, context.operation, ["question"]);
+    return await dispatchKnowledge(serviceClient, "knowledge.ask", {
+      scope,
+      question: requireNonEmptyString(input, "question", context.operation),
+    }, context.signal);
+  }
+
+  if (context.operation === KNOWLEDGE_ANSWER_GET_OPERATION) {
+    const input = requireViewerInput(context.input, context.operation, ["answerId"]);
+    return await dispatchKnowledge(serviceClient, "knowledge.answer.get", {
+      scope,
+      answerId: requireNonEmptyString(input, "answerId", context.operation),
+    }, context.signal);
+  }
+
+  if (context.operation === KNOWLEDGE_ANSWERS_LIST_OPERATION) {
+    requireEmptyInput(context.input, context.operation);
+    return await dispatchKnowledge(serviceClient, "knowledge.answers.list", { scope }, context.signal);
+  }
+
+  if (context.operation === KNOWLEDGE_CITATION_OPEN_OPERATION) {
+    const input = requireViewerInput(context.input, context.operation, ["answerId", "citationId"]);
+    return await dispatchKnowledge(serviceClient, "knowledge.citation.open", {
+      scope,
+      answerId: requireNonEmptyString(input, "answerId", context.operation),
+      citationId: requireNonEmptyString(input, "citationId", context.operation),
+    }, context.signal);
+  }
+
   throw new Error(`Unsupported Knowledge operation: ${context.operation}`);
 }
 
@@ -102,11 +169,16 @@ async function dispatchViewer(
   input: JsonObject,
   signal: AbortSignal,
 ): Promise<JsonObject> {
-  // KnowledgeServiceOperation predates P1 viewer operations; the wire client itself
-  // serializes JSON and the standalone service owns the operation allowlist. A successful
-  // client dispatch has already parsed and validated an object-shaped JSON result.
-  const result = await serviceClient.dispatch(operation as KnowledgeServiceOperation, input, signal);
-  return result as JsonObject;
+  return toJsonObject(await serviceClient.dispatch(operation, input, signal));
+}
+
+async function dispatchKnowledge(
+  serviceClient: KnowledgeServiceClient,
+  operation: Extract<KnowledgeServiceOperation, `knowledge.${string}`>,
+  input: JsonObject,
+  signal: AbortSignal,
+): Promise<JsonObject> {
+  return toJsonObject(await serviceClient.dispatch(operation, input, signal));
 }
 
 async function knowledgePluginHealth(
@@ -172,7 +244,8 @@ function requireViewerInput(
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error(`${operation} input must be an object`);
   }
-  const record = value as Record<string, JsonValue>;
+  if (!isJsonRecord(value)) throw new Error(`${operation} input must be an object`);
+  const record = value;
   const allowed = new Set([...requiredFields, ...optionalFields]);
   for (const key of Object.keys(record)) {
     if (!allowed.has(key)) throw new Error(`${operation} input contains unsupported field: ${key}`);
@@ -205,6 +278,40 @@ function optionalPositiveInteger(record: Record<string, JsonValue>, key: string,
     throw new Error(`${operation} ${key} must be a positive integer when supplied`);
   }
   return value;
+}
+
+function requireStringArray(record: Record<string, JsonValue>, key: string, operation: string): JsonValue[] {
+  const value = record[key];
+  if (!isNonEmptyStringArray(value)) {
+    throw new Error(`${operation} ${key} must be a non-empty string array`);
+  }
+  return value;
+}
+
+function isJsonRecord(value: JsonValue): value is Record<string, JsonValue> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function toJsonObject(value: Record<string, unknown>): JsonObject {
+  const result: Record<string, JsonValue> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (!isJsonValue(item)) throw new Error("pi-knowledge returned a non-JSON object");
+    result[key] = item;
+  }
+  return result;
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.every((item) => isJsonValue(item));
+  if (typeof value !== "object") return false;
+  return Object.values(value).every((item) => isJsonValue(item));
+}
+
+function isNonEmptyStringArray(value: JsonValue | undefined): value is string[] {
+  return value !== undefined && Array.isArray(value)
+    && value.length > 0
+    && value.every((item) => typeof item === "string" && item.trim().length > 0);
 }
 
 function healthErrorMessage(error: unknown): string {

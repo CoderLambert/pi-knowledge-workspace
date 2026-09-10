@@ -115,26 +115,29 @@ export class KnowledgeBackupCreator {
       }
 
       const artifacts: BackupManifestArtifact[] = [];
-      if (artifactRows.length > 0 && this.options.artifactProvider === undefined) {
+      const artifactProvider = this.options.artifactProvider;
+      if (artifactRows.length > 0 && artifactProvider === undefined) {
         throw new Error(
           "Backup requires a durable ParsedArtifact provider; refusing to create an incomplete backup",
         );
       }
-      for (const row of artifactRows) {
-        const bytes = Buffer.from(await this.options.artifactProvider!.readArtifactBundle(row.id));
-        if (bytes.byteLength === 0) throw new Error(`ParsedArtifact bundle is empty: ${row.id}`);
-        const safeName = `${sha256(Buffer.from(row.id, "utf8"))}.bin`;
-        const relativePath = path.posix.join("objects", "artifacts", safeName);
-        await writeObject(temp, relativePath, bytes);
-        artifacts.push({
-          path: relativePath,
-          size: bytes.byteLength,
-          sha256: sha256(bytes),
-          parsedArtifactId: row.id,
-          sourceVersionId: row.source_version_id,
-          parserVersion: row.parser_version,
-          canonicalTextSha256: row.canonical_text_sha256,
-        });
+      if (artifactProvider !== undefined) {
+        for (const row of artifactRows) {
+          const bytes = Buffer.from(await artifactProvider.readArtifactBundle(row.id));
+          if (bytes.byteLength === 0) throw new Error(`ParsedArtifact bundle is empty: ${row.id}`);
+          const safeName = `${sha256(Buffer.from(row.id, "utf8"))}.bin`;
+          const relativePath = path.posix.join("objects", "artifacts", safeName);
+          await writeObject(temp, relativePath, bytes);
+          artifacts.push({
+            path: relativePath,
+            size: bytes.byteLength,
+            sha256: sha256(bytes),
+            parsedArtifactId: row.id,
+            sourceVersionId: row.source_version_id,
+            parserVersion: row.parser_version,
+            canonicalTextSha256: row.canonical_text_sha256,
+          });
+        }
       }
 
       snapshot.close();
@@ -185,7 +188,7 @@ function readBlobClosure(db: KnowledgeDatabase): SourceVersionBlobRow[] {
      FROM source_versions ORDER BY content_sha256 ASC`,
   ).all();
   return rows.map((row) => {
-    const value = row as Record<string, unknown>;
+    const value = recordValue(row, "SourceVersion row");
     const blobKey = stringField(value, "blob_key");
     const contentSha256 = shaField(value, "content_sha256");
     const byteLength = integerField(value, "byte_length");
@@ -199,7 +202,7 @@ function readArtifactClosure(db: KnowledgeDatabase): ParsedArtifactRow[] {
      FROM parsed_artifacts ORDER BY id ASC`,
   ).all();
   return rows.map((row) => {
-    const value = row as Record<string, unknown>;
+    const value = recordValue(row, "ParsedArtifact row");
     return {
       id: stringField(value, "id"),
       source_version_id: stringField(value, "source_version_id"),
@@ -227,8 +230,15 @@ async function assertDestinationAbsent(destination: string): Promise<void> {
 
 function requireNonEmpty(value: string, name: string): string {
   const normalized = value.trim();
-  if (!normalized) throw new TypeError(`${name} must be non-empty`);
+  if (normalized.length === 0) throw new TypeError(`${name} must be non-empty`);
   return normalized;
+}
+
+function recordValue(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`Backup snapshot ${label} is invalid`);
+  }
+  return value;
 }
 
 function stringField(row: Record<string, unknown>, key: string): string {
@@ -255,6 +265,6 @@ function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === code;
+function isNodeError(error: unknown, code: string): error is Error & { code: unknown } {
+  return error instanceof Error && "code" in error && error.code === code;
 }

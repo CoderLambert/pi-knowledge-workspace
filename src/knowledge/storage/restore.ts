@@ -199,7 +199,7 @@ function assertManifestClosure(manifest: KnowledgeBackupManifest, closure: Snaps
     if (seenBlobs.has(entry.contentSha256)) throw new Error(`Duplicate backup blob manifest entry: ${entry.contentSha256}`);
     seenBlobs.add(entry.contentSha256);
     const row = closure.blobs.get(entry.contentSha256);
-    if (row === undefined || row.byteLength !== entry.size) throw new Error(`Backup blob closure mismatch: ${entry.contentSha256}`);
+    if (row?.byteLength !== entry.size) throw new Error(`Backup blob closure mismatch: ${entry.contentSha256}`);
   }
 
   if (manifest.artifacts.length !== closure.artifacts.size) throw new Error("Backup artifact manifest does not match SQLite closure");
@@ -209,8 +209,9 @@ function assertManifestClosure(manifest: KnowledgeBackupManifest, closure: Snaps
     seenArtifacts.add(entry.parsedArtifactId);
     const row = closure.artifacts.get(entry.parsedArtifactId);
     if (
-      row === undefined || row.sourceVersionId !== entry.sourceVersionId || row.parserVersion !== entry.parserVersion
-      || row.canonicalTextSha256 !== entry.canonicalTextSha256
+      row?.sourceVersionId !== entry.sourceVersionId
+      || row?.parserVersion !== entry.parserVersion
+      || row?.canonicalTextSha256 !== entry.canonicalTextSha256
     ) {
       throw new Error(`Backup artifact closure mismatch: ${entry.parsedArtifactId}`);
     }

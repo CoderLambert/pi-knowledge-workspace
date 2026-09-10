@@ -115,7 +115,9 @@ describe("Knowledge database migrations", () => {
       const db = new FakeDatabase();
       db.userVersion = version;
       db.failOn = failOn;
-      expect(() => applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION)).toThrow(new RegExp(`migration ${String(migration)}`));
+      expect(() => {
+        applyMigrations(db, KNOWLEDGE_SCHEMA_VERSION);
+      }).toThrow(new RegExp(`migration ${String(migration)}`));
       expect(db.userVersion).toBe(version);
     }
   });

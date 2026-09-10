@@ -222,14 +222,15 @@ describe("MdTextImportJobs", () => {
 
   it("observes in-flight cancellation after safe capture and before SourceVersion persistence", async () => {
     const bytes = Buffer.from("captured but cancelled");
-    let activeJobs: MdTextImportJobs | undefined;
+    const activeJobs: MdTextImportJobs[] = [];
     let submittedId = "";
     const fx = await fixture({ captureFile: (_root, relativePath) => {
-      if (activeJobs === undefined) throw new Error("import jobs fixture not initialized");
-      activeJobs.requestCancel(submittedId);
+      const currentJobs = activeJobs[0];
+      if (currentJobs === undefined) throw new Error("import jobs fixture not initialized");
+      currentJobs.requestCancel(submittedId);
       return Promise.resolve({ relativePath, canonicalPath: `/fake/${relativePath}`, bytes, byteLength: bytes.byteLength, contentSha256: createHash("sha256").update(bytes).digest("hex") });
     }});
-    activeJobs = fx.jobs;
+    activeJobs.push(fx.jobs);
     const submitted = fx.jobs.submit({ knowledgeWorkspaceId: "workspace-1", relativePath: "cancel.txt", idempotencyKey: "cancel-running" }); submittedId = submitted.id;
     const done = await fx.jobs.run(submitted.id);
     expect(done.status).toBe("cancelled"); expect(fx.sources.versions).toHaveLength(0); expect(fx.db.attempts[0]?.status).toBe("cancelled");

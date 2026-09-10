@@ -1,6 +1,6 @@
 # P3-T01S20 — Golden Dataset Test-Harness Lint
 
-Status: **PARTIAL**
+Status: **PASS**
 
 ## Purpose
 
@@ -17,7 +17,7 @@ Support documentation:
 - this report;
 - `docs/development/verification/P3-T01S20-golden-dataset-test-lint.md`.
 
-The parent lint output reports 9 inherited findings in this file: eight `no-confusing-void-expression` findings around validator assertions and one `consistent-type-assertions` finding for the deliberately invalid Chunk-identity fixture.
+The parent lint output reported 9 inherited findings in this file: eight `no-confusing-void-expression` findings around validator assertions and one `consistent-type-assertions` finding for the deliberately invalid Chunk-identity fixture.
 
 `goldenDataset.ts`, committed evaluation data, benchmark thresholds and retrieval configuration are explicitly out of scope.
 
@@ -40,16 +40,35 @@ The same Golden Dataset invariants remain asserted:
 
 No production validator or frozen P2 evidence changes are made.
 
-## Verification state
+## Verification evidence
 
-Status remains **PARTIAL** until GitHub CI confirms:
+Final S20 code head:
+
+```text
+36a29e1d71cdf5ede054499ada7ac93fcbb1de9d
+```
+
+GitHub CI run `34451400177` confirmed:
 
 ```text
 npm run typecheck → PASS
 ESLint 77 → 68
 ```
 
-The task-owned test file must disappear from the authoritative lint output. Frozen P2 FTS and P2 Lexical Evidence workflows must remain green.
+`src/knowledge/eval/goldenDataset.test.ts` no longer appears in the authoritative lint output. The workflow remains globally red only because 68 inherited repository-wide lint findings remain and lint stops `npm run verify` before knip/full tests.
+
+Frozen P2 regression workflows passed on the same code head:
+
+```text
+P2 FTS Evidence     34451400086 → PASS
+P2 Lexical Evidence 34451400208 → PASS
+```
+
+No frozen evaluation data, thresholds, retrieval configuration, benchmark input or evidence artifact changed.
+
+## Status decision
+
+**PASS.** All nine S20-owned inherited lint findings are closed, typecheck remains green, both frozen P2 regression workflows are green, and no user-local verification is required.
 
 ## Git discipline
 

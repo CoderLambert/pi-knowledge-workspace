@@ -47,7 +47,7 @@ npm run typecheck → PASS
 ESLint baseline: 126 → 100
 ```
 
-All 26 task-owned findings are closed. The repository-wide CI remains red only because 100 inherited P3-T01 ESLint findings remain outside this slice. P2 FTS Evidence passed on the same production head; P2 Lexical Evidence is tracked independently by its workflow and does not require any frozen-evidence mutation from this task.
+All 26 task-owned findings are closed. The repository-wide CI remains red only because 100 inherited P3-T01 ESLint findings remain outside this slice. P2 FTS Evidence run `34441857510` and P2 Lexical Evidence run `34441857478` both passed on the same production head; no frozen P2 evidence or retrieval configuration was modified.
 
 ## Scope exclusions
 

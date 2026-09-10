@@ -41,7 +41,8 @@ export async function runBackupCli(argv: readonly string[]): Promise<KnowledgeBa
 export function parseBackupArgs(argv: readonly string[]): BackupCliOptions {
   const values = new Map<string, string>();
   for (let index = 0; index < argv.length; index += 1) {
-    const flag = argv[index]!;
+    const flag = argv[index];
+    if (flag === undefined) throw new Error("Missing backup argument");
     if (flag !== "--db" && flag !== "--data-dir" && flag !== "--output") {
       throw new Error(`Unknown backup argument: ${flag}`);
     }
@@ -60,15 +61,18 @@ export function parseBackupArgs(argv: readonly string[]): BackupCliOptions {
 }
 
 function asBackupCapable(db: KnowledgeDatabase): KnowledgeDatabase & BackupCapableDatabase {
-  const candidate = db as KnowledgeDatabase & Partial<BackupCapableDatabase>;
-  if (typeof candidate.backup !== "function") {
+  if (!isBackupCapable(db)) {
     throw new Error("Selected SQLite driver does not expose the required online backup API");
   }
-  return candidate as KnowledgeDatabase & BackupCapableDatabase;
+  return db;
+}
+
+function isBackupCapable(db: KnowledgeDatabase): db is KnowledgeDatabase & BackupCapableDatabase {
+  return "backup" in db && typeof db.backup === "function";
 }
 
 function required(values: ReadonlyMap<string, string>, flag: string): string {
   const value = values.get(flag)?.trim();
-  if (!value) throw new Error(`pi-knowledge backup requires ${flag} <path>`);
+  if (value === undefined || value.length === 0) throw new Error(`pi-knowledge backup requires ${flag} <path>`);
   return value;
 }

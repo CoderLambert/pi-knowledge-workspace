@@ -59,6 +59,7 @@ export interface SearchIndexBuildResolver {
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 100;
 const SEARCH_BUILD_LEASE_MS = 60_000;
+const INVALID_SEARCH_METADATA = "Search metadata is missing or inconsistent with the scoped lexical hit";
 
 /** Atomically resolves and leases the Workspace's published active IndexBuild. */
 export class ActiveIndexBuildResolver implements SearchIndexBuildResolver {
@@ -164,7 +165,10 @@ WHERE c.id = ?
 }
 
 function hydrateHit(hit: Fts5SearchHit, row: unknown): SearchQueryHit {
-  const value = recordValue(row, "search metadata row");
+  if (typeof row !== "object" || row === null || Array.isArray(row)) {
+    throw new Error(INVALID_SEARCH_METADATA);
+  }
+  const value = Object.fromEntries(Object.entries(row));
   const chunkId = value["chunk_id"];
   const sourceVersionId = value["source_version_id"];
   const parsedArtifactId = value["parsed_artifact_id"];
@@ -197,7 +201,7 @@ function hydrateHit(hit: Fts5SearchHit, row: unknown): SearchQueryHit {
     sourceDisplayName.length === 0 ||
     (sourceArchivedAt !== null && typeof sourceArchivedAt !== "string")
   ) {
-    throw new Error("Search metadata is missing or inconsistent with the scoped lexical hit");
+    throw new Error(INVALID_SEARCH_METADATA);
   }
 
   return {
@@ -251,11 +255,4 @@ function requireNonEmpty(value: string, name: string): string {
 function stableHandle(kind: "query" | "run", value: unknown): string {
   const digest = createHash("sha256").update(JSON.stringify(value)).digest("hex");
   return `search_${kind}_${digest}`;
-}
-
-function recordValue(value: unknown, label: string): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${label} must be an object record`);
-  }
-  return Object.fromEntries(Object.entries(value));
 }

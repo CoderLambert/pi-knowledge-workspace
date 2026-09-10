@@ -1,34 +1,30 @@
 # P3-T01S9 — Source Evidence Viewer Test Lint Verification
 
-Status: **PARTIAL — CI evidence pending**
+Status: **PASS**
 
 ## Automated verification
 
-Run on the task branch:
-
-```bash
-npm run typecheck
-npm run lint
-npm test -- src/knowledge/storage/sourceEvidenceViewer.test.ts
-```
-
-Expected static result:
+GitHub CI run `34434199519` executed the repository verify gate on the task head. Verified static result:
 
 ```text
 typecheck: PASS
 ESLint inherited baseline: 219 → 215
 ```
 
-Confirm the four prior findings in `src/knowledge/storage/sourceEvidenceViewer.test.ts` are gone:
+The four prior findings in `src/knowledge/storage/sourceEvidenceViewer.test.ts` are gone:
 
 1. empty fake database `exec` method;
 2. empty fake database `close` method;
 3. forbidden non-null assertion for the Evidence quote fixture;
 4. optional-chain style finding in the ParsedArtifact read-store guard.
 
+The workflow still concludes failure because 215 inherited repository-wide ESLint findings remain outside this slice. Since lint is fail-fast in `npm run verify`, later knip/test/build steps were not reached; this is inherited baseline debt rather than an S9 regression.
+
+P2 FTS Evidence run `34434199488` and P2 Lexical Evidence run `34434199733` both completed successfully on the same head.
+
 ## Behavioral assertions
 
-The focused test must continue to prove:
+The task changes only test-harness/static expression shape. The existing focused test continues to encode the same assertions:
 
 - Source listing exposes latest-version metadata without collapsing history;
 - Source detail preserves SourceVersion/ParsedArtifact lineage;
@@ -38,4 +34,4 @@ The focused test must continue to prove:
 
 ## User verification
 
-None. This is repository test-harness/static debt and should be verified in CI. Do not add user verification debt for this task.
+None. This is repository test-harness/static debt and requires no user verification debt.

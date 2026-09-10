@@ -235,6 +235,180 @@ CREATE INDEX index_build_pins_build_expiry_idx ON index_build_pins(index_build_i
 CREATE INDEX index_build_pins_expiry_idx ON index_build_pins(lease_expires_at);
 `,
   },
+  {
+    version: 8,
+    name: "reliable-knowledge-publication",
+    sql: `
+ALTER TABLE parsed_artifacts ADD COLUMN parser_fingerprint TEXT;
+ALTER TABLE parsed_artifacts ADD COLUMN normalization_fingerprint TEXT;
+ALTER TABLE parsed_artifacts ADD COLUMN document_schema_version INTEGER CHECK (document_schema_version > 0);
+ALTER TABLE parsed_artifacts ADD COLUMN interpretation_config_sha256 TEXT CHECK (
+  interpretation_config_sha256 IS NULL OR (
+    length(interpretation_config_sha256) = 64
+    AND interpretation_config_sha256 = lower(interpretation_config_sha256)
+    AND interpretation_config_sha256 NOT GLOB '*[^0-9a-f]*'
+  )
+);
+ALTER TABLE parsed_artifacts ADD COLUMN artifact_hash TEXT CHECK (
+  artifact_hash IS NULL OR (
+    length(artifact_hash) = 64
+    AND artifact_hash = lower(artifact_hash)
+    AND artifact_hash NOT GLOB '*[^0-9a-f]*'
+  )
+);
+ALTER TABLE parsed_artifacts ADD COLUMN canonical_bytes BLOB;
+ALTER TABLE parsed_artifacts ADD COLUMN document_structure_json TEXT CHECK (
+  document_structure_json IS NULL OR json_valid(document_structure_json)
+);
+ALTER TABLE parsed_artifacts ADD COLUMN source_map_json TEXT CHECK (
+  source_map_json IS NULL OR json_valid(source_map_json)
+);
+CREATE UNIQUE INDEX parsed_artifacts_artifact_hash_idx
+  ON parsed_artifacts(artifact_hash) WHERE artifact_hash IS NOT NULL;
+CREATE UNIQUE INDEX parsed_artifacts_interpretation_idx
+  ON parsed_artifacts(
+    source_version_id,
+    parser_fingerprint,
+    normalization_fingerprint,
+    document_schema_version,
+    interpretation_config_sha256
+  )
+  WHERE parser_fingerprint IS NOT NULL
+    AND normalization_fingerprint IS NOT NULL
+    AND document_schema_version IS NOT NULL
+    AND interpretation_config_sha256 IS NOT NULL;
+
+ALTER TABLE index_builds ADD COLUMN retrieval_config_revision TEXT NOT NULL DEFAULT 'legacy-unspecified';
+ALTER TABLE index_builds ADD COLUMN base_publication_id TEXT;
+CREATE TABLE index_build_selections (
+  index_build_id TEXT NOT NULL REFERENCES index_builds(id) ON DELETE CASCADE,
+  source_id TEXT NOT NULL REFERENCES sources(id),
+  source_version_id TEXT NOT NULL REFERENCES source_versions(id),
+  parsed_artifact_id TEXT NOT NULL REFERENCES parsed_artifacts(id),
+  PRIMARY KEY (index_build_id, source_id)
+);
+CREATE UNIQUE INDEX index_build_selection_artifact_idx
+  ON index_build_selections(index_build_id, parsed_artifact_id);
+
+CREATE TABLE reliable_knowledge_migration_guard (
+  invalid_count INTEGER NOT NULL CHECK (invalid_count = 0)
+);
+INSERT INTO reliable_knowledge_migration_guard(invalid_count)
+SELECT COUNT(*) FROM (
+  SELECT c.index_build_id, sv.source_id
+  FROM chunks c
+  JOIN source_versions sv ON sv.id = c.source_version_id
+  GROUP BY c.index_build_id, sv.source_id
+  HAVING COUNT(DISTINCT c.source_version_id) <> 1
+      OR COUNT(DISTINCT c.parsed_artifact_id) <> 1
+  UNION ALL
+  SELECT c.id, sv.source_id
+  FROM chunks c
+  JOIN index_builds ib ON ib.id = c.index_build_id
+  JOIN parsed_artifacts pa ON pa.id = c.parsed_artifact_id
+  JOIN source_versions sv ON sv.id = c.source_version_id
+  JOIN sources s ON s.id = sv.source_id
+  WHERE pa.source_version_id <> c.source_version_id
+     OR s.knowledge_workspace_id <> ib.knowledge_workspace_id
+);
+DROP TABLE reliable_knowledge_migration_guard;
+
+INSERT INTO index_build_selections(index_build_id, source_id, source_version_id, parsed_artifact_id)
+SELECT DISTINCT c.index_build_id, sv.source_id, c.source_version_id, c.parsed_artifact_id
+FROM chunks c
+JOIN source_versions sv ON sv.id = c.source_version_id;
+
+CREATE TABLE knowledge_publications (
+  id TEXT PRIMARY KEY,
+  knowledge_workspace_id TEXT NOT NULL REFERENCES knowledge_workspaces(id),
+  generation INTEGER NOT NULL CHECK (generation > 0),
+  index_build_id TEXT NOT NULL,
+  retrieval_config_revision TEXT NOT NULL,
+  published_at TEXT NOT NULL,
+  UNIQUE (knowledge_workspace_id, generation),
+  UNIQUE (index_build_id)
+);
+CREATE TABLE knowledge_publication_selections (
+  publication_id TEXT NOT NULL REFERENCES knowledge_publications(id),
+  source_id TEXT NOT NULL REFERENCES sources(id),
+  source_version_id TEXT NOT NULL REFERENCES source_versions(id),
+  parsed_artifact_id TEXT NOT NULL REFERENCES parsed_artifacts(id),
+  PRIMARY KEY (publication_id, source_id),
+  UNIQUE (publication_id, parsed_artifact_id)
+);
+CREATE INDEX knowledge_publications_workspace_generation_idx
+  ON knowledge_publications(knowledge_workspace_id, generation);
+CREATE INDEX knowledge_publication_artifact_idx
+  ON knowledge_publication_selections(parsed_artifact_id);
+CREATE TRIGGER knowledge_publications_immutable_update
+BEFORE UPDATE ON knowledge_publications BEGIN
+  SELECT RAISE(ABORT, 'Knowledge publications are immutable');
+END;
+CREATE TRIGGER knowledge_publications_immutable_delete
+BEFORE DELETE ON knowledge_publications BEGIN
+  SELECT RAISE(ABORT, 'Knowledge publications are immutable');
+END;
+CREATE TRIGGER knowledge_publication_selections_immutable_update
+BEFORE UPDATE ON knowledge_publication_selections BEGIN
+  SELECT RAISE(ABORT, 'Knowledge publication selections are immutable');
+END;
+CREATE TRIGGER knowledge_publication_selections_immutable_delete
+BEFORE DELETE ON knowledge_publication_selections BEGIN
+  SELECT RAISE(ABORT, 'Knowledge publication selections are immutable');
+END;
+
+CREATE TABLE active_publication_migration_guard (
+  invalid_count INTEGER NOT NULL CHECK (invalid_count = 0)
+);
+INSERT INTO active_publication_migration_guard(invalid_count)
+SELECT COUNT(*)
+FROM knowledge_workspaces kw
+LEFT JOIN index_builds ib ON ib.id = kw.active_index_build_id
+WHERE (kw.active_index_build_id IS NULL AND kw.index_generation <> 0)
+   OR (kw.active_index_build_id IS NOT NULL AND (
+        kw.index_generation = 0
+        OR ib.id IS NULL
+        OR ib.knowledge_workspace_id <> kw.id
+        OR ib.status <> 'active'
+        OR ib.published_at IS NULL
+        OR NOT EXISTS (
+          SELECT 1 FROM index_build_selections selection
+          WHERE selection.index_build_id = ib.id
+        )
+      ));
+DROP TABLE active_publication_migration_guard;
+
+INSERT INTO knowledge_publications(
+  id, knowledge_workspace_id, generation, index_build_id, retrieval_config_revision, published_at
+)
+SELECT
+  'legacy-publication:' || kw.id || ':' || kw.index_generation,
+  kw.id,
+  kw.index_generation,
+  ib.id,
+  ib.retrieval_config_revision,
+  ib.published_at
+FROM knowledge_workspaces kw
+JOIN index_builds ib ON ib.id = kw.active_index_build_id;
+
+INSERT INTO knowledge_publication_selections(
+  publication_id, source_id, source_version_id, parsed_artifact_id
+)
+SELECT
+  'legacy-publication:' || kw.id || ':' || kw.index_generation,
+  selection.source_id,
+  selection.source_version_id,
+  selection.parsed_artifact_id
+FROM knowledge_workspaces kw
+JOIN index_build_selections selection ON selection.index_build_id = kw.active_index_build_id;
+
+ALTER TABLE knowledge_workspaces ADD COLUMN active_knowledge_publication_id TEXT
+  REFERENCES knowledge_publications(id);
+UPDATE knowledge_workspaces
+SET active_knowledge_publication_id = 'legacy-publication:' || id || ':' || index_generation
+WHERE active_index_build_id IS NOT NULL;
+`,
+  },
 ];
 
 function readUserVersion(db: MigrationDatabase): number {

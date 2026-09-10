@@ -21,7 +21,7 @@ class SnapshotDatabase implements KnowledgeDatabase {
   close(): void { return; }
   pragma(source: string): unknown {
     if (source === "integrity_check") return "ok";
-    if (source === "user_version") return 7;
+    if (source === "user_version") return 8;
     return undefined;
   }
   prepare(sql: string): SqliteStatement {
@@ -87,7 +87,7 @@ async function writeBackup(
   const manifest: KnowledgeBackupManifest = {
     formatVersion: 1,
     createdAt: "2026-09-09T08:00:00.000Z",
-    schemaVersion: 7,
+    schemaVersion: 8,
     database: { path: "knowledge.sqlite", size: database.byteLength, sha256: sha(database) },
     blobs: blobEntry ? [blobEntry] : [],
     artifacts: artifactEntry ? [artifactEntry] : [],
@@ -113,7 +113,7 @@ describe("KnowledgeRestore", () => {
 
     const result = await restore.restore(fixture.backup, target);
 
-    expect(result).toMatchObject({ schemaVersion: 7, blobCount: 1, artifactCount: 0, evidenceCount: 0 });
+    expect(result).toMatchObject({ schemaVersion: 8, blobCount: 1, artifactCount: 0, evidenceCount: 0 });
     expect(await readFile(path.join(target, "knowledge.sqlite"), "utf8")).toBe("sqlite snapshot bytes");
     expect(await readFile(path.join(target, "blobs/sha256", blobHash))).toEqual(raw);
     expect(JSON.parse(await readFile(path.join(target, "restore-source-manifest.json"), "utf8"))).toEqual(fixture.manifest);

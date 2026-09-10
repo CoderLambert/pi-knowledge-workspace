@@ -68,6 +68,13 @@ describe("Knowledge database migrations", () => {
     expect(pinMigration).toContain("lease_expires_at");
     expect(pinMigration).toContain("ON DELETE CASCADE");
     expect(pinMigration).toContain("index_build_pins_build_expiry_idx");
+
+    const reliableKnowledgeMigration = db.execLog.find((sql) => sql.includes("knowledge_publications")) ?? "";
+    expect(reliableKnowledgeMigration).toContain("parser_fingerprint");
+    expect(reliableKnowledgeMigration).toContain("interpretation_config_sha256");
+    expect(reliableKnowledgeMigration).toContain("index_build_selections");
+    expect(reliableKnowledgeMigration).toContain("active_knowledge_publication_id");
+    expect(reliableKnowledgeMigration).toContain("active_publication_migration_guard");
     expect(db.execLog.at(-1)).toBe("COMMIT");
   });
 
@@ -83,6 +90,7 @@ describe("Knowledge database migrations", () => {
     expect(db.execLog.some((sql) => sql.includes("lease_expires_at"))).toBe(true);
     expect(db.execLog.some((sql) => sql.includes("index_publication_migration_guard"))).toBe(true);
     expect(db.execLog.some((sql) => sql.includes("CREATE TABLE index_build_pins"))).toBe(true);
+    expect(db.execLog.some((sql) => sql.includes("knowledge_publications"))).toBe(true);
   });
 
   it("is idempotent when the database is already current", () => {
@@ -110,6 +118,7 @@ describe("Knowledge database migrations", () => {
       [4, "lease_expires_at", 5],
       [5, "index_publication_migration_guard", 6],
       [6, "CREATE TABLE index_build_pins", 7],
+      [7, "reliable_knowledge_migration_guard", 8],
     ];
     for (const [version, failOn, migration] of cases) {
       const db = new FakeDatabase();

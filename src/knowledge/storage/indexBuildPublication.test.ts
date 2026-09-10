@@ -34,6 +34,8 @@ function build(overrides: Record<string, unknown> = {}): Record<string, unknown>
     status: "staging",
     base_generation: 0,
     base_active_build_id: null,
+    base_publication_id: null,
+    retrieval_config_revision: "fts5-baseline-v1",
     created_at: NOW,
     validated_at: null,
     published_at: null,
@@ -45,6 +47,7 @@ function publisher(db: ScriptedDatabase): IndexBuildPublisher {
   return new IndexBuildPublisher(db, {
     now: () => new Date(NOW),
     createId: () => "build-b",
+    createPublicationId: () => "publication-b",
   });
 }
 
@@ -52,8 +55,8 @@ describe("IndexBuildPublisher", () => {
   it("creates staging work from the exact active-build generation snapshot", () => {
     const db = new ScriptedDatabase();
     db.getRows = [
-      { index_generation: 7, active_index_build_id: "build-a" },
-      build({ base_generation: 7, base_active_build_id: "build-a" }),
+      { index_generation: 7, active_index_build_id: "build-a", active_knowledge_publication_id: "publication-a" },
+      build({ base_generation: 7, base_active_build_id: "build-a", base_publication_id: "publication-a" }),
     ];
 
     const result = publisher(db).createStaging("kw-1", "fts5-v1");
@@ -78,9 +81,9 @@ describe("IndexBuildPublisher", () => {
   it("publishes by CAS on generation and previous active build, then retains the old build", () => {
     const db = new ScriptedDatabase();
     db.getRows = [
-      build({ status: "validated", base_generation: 4, base_active_build_id: "build-a", validated_at: NOW }),
-      { index_generation: 4, active_index_build_id: "build-a" },
-      build({ status: "active", base_generation: 4, base_active_build_id: "build-a", validated_at: NOW, published_at: NOW }),
+      build({ status: "validated", base_generation: 4, base_active_build_id: "build-a", base_publication_id: "publication-a", validated_at: NOW }),
+      { index_generation: 4, active_index_build_id: "build-a", active_knowledge_publication_id: "publication-a" },
+      build({ status: "active", base_generation: 4, base_active_build_id: "build-a", base_publication_id: "publication-a", validated_at: NOW, published_at: NOW }),
     ];
     db.runRows = [
       { changes: 1, lastInsertRowid: 0 },
@@ -94,6 +97,9 @@ describe("IndexBuildPublisher", () => {
     const workspaceCas = db.sqlLog.find((sql) => sql.includes("SET active_index_build_id")) ?? "";
     expect(workspaceCas).toContain("index_generation=?");
     expect(workspaceCas).toContain("active_index_build_id IS NULL");
+    expect(workspaceCas).toContain("active_knowledge_publication_id IS NULL");
+    expect(db.sqlLog.some((sql) => sql.includes("INSERT INTO knowledge_publications"))).toBe(true);
+    expect(db.sqlLog.some((sql) => sql.includes("INSERT INTO knowledge_publication_selections"))).toBe(true);
     expect(db.sqlLog.some((sql) => sql.includes("status='retained'"))).toBe(true);
     expect(db.execLog).toEqual(["BEGIN IMMEDIATE", "COMMIT"]);
   });
@@ -101,8 +107,8 @@ describe("IndexBuildPublisher", () => {
   it("rejects an out-of-order build after another rebuild advances the generation", () => {
     const db = new ScriptedDatabase();
     db.getRows = [
-      build({ id: "build-c", status: "validated", base_generation: 4, base_active_build_id: "build-a", validated_at: NOW }),
-      { index_generation: 5, active_index_build_id: "build-b" },
+      build({ id: "build-c", status: "validated", base_generation: 4, base_active_build_id: "build-a", base_publication_id: "publication-a", validated_at: NOW }),
+      { index_generation: 5, active_index_build_id: "build-b", active_knowledge_publication_id: "publication-b" },
     ];
 
     expect(() => publisher(db).publish("build-c")).toThrow(IndexBuildPublicationConflictError);
@@ -114,9 +120,13 @@ describe("IndexBuildPublisher", () => {
     const db = new ScriptedDatabase();
     db.getRows = [
       build({ status: "validated", validated_at: NOW }),
-      { index_generation: 0, active_index_build_id: null },
+      { index_generation: 0, active_index_build_id: null, active_knowledge_publication_id: null },
     ];
-    db.runRows = [{ changes: 0, lastInsertRowid: 0 }];
+    db.runRows = [
+      { changes: 1, lastInsertRowid: 0 },
+      { changes: 1, lastInsertRowid: 0 },
+      { changes: 0, lastInsertRowid: 0 },
+    ];
 
     expect(() => publisher(db).publish("build-b")).toThrow(/compare-and-swap race/);
     expect(db.execLog).toEqual(["BEGIN IMMEDIATE", "ROLLBACK"]);
@@ -125,7 +135,7 @@ describe("IndexBuildPublisher", () => {
   it("returns the Workspace active build without interpreting latest-created as active", () => {
     const db = new ScriptedDatabase();
     db.getRows = [
-      { index_generation: 9, active_index_build_id: "build-z" },
+      { index_generation: 9, active_index_build_id: "build-z", active_knowledge_publication_id: "publication-z" },
       build({ id: "build-z", status: "active", base_generation: 8, published_at: NOW }),
     ];
 

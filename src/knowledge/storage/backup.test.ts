@@ -17,7 +17,7 @@ class SnapshotDatabase implements KnowledgeDatabase {
   constructor(
     private readonly blobRows: unknown[],
     private readonly artifactRows: unknown[],
-    private readonly schemaVersion = 7,
+    private readonly schemaVersion = 8,
   ) {}
   exec(): void { return; }
   close(): void { this.closed = true; }
@@ -71,7 +71,7 @@ describe("KnowledgeBackupCreator", () => {
     const manifest = await creator.create(output);
 
     expect(manifest.formatVersion).toBe(1);
-    expect(manifest.schemaVersion).toBe(7);
+    expect(manifest.schemaVersion).toBe(8);
     expect(manifest.blobs).toHaveLength(1);
     expect(manifest.blobs[0]?.contentSha256).toBe(written.hash);
     expect(manifest.artifacts[0]).toMatchObject({ parsedArtifactId: "artifact-1", sourceVersionId: "sv-1", canonicalTextSha256: HASH_A });

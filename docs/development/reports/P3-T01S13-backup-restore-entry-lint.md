@@ -1,6 +1,6 @@
 # P3-T01S13 — Backup / Restore Entry Production Lint
 
-Status: **PARTIAL — CI evidence pending**
+Status: **PASS**
 
 Date: 2026-09-10
 
@@ -31,18 +31,22 @@ Targeted inherited findings: **10**.
 
 No backup format, restore format, schema, canonical identity, retrieval behavior or CLI argument contract is intentionally changed.
 
-## Risk split
+## Verification evidence
 
-`src/knowledge/storage/restore.ts` still has a larger set of production lint findings. It is intentionally excluded from S13 because its manifest validation, historical Evidence verification and atomic restore behavior deserve an independently reviewable slice rather than being bundled only to maximize lint-count throughput.
-
-## Expected verification
+GitHub CI run `34438125327` confirmed:
 
 ```text
 npm run typecheck → PASS
 ESLint 201 → 191
 ```
 
-Focused backup/restore tests should retain existing behavior.
+All ten task-owned findings are closed. The CI workflow remains red only because 191 inherited repository-wide ESLint findings remain and lint stops `npm run verify` before later knip/test/build steps.
+
+P2 FTS Evidence run `34438125322` and P2 Lexical Evidence run `34438125323` both succeeded on the same head.
+
+## Risk split
+
+`src/knowledge/storage/restore.ts` still has a larger set of production lint findings. It is intentionally excluded from S13 because its manifest validation, historical Evidence verification and atomic restore behavior deserve an independently reviewable slice rather than being bundled only to maximize lint-count throughput.
 
 ## Scope exclusions
 

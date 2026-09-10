@@ -10,6 +10,8 @@ export interface IndexBuildRecord {
   status: string;
   baseGeneration: number;
   baseActiveBuildId: string | null;
+  basePublicationId: string | null;
+  retrievalConfigRevision: string;
   createdAt: string;
   validatedAt: string | null;
   publishedAt: string | null;
@@ -18,6 +20,11 @@ export interface IndexBuildRecord {
 export interface IndexBuildPublisherOptions {
   now?: () => Date;
   createId?: () => string;
+  createPublicationId?: () => string;
+}
+
+export interface IndexBuildCandidateOptions {
+  retrievalConfigRevision?: string;
 }
 
 export class IndexBuildPublicationConflictError extends Error {}
@@ -25,15 +32,25 @@ export class IndexBuildPublicationConflictError extends Error {}
 export class IndexBuildPublisher {
   private readonly now: () => Date;
   private readonly createId: () => string;
+  private readonly createPublicationId: () => string;
 
   constructor(private readonly db: KnowledgeDatabase, options: IndexBuildPublisherOptions = {}) {
     this.now = options.now ?? (() => new Date());
     this.createId = options.createId ?? randomUUID;
+    this.createPublicationId = options.createPublicationId ?? randomUUID;
   }
 
-  createStaging(knowledgeWorkspaceId: string, strategy: string): IndexBuildRecord {
+  createStaging(
+    knowledgeWorkspaceId: string,
+    strategy: string,
+    options: IndexBuildCandidateOptions = {},
+  ): IndexBuildRecord {
     const workspaceId = nonEmpty(knowledgeWorkspaceId, "knowledgeWorkspaceId");
     const normalizedStrategy = nonEmpty(strategy, "strategy");
+    const retrievalConfigRevision = nonEmpty(
+      options.retrievalConfigRevision ?? "fts5-baseline-v1",
+      "retrievalConfigRevision",
+    );
     return withTransaction(this.db, () => {
       const workspace = workspaceState(this.db, workspaceId);
       const id = this.createId();
@@ -41,9 +58,19 @@ export class IndexBuildPublisher {
       this.db.prepare(
         `INSERT INTO index_builds
          (id, knowledge_workspace_id, strategy, status, created_at, completed_at,
-          base_generation, base_active_build_id, validated_at, published_at)
-         VALUES (?, ?, ?, 'staging', ?, NULL, ?, ?, NULL, NULL)`,
-      ).run(id, workspaceId, normalizedStrategy, createdAt, workspace.generation, workspace.activeBuildId);
+          base_generation, base_active_build_id, base_publication_id,
+          retrieval_config_revision, validated_at, published_at)
+         VALUES (?, ?, ?, 'staging', ?, NULL, ?, ?, ?, ?, NULL, NULL)`,
+      ).run(
+        id,
+        workspaceId,
+        normalizedStrategy,
+        createdAt,
+        workspace.generation,
+        workspace.activeBuildId,
+        workspace.activePublicationId,
+        retrievalConfigRevision,
+      );
       return this.get(id);
     });
   }
@@ -53,7 +80,54 @@ export class IndexBuildPublisher {
     const at = this.now().toISOString();
     const update = this.db.prepare(
       `UPDATE index_builds SET status='validated', validated_at=?
-       WHERE id=? AND status='staging'`,
+       WHERE id=? AND status='staging'
+         AND EXISTS (
+           SELECT 1 FROM index_build_selections selection
+           WHERE selection.index_build_id=index_builds.id
+         )
+         AND NOT EXISTS (
+           SELECT 1
+           FROM index_build_selections selection
+           JOIN source_versions version ON version.id=selection.source_version_id
+           JOIN sources source ON source.id=selection.source_id
+           JOIN parsed_artifacts artifact ON artifact.id=selection.parsed_artifact_id
+           WHERE selection.index_build_id=index_builds.id
+             AND (
+               version.source_id<>selection.source_id
+               OR artifact.source_version_id<>selection.source_version_id
+               OR source.knowledge_workspace_id<>index_builds.knowledge_workspace_id
+             )
+         )
+         AND NOT EXISTS (
+           SELECT 1
+           FROM index_build_selections selection
+           WHERE selection.index_build_id=index_builds.id
+             AND NOT EXISTS (
+               SELECT 1 FROM chunks chunk
+               WHERE chunk.index_build_id=selection.index_build_id
+                 AND chunk.source_version_id=selection.source_version_id
+                 AND chunk.parsed_artifact_id=selection.parsed_artifact_id
+             )
+             AND NOT EXISTS (
+               SELECT 1 FROM parsed_artifacts artifact
+               WHERE artifact.id=selection.parsed_artifact_id
+                 AND artifact.canonical_bytes IS NOT NULL
+                 AND length(artifact.canonical_bytes)=0
+             )
+         )
+         AND NOT EXISTS (
+           SELECT 1
+           FROM chunks chunk
+           JOIN source_versions sv ON sv.id=chunk.source_version_id
+           WHERE chunk.index_build_id=index_builds.id
+             AND NOT EXISTS (
+               SELECT 1 FROM index_build_selections selection
+               WHERE selection.index_build_id=chunk.index_build_id
+                 AND selection.source_id=sv.source_id
+                 AND selection.source_version_id=chunk.source_version_id
+                 AND selection.parsed_artifact_id=chunk.parsed_artifact_id
+             )
+         )`,
     ).run(at, id);
     one(update.changes, `IndexBuild ${id} cannot be validated from its current state`);
     return this.get(id);
@@ -65,17 +139,57 @@ export class IndexBuildPublisher {
       const build = this.get(id);
       if (build.status !== "validated") throw new Error(`IndexBuild ${id} must be validated before publication`);
       const workspace = workspaceState(this.db, build.knowledgeWorkspaceId);
-      if (workspace.generation !== build.baseGeneration || workspace.activeBuildId !== build.baseActiveBuildId) {
+      if (
+        workspace.generation !== build.baseGeneration
+        || workspace.activeBuildId !== build.baseActiveBuildId
+        || workspace.activePublicationId !== build.basePublicationId
+      ) {
         throw new IndexBuildPublicationConflictError(`IndexBuild ${id} was built from a stale publication generation`);
       }
 
       const publishedAt = this.now().toISOString();
+      const publicationId = nonEmpty(this.createPublicationId(), "publicationId");
+      const nextGeneration = build.baseGeneration + 1;
+      if (!Number.isSafeInteger(nextGeneration)) {
+        throw new IndexBuildPublicationConflictError("Knowledge publication generation is exhausted");
+      }
+      this.db.prepare(
+        `INSERT INTO knowledge_publications
+         (id, knowledge_workspace_id, generation, index_build_id, retrieval_config_revision, published_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).run(
+        publicationId,
+        build.knowledgeWorkspaceId,
+        nextGeneration,
+        id,
+        build.retrievalConfigRevision,
+        publishedAt,
+      );
+      const selectionInsert = this.db.prepare(
+        `INSERT INTO knowledge_publication_selections
+         (publication_id, source_id, source_version_id, parsed_artifact_id)
+         SELECT ?, source_id, source_version_id, parsed_artifact_id
+         FROM index_build_selections
+         WHERE index_build_id=?`,
+      ).run(publicationId, id);
+      one(selectionInsert.changes, `IndexBuild ${id} has no complete canonical selection`, false);
+
       const workspaceUpdate = this.db.prepare(
         `UPDATE knowledge_workspaces
-         SET active_index_build_id=?, index_generation=index_generation+1
+         SET active_index_build_id=?, active_knowledge_publication_id=?, index_generation=index_generation+1
          WHERE id=? AND index_generation=?
-           AND ((active_index_build_id IS NULL AND ? IS NULL) OR active_index_build_id=?)`,
-      ).run(id, build.knowledgeWorkspaceId, build.baseGeneration, build.baseActiveBuildId, build.baseActiveBuildId);
+           AND ((active_index_build_id IS NULL AND ? IS NULL) OR active_index_build_id=?)
+           AND ((active_knowledge_publication_id IS NULL AND ? IS NULL) OR active_knowledge_publication_id=?)`,
+      ).run(
+        id,
+        publicationId,
+        build.knowledgeWorkspaceId,
+        build.baseGeneration,
+        build.baseActiveBuildId,
+        build.baseActiveBuildId,
+        build.basePublicationId,
+        build.basePublicationId,
+      );
       one(workspaceUpdate.changes, `IndexBuild ${id} publication lost compare-and-swap race`);
 
       const buildUpdate = this.db.prepare(
@@ -103,7 +217,8 @@ export class IndexBuildPublisher {
     const id = nonEmpty(buildId, "buildId");
     const row = this.db.prepare(
       `SELECT id, knowledge_workspace_id, strategy, status, base_generation,
-              base_active_build_id, created_at, validated_at, published_at
+              base_active_build_id, base_publication_id, retrieval_config_revision,
+              created_at, validated_at, published_at
        FROM index_builds WHERE id=?`,
     ).get(id);
     if (row === undefined) throw new Error(`Unknown IndexBuild: ${id}`);
@@ -111,9 +226,14 @@ export class IndexBuildPublisher {
   }
 }
 
-function workspaceState(db: KnowledgeDatabase, workspaceId: string): { generation: number; activeBuildId: string | null } {
+function workspaceState(db: KnowledgeDatabase, workspaceId: string): {
+  generation: number;
+  activeBuildId: string | null;
+  activePublicationId: string | null;
+} {
   const raw = db.prepare(
-    `SELECT index_generation, active_index_build_id FROM knowledge_workspaces WHERE id=?`,
+    `SELECT index_generation, active_index_build_id, active_knowledge_publication_id
+     FROM knowledge_workspaces WHERE id=?`,
   ).get(workspaceId);
   if (raw === undefined) throw new Error(`Unknown Knowledge Workspace: ${workspaceId}`);
   const row = recordValue(raw, "Knowledge Workspace index state");
@@ -122,9 +242,19 @@ function workspaceState(db: KnowledgeDatabase, workspaceId: string): { generatio
     throw new Error("Workspace index generation is invalid");
   }
   const active = row["active_index_build_id"];
-  if (active === null) return { generation, activeBuildId: null };
+  const activePublication = row["active_knowledge_publication_id"];
+  const activePublicationId = nullableValue(activePublication, "Workspace active Knowledge publication");
+  if (active === null) {
+    if (activePublicationId !== null || generation !== 0) {
+      throw new Error("Workspace Knowledge publication state is inconsistent");
+    }
+    return { generation, activeBuildId: null, activePublicationId };
+  }
   if (typeof active !== "string" || active.length === 0) throw new Error("Workspace active IndexBuild is invalid");
-  return { generation, activeBuildId: active };
+  if (activePublicationId === null || generation === 0) {
+    throw new Error("Workspace Knowledge publication state is inconsistent");
+  }
+  return { generation, activeBuildId: active, activePublicationId };
 }
 
 function mapBuild(row: unknown): IndexBuildRecord {
@@ -136,6 +266,8 @@ function mapBuild(row: unknown): IndexBuildRecord {
     status: str(r, "status"),
     baseGeneration: integer(r, "base_generation"),
     baseActiveBuildId: nullable(r, "base_active_build_id"),
+    basePublicationId: nullable(r, "base_publication_id"),
+    retrievalConfigRevision: str(r, "retrieval_config_revision"),
     createdAt: str(r, "created_at"),
     validatedAt: nullable(r, "validated_at"),
     publishedAt: nullable(r, "published_at"),
@@ -147,8 +279,11 @@ function nonEmpty(value: string, name: string): string {
   if (normalized.length === 0) throw new TypeError(`${name} must be non-empty`);
   return normalized;
 }
-function one(changes: number | bigint, message: string): void {
-  if (Number(changes) !== 1) throw new IndexBuildPublicationConflictError(message);
+function one(changes: number | bigint, message: string, exactlyOne = true): void {
+  const count = Number(changes);
+  if ((exactlyOne && count !== 1) || (!exactlyOne && count < 1)) {
+    throw new IndexBuildPublicationConflictError(message);
+  }
 }
 function str(row: Record<string, unknown>, key: string): string {
   const value = row[key];
@@ -159,6 +294,11 @@ function nullable(row: Record<string, unknown>, key: string): string | null {
   const value = row[key];
   if (value === null) return null;
   if (typeof value !== "string" || value.length === 0) throw new Error(`${key} is invalid`);
+  return value;
+}
+function nullableValue(value: unknown, label: string): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string" || value.length === 0) throw new Error(`${label} is invalid`);
   return value;
 }
 function integer(row: Record<string, unknown>, key: string): number {

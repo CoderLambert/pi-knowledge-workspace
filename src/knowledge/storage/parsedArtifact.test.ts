@@ -88,6 +88,23 @@ describe("ParsedArtifact canonicalization", () => {
     expect(otherVersion.artifactHash).not.toBe(first.artifactHash);
   });
 
+  it("changes immutable identity for every material interpretation input", () => {
+    const bytes = Buffer.from("same interpretation input\n", "utf8");
+    const baseline = canonicalizeParsedArtifact("sv-a", bytes, "txt");
+    const parser = canonicalizeParsedArtifact("sv-a", bytes, "txt", { parserFingerprint: "parser-v2" });
+    const normalization = canonicalizeParsedArtifact("sv-a", bytes, "txt", {
+      normalizationFingerprint: "normalization-v2",
+    });
+    const schema = canonicalizeParsedArtifact("sv-a", bytes, "txt", { documentSchemaVersion: 2 });
+    const config = canonicalizeParsedArtifact("sv-a", bytes, "txt", {
+      interpretationConfigRevision: "config-v2",
+    });
+
+    expect(new Set([baseline, parser, normalization, schema, config].map((artifact) => artifact.artifactHash)).size).toBe(5);
+    expect(config.canonicalTextSha256).toBe(baseline.canonicalTextSha256);
+    expect(config.interpretationConfigSha256).not.toBe(baseline.interpretationConfigSha256);
+  });
+
   it("reads only the immutable SourceVersion blob and verifies its identity", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "pi-knowledge-parsed-artifact-"));
     tempDirs.push(root);

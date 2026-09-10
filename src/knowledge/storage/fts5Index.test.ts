@@ -14,7 +14,7 @@ interface PreparedCall {
 class FakeKnowledgeDatabase implements KnowledgeDatabase {
   readonly execLog: string[] = [];
   readonly prepared: PreparedCall[] = [];
-  authorityResult: unknown = { id: "build-1" };
+  authorityResult: unknown = { id: "build-1", source_id: "source-1" };
   searchRows: unknown[] = [];
 
   exec(sql: string): void {

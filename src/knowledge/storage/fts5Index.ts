@@ -45,13 +45,14 @@ export class Fts5BaselineIndex {
 
     const authority = this.db
       .prepare(`
-SELECT ib.id
+SELECT ib.id, s.id AS source_id
 FROM index_builds ib
 JOIN parsed_artifacts pa ON pa.id = ?
 JOIN source_versions sv ON sv.id = pa.source_version_id
 JOIN sources s ON s.id = sv.source_id
 WHERE ib.id = ?
   AND ib.knowledge_workspace_id = ?
+  AND ib.status = 'staging'
   AND sv.id = ?
   AND s.knowledge_workspace_id = ?
 `)
@@ -63,19 +64,38 @@ WHERE ib.id = ?
         input.knowledgeWorkspaceId,
       );
     if (authority === undefined) {
-      throw new Error("IndexBuild, ParsedArtifact and SourceVersion do not belong to the requested Knowledge Workspace");
+      throw new Error("Staging IndexBuild, ParsedArtifact and SourceVersion do not belong to the requested Knowledge Workspace");
     }
+    const sourceId = authoritySourceId(authority);
 
     const createdAt = input.createdAt ?? new Date().toISOString();
     if (!Number.isFinite(Date.parse(createdAt))) throw new TypeError("createdAt must be an ISO-compatible timestamp");
 
     withTransaction(this.db, () => {
       this.db
+        .prepare(`DELETE FROM chunk_fts
+                  WHERE index_build_id = ?
+                    AND source_version_id IN (SELECT id FROM source_versions WHERE source_id = ?)`)
+        .run(input.indexBuildId, sourceId);
+      this.db
+        .prepare(`DELETE FROM chunks
+                  WHERE index_build_id = ?
+                    AND source_version_id IN (SELECT id FROM source_versions WHERE source_id = ?)`)
+        .run(input.indexBuildId, sourceId);
+      this.db
         .prepare("DELETE FROM chunk_fts WHERE index_build_id = ? AND parsed_artifact_id = ?")
         .run(input.indexBuildId, input.parsedArtifactId);
       this.db
         .prepare("DELETE FROM chunks WHERE index_build_id = ? AND parsed_artifact_id = ?")
         .run(input.indexBuildId, input.parsedArtifactId);
+
+      this.db.prepare(`
+INSERT INTO index_build_selections(index_build_id, source_id, source_version_id, parsed_artifact_id)
+VALUES (?, ?, ?, ?)
+ON CONFLICT(index_build_id, source_id) DO UPDATE SET
+  source_version_id = excluded.source_version_id,
+  parsed_artifact_id = excluded.parsed_artifact_id
+`).run(input.indexBuildId, sourceId, input.sourceVersionId, input.parsedArtifactId);
 
       const insertChunk = this.db.prepare(`
 INSERT INTO chunks (
@@ -154,6 +174,15 @@ LIMIT ?
 
     return statement.all(...params).map(parseSearchHit);
   }
+}
+
+function authoritySourceId(value: unknown): string {
+  const row = recordValue(value, "FTS5 indexing authority row");
+  const sourceId = row["source_id"];
+  if (typeof sourceId !== "string" || sourceId.length === 0) {
+    throw new Error("FTS5 indexing authority returned an invalid Source identity");
+  }
+  return sourceId;
 }
 
 function stableChunkId(indexBuildId: string, parsedArtifactId: string, chunk: StructureAwareChunk): string {

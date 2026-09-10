@@ -1,6 +1,6 @@
 # P3-T01S19 — Worker / Import Test-Harness Lint
 
-Status: **PARTIAL**
+Status: **PASS**
 
 ## Purpose
 
@@ -18,7 +18,7 @@ Support documentation:
 - this report;
 - `docs/development/verification/P3-T01S19-worker-import-test-harness-lint.md`.
 
-Authoritative CI at the parent checkpoint reported 23 inherited findings in these two files:
+Authoritative parent CI reported 23 inherited findings in these two files:
 
 ```text
 importJobs.test.ts  11
@@ -35,7 +35,7 @@ No production code, ADR, schema, retrieval configuration, P2 evaluation data/evi
 - replace nullable-string truthiness with explicit undefined narrowing;
 - stringify numeric fixture identifiers before template interpolation;
 - replace unnecessary `async` test doubles with explicit resolved/rejected Promises;
-- replace the in-flight cancellation non-null assignment pattern with an explicitly initialized optional fixture reference;
+- replace the in-flight cancellation non-null assignment pattern with an explicit holder;
 - replace the interrupted-job non-null assertion with fail-fast fixture narrowing.
 
 ### Worker test harness
@@ -45,7 +45,7 @@ No production code, ADR, schema, retrieval configuration, P2 evaluation data/evi
 - make the fake store extend `DurableJobStore` so the worker receives a nominally valid store without type assertions;
 - model the one-shot claim-race injection with explicit fake-store state instead of method reassignment/type assertion;
 - replace unnecessary async handlers with explicit `Promise.resolve` handlers;
-- add the required `override` modifiers to fake-store methods that intentionally override `DurableJobStore` methods.
+- add required `override` modifiers and remove the redundant constructor exposed by the stricter type/lint rules.
 
 ## Contract preservation
 
@@ -63,21 +63,35 @@ The test scenarios remain the same:
 
 The task does not alter production worker/import semantics and does not reopen ADR-029.
 
-## Verification state
+## Verification evidence
 
-Initial GitHub CI run `34443652575` on head `517cf46dc525bad026fb255d0aca633c39987748` failed during `npm run typecheck` before lint. The failure was task-owned and isolated to `workerLoop.test.ts`: seven methods on `FakeStore extends DurableJobStore` required explicit `override` modifiers under the repository TypeScript configuration.
-
-That defect was corrected in commit `1d8eabe9359e84f2ebd7d0cee17e8a8b698d2b08` without changing test scenarios or production code. P2 FTS Evidence run `34443652562` and P2 Lexical Evidence run `34443652553` both passed on the initial S19 head; no frozen evidence/configuration changed.
-
-A follow-up CI run has not yet been published for the corrected head at the time of this report update. Until CI proves typecheck remains green and the 23 task-owned lint findings are removed without new task-owned failures, task status remains **PARTIAL**.
-
-Expected inherited repository lint endpoint if all targeted findings close cleanly:
+Initial CI exposed task-owned type/lint interactions and they were corrected within this same bounded task. Final production/test code head:
 
 ```text
-100 → 77
+a1a07c2b0c408e1043d419c7c8ba789efd8afb5c
 ```
 
-Any remaining repository failures outside the two task files must be classified against the inherited baseline rather than pulled into this scope.
+GitHub CI run `34446070579` confirmed:
+
+```text
+npm run typecheck → PASS
+ESLint 100 → 77
+```
+
+Neither `src/knowledge/storage/importJobs.test.ts` nor `src/knowledge/storage/workerLoop.test.ts` appears in the final authoritative ESLint output. The remaining 77 findings are inherited baseline outside S19 scope; CI remains globally red because `npm run verify` stops at repository lint before knip/full tests.
+
+Frozen P2 regression workflows passed on the same final code head:
+
+```text
+P2 FTS Evidence     34446070590 → PASS
+P2 Lexical Evidence 34446070612 → PASS
+```
+
+No frozen evidence, evaluation inputs, thresholds, retrieval configuration, or benchmark tuning changed.
+
+## Status decision
+
+**PASS.** All 23 task-owned inherited lint findings are closed, typecheck is green, the frozen P2 regression workflows are green, and no user-local acceptance is required for this static/test-harness task.
 
 ## Git discipline
 

@@ -61,14 +61,30 @@ No production source, schema, migration, ADR-029, P2 corpus/query/label/evidence
 
 ## Verification state
 
-Status remains **PARTIAL** until GitHub CI establishes:
+Initial GitHub CI run `34468104382` on head `6d36b4238c04c22272eeeaa3c05775c3250ae0b0` established:
+
+```text
+npm run typecheck → PASS
+ESLint 53 → 45
+```
+
+Eight of the nine task-owned findings closed. One S23-owned `@typescript-eslint/dot-notation` finding remained in the new backup-capability predicate at `evidenceDurability.e2e.test.ts:562` (`db["backup"]`). This is task-owned implementation debt, not inherited baseline. It was corrected on follow-up commit `337b7ded98af1d3979af6561622ea6c72ae3a54d` by using dot notation after the explicit `"backup" in db` capability guard.
+
+The same initial head passed both frozen regression workflows:
+
+```text
+P2 FTS Evidence     34468104461 → PASS
+P2 Lexical Evidence 34468104433 → PASS
+```
+
+Status remains **PARTIAL** until follow-up GitHub CI proves:
 
 ```text
 npm run typecheck → PASS
 ESLint 53 → 44
 ```
 
-The task-owned test file must disappear from authoritative lint output. Because the harness exercises storage/retrieval durability, any path-triggered P2 FTS/Lexical workflows must remain PASS.
+The task-owned test file must disappear from authoritative lint output. Any remaining 44 findings are expected to be inherited outside this slice; they must not be pulled into S23 merely to make global CI green.
 
 ## Git discipline
 

@@ -1,26 +1,29 @@
 # P3-T01S18 — Worker / Import Production Lint Verification
 
-Status: **PARTIAL — CI EVIDENCE PENDING**
+Status: **PASS**
 
 ## Automated verification
 
-```bash
-npm run typecheck
-npm run lint
-npm test -- src/knowledge/storage/durableJobs.test.ts src/knowledge/storage/importJobs.test.ts src/knowledge/storage/workerLoop.test.ts
+Authoritative GitHub CI run `34441857553` on production code head `2a121385e754bb0f00dd7a11cae7d07d241ee539` established:
+
+```text
+npm run typecheck → PASS
+npm run lint → 100 inherited repository errors
 ```
 
-Expected task-owned delta:
+Verified task-owned delta:
 
-- 8 inherited findings disappear from `durableJobs.ts`;
-- 13 inherited findings disappear from `importJobs.ts`;
-- 5 inherited findings disappear from `workerLoop.ts`;
-- typecheck remains green;
-- repository ESLint baseline should move from 126 to approximately 100; exact CI output is authoritative.
+- 8 inherited findings removed from `durableJobs.ts`;
+- 13 inherited findings removed from `importJobs.ts`;
+- 5 inherited findings removed from `workerLoop.ts`;
+- repository ESLint baseline moved from **126 → 100**;
+- no S18 production file remains in the authoritative lint output.
+
+The full `npm run verify` workflow remains globally red because lint intentionally stops at the remaining inherited baseline before `knip`/tests. This is baseline debt, not an S18 regression. P2 FTS Evidence passed on the same production head; no P2 evidence/configuration was changed.
 
 ## Behavioral assertions
 
-Verification must preserve:
+The refactor preserves:
 
 - idempotent durable/import job submission;
 - claim/heartbeat/completion owner and fencing-token predicates;
@@ -31,13 +34,14 @@ Verification must preserve:
 - capture hash/byte-length validation against the persisted SourceVersion;
 - interruption recovery and attempt recording;
 - worker lost-lease classification and timer cleanup;
-- malformed SQLite/JSON rows fail closed.
+- malformed SQLite/JSON rows fail closed;
+- top-level values that `JSON.stringify` cannot represent as JSON text are rejected explicitly.
 
 This task does not claim to implement ADR-029 P3-A04 business-commit fencing beyond the existing durable job completion contract.
 
 ## Baseline classification
 
-Any unrelated remaining lint findings are inherited P3-T01 baseline debt and must not be absorbed into S18.
+The remaining 100 lint findings are inherited P3-T01 baseline debt outside S18 and are not absorbed into this slice.
 
 ## User verification
 

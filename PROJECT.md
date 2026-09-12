@@ -1,90 +1,137 @@
-# Pi Knowledge Learning Workspace
+# Pi Knowledge System
 
-> Thin fork of `jmfederico/pi-web` for a local-first Coding + Knowledge + Learning workspace.
+> Local-first knowledge workflows built on Obsidian + Codex + Git, with an optional evidence/provenance core for workflows that require stronger historical guarantees.
 
 ## Product direction
 
-This repository keeps PI WEB as the coding/workspace foundation and adds first-party knowledge capabilities without moving RAG, indexing, or learning workflows into PI WEB core.
+The project no longer aims to become a complete Knowledge Workspace inside a PI WEB fork.
+
+The preferred architecture is:
 
 ```text
-PI WEB fork
-├─ Coding Chat / Files / Terminal / Git     upstream-first
-├─ Knowledge UI                             ours
-└─ Course UI                                ours, V1.1+
+Obsidian
+├─ human knowledge UI
+├─ Markdown vault
+├─ properties / backlinks / navigation
+└─ focused plugins only when needed
         │
         ▼
-pi-knowledge
-├─ Sources / snapshots
-├─ Parsing
-├─ Retrieval
+Codex
+├─ knowledge workflows
+├─ file refactoring / linking / summarization
+├─ scripts / tools / Git
+└─ automation rules from AGENTS.md
+        │
+        ▼
+Git
+├─ diff
+├─ history
+├─ rollback
+└─ review
+        │
+        ▼
+optional pi-knowledge evidence core
+├─ immutable SourceVersion
+├─ ParsedArtifact identity
 ├─ Stable Evidence
-├─ Restricted Knowledge Ask
-├─ Notes / revisions
-└─ Jobs / recovery
+├─ frozen GenerationRun scope
+├─ DeliveredEvidence
+├─ Answer / Citation lineage
+└─ durable lifecycle safety
 ```
-
-## V1 promise
-
-> Import selected technical documents, find evidence, ask questions against fixed source versions, and save traceable answers as editable notes.
-
-```text
-Markdown / TXT / selected workspace file
-→ immutable source snapshot
-→ parsed artifact
-→ retrieval
-→ stable evidence
-→ restricted Knowledge Ask
-→ answer revision
-→ saved note
-→ edit / reopen / Markdown export
-```
-
-## V1 scope
-
-### Must
-
-- Markdown / TXT / explicit workspace-file import
-- immutable source snapshots and manual update
-- stable parsed artifacts and evidence
-- retrieval baseline and evaluation
-- `knowledge_search`, `knowledge_read`, `knowledge_sources`
-- restricted Knowledge Ask session
-- deterministic citation integrity checks
-- notes with immutable revisions and conflict protection
-- jobs, retry/cancel/recovery, atomic index publication
-- migrations and backup/restore
-
-### Later
-
-- PDF / URL import
-- automatic semantic checker
-- reranker
-- Course generation
-- quiz / flashcards / learning progress
-- source watchers
-- multi-user / RBAC / cloud sync
-
-## Non-goals
-
-V1 does not promise zero hallucination, absolute truth, automatic complete knowledge coverage, cross-machine aggregated retrieval, or multi-tenant isolation.
-
-## Core architectural rules
-
-1. **Thin Fork** — keep upstream PI WEB behavior intact unless the product requires a first-party integration point.
-2. **Knowledge is not Agent memory** — authoritative knowledge state lives outside Pi sessions.
-3. **Stable evidence, rebuildable indexes** — citations never depend only on current chunk IDs.
-4. **Restricted Ask is separate from Coding Chat** — knowledge Q&A does not inherit shell/write/arbitrary-network capabilities.
-5. **Reliability before feature breadth** — retry, recovery, migration, backup, versioning and evaluation are V1 correctness requirements.
-6. **Benchmark retrieval** — FTS / Dense / Hybrid are evaluated; Hybrid is not assumed by architecture.
-7. **Course waits for V1.1** — first prove reliable evidence and useful grounded Q&A.
-
-## Development status
-
-Current state: **Conditional Go → bounded implementation spike**.
 
 See:
 
-- `docs/architecture/BASELINE-V0.3.md`
-- `docs/development/PHASES.md`
-- `docs/UPSTREAM.md`
-- `docs/architecture/ADR-027-thin-fork.md`
+- `docs/architecture/ADR-030-obsidian-codex-pivot.md`
+- `docs/development/OBSIDIAN-CODEX-MIGRATION.md`
+
+## Product promise
+
+For normal knowledge work:
+
+> Capture information as durable Markdown, let Codex organize and transform it through reviewable file changes, and keep the knowledge base directly usable in Obsidian without requiring a custom service.
+
+For provenance-sensitive work:
+
+> Opt into immutable source/evidence tracking so historical citations and model-delivered evidence remain reproducible across source updates and index rebuilds.
+
+## Default workflow
+
+```text
+RSS / web / files / manual notes
+→ Vault Inbox
+→ Codex normalize / classify / link
+→ Obsidian knowledge graph / projects / reviews
+→ Git history
+```
+
+Optional evidence path:
+
+```text
+external immutable source
+→ SourceVersion
+→ ParsedArtifact
+→ Stable Evidence
+→ frozen generation
+→ DeliveredEvidence
+→ answer + citation lineage
+```
+
+## What the project owns
+
+### First-party
+
+- Vault conventions and templates;
+- Codex operating rules and reusable workflows;
+- ingestion/normalization/linking/review automation;
+- provenance metadata conventions;
+- optional headless evidence-core contracts and implementation;
+- focused Obsidian plugins only where file/workflow primitives are insufficient.
+
+### Platform responsibilities
+
+- Obsidian owns the primary human workspace UI;
+- Codex owns the general agent/automation runtime;
+- Git owns normal text history, diff, rollback, and review.
+
+## What is no longer a product goal
+
+- maintaining a full Knowledge Workspace UI in PI WEB;
+- duplicating Obsidian editing, files, backlinks, tags, graph, or note navigation;
+- building a custom note editor/revision UI;
+- making custom retrieval infrastructure mandatory for normal Vault use;
+- adding Course UI before file-based learning workflows prove a concrete UI gap;
+- Knowledge-specific Machine/Fleet integration;
+- multi-user SaaS, RBAC, or multi-tenant hosting unless deliberately reintroduced later.
+
+## Retained differentiated semantics
+
+The existing Knowledge work remains valuable where it guarantees properties not provided by ordinary Markdown + Git:
+
+1. immutable external source versions;
+2. versioned ParsedArtifact interpretation identity;
+3. Stable Evidence independent of retrieval chunk identity;
+4. historical Evidence reopening;
+5. atomic publication and stale-candidate rejection;
+6. frozen generation scope;
+7. DeliveredEvidence provenance;
+8. Answer/Citation lineage and deterministic integrity checks;
+9. durable worker fencing, recovery, and archive/purge distinction.
+
+These should be extracted behind a headless boundary rather than carried forward as justification for a custom workspace shell.
+
+## Development status
+
+Current state: **Architecture pivot accepted; migration inventory complete; Vault-native baseline is the next implementation target.**
+
+Execution order:
+
+```text
+M0 freeze workspace-surface expansion
+→ M1 build Vault template + AGENTS.md
+→ M2 prove Codex workflows
+→ M3 extract optional evidence core
+→ M4 archive PI WEB fork maintenance
+```
+
+Do not delete or mechanically rewrite existing Knowledge implementation before M3 extraction acceptance. Preserve repository history and verification evidence while the new boundary is proven.
